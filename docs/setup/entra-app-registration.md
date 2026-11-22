@@ -1,0 +1,83 @@
+# Entra ID app registration
+
+HAmmond uses FastMCP's OAuth proxy (`AzureProvider`): Claude talks OAuth 2.1 + dynamic
+client registration to HAmmond, HAmmond signs the user in at Entra ID with one fixed app
+registration. (Connecting claude.ai directly to Entra does not work today because Entra
+does not support dynamic client registration, tracked as claude.ai MCP issue #506.)
+
+You need: an Entra tenant where you can register applications and grant admin consent.
+
+## 1. Register the application
+
+Entra admin center → **Identity → Applications → App registrations → New registration**
+
+| Field | Value |
+| --- | --- |
+| Name | `HAmmond MCP` |
+| Supported account types | **Accounts in this organizational directory only** (single tenant) |
+| Redirect URI | platform **Web**, `https://<public-host>/auth/callback` |
+
+Note **Application (client) ID** and **Directory (tenant) ID** from the Overview page
+→ `.env`: `HAMMOND_ENTRA_CLIENT_ID`, `HAMMOND_ENTRA_TENANT_ID`.
+
+For local tests you can add a second Web redirect URI `http://localhost:8000/auth/callback`.
+
+## 2. Use v2 access tokens
+
+**Manifest** → set `"requestedAccessTokenVersion": 2` (in the `api` section of the new
+manifest format, `accessTokenAcceptedVersion` in the old one) → Save.
+FastMCP validates the v2 issuer `https://login.microsoftonline.com/<tenant-id>/v2.0`.
+
+## 3. Expose an API scope
+
+**Expose an API** → Application ID URI → **Add** → keep `api://<client-id>` → Save.
+**Add a scope**:
+
+| Field | Value |
+| --- | --- |
+| Scope name | `mcp.access` (must match `HAMMOND_ENTRA_REQUIRED_SCOPES`) |
+| Who can consent | Admins only |
+| Admin consent display name | `Access HAmmond MCP` |
+| State | Enabled |
+
+## 4. API permissions
+
+**API permissions** → Microsoft Graph, delegated: `openid`, `profile`, `email`,
+`offline_access` (keep `User.Read`). Add your own API → `mcp.access`.
+Then **Grant admin consent for <tenant>**.
+
+## 5. Client secret
+
+**Certificates & secrets → New client secret**, expiry max. 12 months (put a renewal
+reminder in your calendar). Copy the *Value* → `.env`: `HAMMOND_ENTRA_CLIENT_SECRET`.
+`chmod 600 .env`. Never paste the secret into chats, issues or commits.
+
+## 6. App roles and assignment (used from phase 1a.3, create now)
+
+**App roles → Create app role** (allowed member types: *Users/Groups*):
+
+| Display name | Value | Purpose |
+| --- | --- | --- |
+| HAmmond Admin | `HAmmond.Admin` | administration, all data |
+| HAmmond Reader | `HAmmond.Reader` | read catalog and data views |
+
+**Enterprise applications → HAmmond MCP → Properties → Assignment required? = Yes**
+(only assigned users can sign in), then **Users and groups → Add user/group** and assign
+yourself the `HAmmond.Admin` role. The `whoami` tool shows the roles from the token.
+
+## 7. Recommended hardening
+
+- Conditional Access policy for the app: MFA, compliant/known devices or named locations.
+- Sign-in logs of the enterprise app are the second audit trail next to HAmmond's audit.
+
+## `.env` summary
+
+```dotenv
+HAMMOND_AUTH_MODE=entra
+HAMMOND_BASE_URL=https://<public-host>
+HAMMOND_ENTRA_TENANT_ID=<tenant-id>
+HAMMOND_ENTRA_CLIENT_ID=<client-id>
+HAMMOND_ENTRA_CLIENT_SECRET=<secret value>
+HAMMOND_ENTRA_REQUIRED_SCOPES=mcp.access
+HAMMOND_JWT_SIGNING_KEY=<openssl rand -hex 32>
+```
