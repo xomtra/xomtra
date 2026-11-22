@@ -28,7 +28,7 @@ REQUIRED_EXTENSIONS = ("ducklake", "postgres", "httpfs")
 LAKE_ALIAS = "lake"
 
 
-def _sql_literal(value: str) -> str:
+def sql_literal(value: str) -> str:
     """Quote a value as a SQL string literal."""
     return "'" + value.replace("'", "''") + "'"
 
@@ -121,13 +121,13 @@ def secret_sql(settings: LakeSettings) -> str:
     return (
         "CREATE OR REPLACE TEMPORARY SECRET hammond_s3 ("
         "TYPE s3, "
-        f"KEY_ID {_sql_literal(settings.s3_access_key)}, "
-        f"SECRET {_sql_literal(settings.s3_secret_key)}, "
-        f"ENDPOINT {_sql_literal(settings.s3_endpoint)}, "
-        f"REGION {_sql_literal(settings.s3_region)}, "
+        f"KEY_ID {sql_literal(settings.s3_access_key)}, "
+        f"SECRET {sql_literal(settings.s3_secret_key)}, "
+        f"ENDPOINT {sql_literal(settings.s3_endpoint)}, "
+        f"REGION {sql_literal(settings.s3_region)}, "
         "URL_STYLE 'path', "
         f"USE_SSL {'true' if settings.s3_use_ssl else 'false'}, "
-        f"SCOPE {_sql_literal(f's3://{settings.s3_bucket}')})"
+        f"SCOPE {sql_literal(f's3://{settings.s3_bucket}')})"
     )
 
 
@@ -135,8 +135,8 @@ def attach_sql(settings: LakeSettings, alias: str = LAKE_ALIAS) -> str:
     # Data inlining is disabled: all rows go to object storage, so that access control
     # on storage prefixes (phase 2) covers all data, not only larger inserts.
     return (
-        f"ATTACH {_sql_literal('ducklake:postgres:' + settings.catalog_dsn)} AS {alias} "
-        f"(DATA_PATH {_sql_literal(settings.data_path)}, DATA_INLINING_ROW_LIMIT 0)"
+        f"ATTACH {sql_literal('ducklake:postgres:' + settings.catalog_dsn)} AS {alias} "
+        f"(DATA_PATH {sql_literal(settings.data_path)}, DATA_INLINING_ROW_LIMIT 0)"
     )
 
 
@@ -147,10 +147,37 @@ def connect(settings: LakeSettings, *, alias: str = LAKE_ALIAS) -> duckdb.DuckDB
         config["extension_directory"] = settings.extension_dir
     con = duckdb.connect(config=config)
     try:
+        # Timestamps are stored and compared in UTC regardless of the host time zone.
+        con.execute("SET TimeZone = 'UTC'")
         for ext in REQUIRED_EXTENSIONS:
             con.load_extension(ext)
         con.execute(secret_sql(settings))
         con.execute(attach_sql(settings, alias))
+    except Exception:
+        con.close()
+        raise
+    return con
+
+
+def connect_local(
+    catalog_path: str,
+    data_path: str,
+    *,
+    alias: str = LAKE_ALIAS,
+    extension_dir: str | None = None,
+) -> duckdb.DuckDBPyConnection:
+    """DuckLake with a local DuckDB catalog and local data files (tests, development)."""
+    config: dict[str, Any] = {"autoinstall_known_extensions": False}
+    if extension_dir:
+        config["extension_directory"] = extension_dir
+    con = duckdb.connect(config=config)
+    try:
+        con.execute("SET TimeZone = 'UTC'")
+        con.load_extension("ducklake")
+        con.execute(
+            f"ATTACH {sql_literal('ducklake:' + catalog_path)} AS {alias} "
+            f"(DATA_PATH {sql_literal(data_path)}, DATA_INLINING_ROW_LIMIT 0)"
+        )
     except Exception:
         con.close()
         raise
