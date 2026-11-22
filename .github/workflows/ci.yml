@@ -136,9 +136,12 @@ jobs:
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" image \
               --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$image"
           done
-      - name: Validate Caddyfile
+      - name: Validate Caddyfile (with the runtime hardening of compose.yaml)
+        # cap_drop ALL + no-new-privileges: exec fails with EPERM if the binary carries
+        # file capabilities, which the plain `docker run` default would hide.
         run: |
-          docker run --rm -e HAMMOND_PUBLIC_HOST -e ACME_EMAIL -e CLAUDE_IP_RANGES \
+          docker run --rm --cap-drop ALL --security-opt no-new-privileges --read-only \
+            -e HAMMOND_PUBLIC_HOST -e ACME_EMAIL -e CLAUDE_IP_RANGES \
             hammond-caddy:ci caddy adapt --config /etc/caddy/Caddyfile >/dev/null
       - name: Smoke test compose stack (Postgres + SeaweedFS + DuckLake + MCP)
         working-directory: deploy/compose

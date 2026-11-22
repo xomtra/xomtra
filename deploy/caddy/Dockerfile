@@ -16,7 +16,13 @@ FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20f
 LABEL org.opencontainers.image.source="https://github.com/zettabyte-cz/hammond" \
       org.opencontainers.image.description="HAmmond reverse proxy (Caddy + DNS-01)" \
       org.opencontainers.image.licenses="Apache-2.0"
+# The upstream image sets cap_net_bind_service on /usr/bin/caddy. A binary with file
+# capabilities cannot be executed under compose's cap_drop: [ALL] (EPERM on exec), and
+# Caddy listens on unprivileged ports anyway. Copying over the existing file would keep
+# its capability xattr, so the upstream binary is removed first. CI starts the image
+# with cap_drop ALL to catch regressions.
 RUN apk upgrade --no-cache \
+ && rm -f /usr/bin/caddy \
  && addgroup -S -g 10002 caddy \
  && adduser -S -D -H -u 10002 -G caddy caddy \
  && mkdir -p /data /config \
