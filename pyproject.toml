@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "HAmmond development workspace (not published)"
 requires-python = ">=3.13"
 license = "Apache-2.0"
-dependencies = ["hacore", "hammond-mcp"]
+dependencies = ["hacore", "hammond-ingest", "hammond-mcp"]
 
 [dependency-groups]
 dev = [
@@ -18,11 +18,17 @@ dev = [
 [tool.uv]
 package = false
 
+# SQLMesh still declares duckdb<2; the lake runs on DuckDB 2 (DuckLake catalog format
+# of the deployed stack). The SQLMesh integration test in services/ingest guards this
+# override (ADR 031).
+override-dependencies = ["duckdb>=2.0"]
+
 [tool.uv.workspace]
 members = ["packages/*", "services/*"]
 
 [tool.uv.sources]
 hacore = { workspace = true }
+hammond-ingest = { workspace = true }
 hammond-mcp = { workspace = true }
 
 [tool.ruff]
@@ -40,15 +46,18 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["hacore", "hammond_mcp"]
+known-first-party = ["hacore", "hammond_ingest", "hammond_mcp"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101", "S104", "S105", "S106", "PLR2004", "PLC0415"]
+"**/tests/**" = ["S101", "S104", "S105", "S106", "S608", "PLR2004", "PLC0415", "ASYNC109", "ASYNC110"]
+# SQL built from internal identifiers (schema/table constants) and values quoted with
+# hacore.lake.sql_literal; DuckDB cannot bind identifiers or ATTACH/read_json options.
+"packages/hacore/src/hacore/{bronze,maintenance,recorder}.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["packages/hacore/src", "services/mcp-server/src"]
+files = ["packages/hacore/src", "services/mcp-server/src", "services/ingest/src"]
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
@@ -58,9 +67,10 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = ["packages/hacore/tests", "services/mcp-server/tests"]
+testpaths = ["packages/hacore/tests", "services/mcp-server/tests", "services/ingest/tests"]
 addopts = "--import-mode=importlib -ra"
+markers = ["contract: needs a real Home Assistant (HAMMOND_CONTRACT_HA_URL)"]
 
 [tool.coverage.run]
-source = ["hacore", "hammond_mcp"]
+source = ["hacore", "hammond_ingest", "hammond_mcp"]
 branch = true
