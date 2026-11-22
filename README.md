@@ -5,16 +5,17 @@ into a queryable data platform and exposes it to AI assistants (e.g. Claude) thr
 [Model Context Protocol](https://modelcontextprotocol.io/), with identity and roles from
 Microsoft Entra ID.
 
-> **Status:** early development (phase 1a.1 – foundations and the OAuth proof of concept).
+> **Status:** early development (phase 1a.2 – data ingest: backfill, live stream, bronze/silver).
 > Nothing here is production ready yet. APIs, layout and configuration will change.
 
 ## Repository layout
 
 | Path | Contents |
 | --- | --- |
-| `packages/hacore` | Core library: Home Assistant WebSocket client, registries, DuckLake access |
+| `packages/hacore` | Core library: Home Assistant WebSocket client, registries, history/statistics, bronze layer in DuckLake, live stream, recorder backup import |
 | `services/mcp-server` | MCP server (FastMCP) with OAuth proxy to Entra ID |
-| `deploy/compose` | Docker Compose stack: Caddy + MCP server + Postgres (DuckLake catalog) + SeaweedFS (S3) |
+| `services/ingest` | Ingest service: live stream, Dagster jobs and schedules, SQLMesh models (bronze → silver) |
+| `deploy/compose` | Docker Compose stack: Caddy + MCP server + ingest + Postgres (DuckLake catalog, Dagster/SQLMesh state) + SeaweedFS (S3) |
 | `deploy/caddy` | Caddy image (TLS via ACME DNS-01) and Caddyfile with the public access rules |
 | `deploy/vm` | Bootstrap script for the Debian 13 host VM |
 | `docs/setup` | Step-by-step guides (Entra app registration, host VM, Claude connector) |
@@ -27,6 +28,11 @@ Requirements: [uv](https://docs.astral.sh/uv/), Docker with Compose v2.
 uv sync                      # create .venv with all workspace packages + dev tools
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run pytest
+
+# Contract tests against a real Home Assistant in a container (see the CI `contract` job)
+docker run -d --name ha -p 127.0.0.1:8123:8123 \
+  -v "$PWD/packages/hacore/tests/contract/ha-config:/config" homeassistant/home-assistant:stable
+HAMMOND_CONTRACT_HA_URL=http://127.0.0.1:8123 uv run pytest -m contract
 
 cp deploy/compose/.env.example deploy/compose/.env   # then edit the values
 docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.dev.yaml up -d --build
