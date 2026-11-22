@@ -1,6 +1,6 @@
-# HAmmond stack: Postgres (DuckLake catalog) + SeaweedFS (S3) + MCP server.
+# HAmmond stack: Caddy (TLS) + MCP server + Postgres (DuckLake catalog) + SeaweedFS (S3).
 # Usage: cp .env.example .env && edit && docker compose up -d
-# Only the MCP server is published, and by default only on 127.0.0.1.
+# Only Caddy is published (HTTPS); the MCP server is reachable only through it.
 
 name: hammond
 
@@ -97,8 +97,6 @@ services:
       HAMMOND_JWT_SIGNING_KEY: ${HAMMOND_JWT_SIGNING_KEY:-}
       HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
       HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
-    ports:
-      - "${HAMMOND_MCP_BIND:-127.0.0.1}:${HAMMOND_MCP_PORT:-8000}:8000"
     volumes:
       - mcp-data:/data
     read_only: true
@@ -108,7 +106,29 @@ services:
       ducklake-init: { condition: service_completed_successfully }
     networks: [backend, frontend]
 
+  caddy:
+    <<: *hardening
+    image: ${HAMMOND_CADDY_IMAGE:-ghcr.io/zettabyte-cz/hammond-caddy:main}
+    environment:
+      HAMMOND_PUBLIC_HOST: ${HAMMOND_PUBLIC_HOST:?set HAMMOND_PUBLIC_HOST in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN in .env}
+      CLAUDE_IP_RANGES: ${CLAUDE_IP_RANGES:?set CLAUDE_IP_RANGES in .env}
+    ports:
+      - "${HAMMOND_HTTPS_BIND:-0.0.0.0}:443:8443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      mcp: { condition: service_healthy }
+    networks: [frontend]
+
 volumes:
+  caddy-data:
+  caddy-config:
   postgres-data:
   seaweedfs-data:
   mcp-data:

@@ -2,10 +2,10 @@
 
 Order for the proof of concept "Claude connector authenticated by Entra ID":
 
-1. [Host VM](homelab-vm.md) – Debian 13 VM on Proxmox in its own VLAN, Docker.
+1. [Host VM](homelab-vm.md) – Debian 13 VM on Proxmox in the DMZ VLAN, Docker.
 2. [Entra ID app registration](entra-app-registration.md) – app, API scope, secret, app roles.
 3. Deploy the compose stack (`deploy/compose`, see the VM guide).
-4. [Claude connector](claude-connector.md) – expose the server and add it in claude.ai.
+4. [Claude connector](claude-connector.md) – DNS, port forward, Caddy/TLS and the connector in claude.ai.
 
 Placeholders used in all guides: `<public-host>` (public DNS name of the MCP server),
-`<tenant-id>`, `<client-id>`. Keep real values in `.env` only, never in the repository.
+`<public-ip>`, `<dmz-cidr>`, `<tenant-id>`, `<client-id>`. Keep real values in `.env` only, never in the repository.

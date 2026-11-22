@@ -8,3 +8,10 @@ services:
     image: hammond-mcp:dev
   mcp:
     image: hammond-mcp:dev
+    # Direct access for local tests, loopback only.
+    ports:
+      - "127.0.0.1:8000:8000"
+  caddy:
+    build:
+      context: ../caddy
+    image: hammond-caddy:dev

@@ -2,18 +2,23 @@
 
 ## 1. Network
 
-Create a dedicated VLAN for HAmmond on the router/firewall and allow only:
+Put the VM into a DMZ VLAN (`<dmz-cidr>`) whose default policy towards the internal
+networks is **deny**. The VM is the only Internet-facing service of HAmmond, so a
+compromise must not reach the rest of the home network. Rules:
 
 | From | To | Port | Why |
 | --- | --- | --- | --- |
-| HAmmond VLAN | Internet | 443/tcp | Entra ID, GHCR images, Claude, Tailscale |
-| HAmmond VLAN | Home Assistant | 8123/tcp | WebSocket API |
-| HAmmond VLAN | DNS/NTP servers | 53, 123 | |
-| Admin network | HAmmond VM | 22/tcp | SSH |
+| Internet | VM (port forward) | 443/tcp | Caddy: Claude's servers + your browser during sign-in |
+| DMZ (VM only) | Home Assistant | 8123/tcp | WebSocket API |
+| DMZ | Internet | 443/tcp | Entra ID, Let's Encrypt, Cloudflare API, GHCR |
+| DMZ | DNS/NTP servers | 53, 123 | |
+| Admin network | VM | 22/tcp | SSH |
 
-Everything else between VLANs: deny. Inbound from the Internet stays closed in phase
-1a.1/1a.2 (the PoC is reached through Tailscale Funnel, see the connector guide); the
-port forward restricted to Anthropic's IP ranges comes in iteration 1a.3.
+Everything else from the DMZ to internal VLANs: deny. Do not forward port 80 (certificates
+use the DNS-01 challenge). The port forward has to accept any source address because
+the OAuth sign-in steps run in your browser; Caddy restricts everything else to Claude's
+IP ranges (see the connector guide). Enable IPS/geo filtering on the router if you have
+it.
 
 ## 2. Create the VM in Proxmox
 
@@ -25,7 +30,7 @@ Debian 13 netinst ISO, then **Create VM**:
 | CPU | 4 vCPU, type `host` |
 | Memory | 8 GiB (no ballooning below 6 GiB) |
 | Disk | 64 GiB, VirtIO SCSI single, `discard=on`, `ssd=1`, `iothread=1` |
-| Network | VirtIO, bridge with **VLAN tag** of the HAmmond VLAN, Proxmox firewall on |
+| Network | VirtIO, bridge with **VLAN tag** of the DMZ VLAN, Proxmox firewall on |
 | Options | QEMU guest agent enabled, start at boot |
 
 Install Debian: SSH server + standard system utilities only (no desktop), create your
@@ -37,7 +42,7 @@ Include the VM in your Proxmox Backup Server job.
 ```bash
 scp deploy/vm/bootstrap-debian13.sh <admin>@<vm>:
 ssh <admin>@<vm>
-sudo ADMIN_CIDR=<admin-network-cidr> INSTALL_TAILSCALE=1 ./bootstrap-debian13.sh
+sudo ADMIN_CIDR=<admin-network-cidr> ./bootstrap-debian13.sh
 ```
 
 The script installs Docker Engine + Compose, hardens SSH (keys only, no root), enables
@@ -51,8 +56,8 @@ sudo cp -r deploy/compose/* /opt/hammond/
 sudo cp deploy/compose/.env.example /opt/hammond/.env
 sudo chmod 600 /opt/hammond/.env && sudoedit /opt/hammond/.env   # fill in all values
 cd /opt/hammond && sudo docker compose pull && sudo docker compose up -d
-sudo docker compose ps        # ducklake-init: exited (0), mcp: healthy
-curl -fsS http://127.0.0.1:8000/healthz
+sudo docker compose ps        # ducklake-init: exited (0), mcp: healthy, caddy: up
+sudo docker compose logs caddy | grep -i certificate   # certificate obtained
 ```
 
 Verify the image signature before the first deployment (see README, `cosign verify`) and

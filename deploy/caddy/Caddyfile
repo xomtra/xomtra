@@ -1,0 +1,62 @@
+# HAmmond public entry point.
+#
+# Required environment:
+#   HAMMOND_PUBLIC_HOST   public DNS name, e.g. mcp.example.org
+#   ACME_EMAIL            contact for Let's Encrypt
+#   CLOUDFLARE_API_TOKEN  token with Zone:DNS:Edit on that zone only
+#   CLAUDE_IP_RANGES      space separated CIDRs Claude's servers connect from
+#                         (see docs/setup/claude-connector.md)
+#
+# Access model:
+#   - OAuth browser steps (/authorize, /consent, /auth/callback) come from the user's own
+#     device and are reachable from anywhere; they only start or finish an Entra sign-in.
+#   - Everything else (MCP endpoint, token/registration endpoints, metadata) is called by
+#     Claude's servers and is accepted only from CLAUDE_IP_RANGES.
+{
+	admin off
+	email {$ACME_EMAIL}
+	http_port 8080
+	https_port 8443
+	auto_https disable_redirects
+}
+
+{$HAMMOND_PUBLIC_HOST} {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+		resolvers 1.1.1.1 1.0.0.1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+
+	@browser path /authorize /consent /auth/callback
+	handle @browser {
+		reverse_proxy mcp:8000
+	}
+
+	@internal path /healthz
+	handle @internal {
+		respond 404
+	}
+
+	@claude remote_ip {$CLAUDE_IP_RANGES}
+	handle @claude {
+		reverse_proxy mcp:8000 {
+			# MCP streamable HTTP uses SSE responses: do not buffer.
+			flush_interval -1
+		}
+	}
+
+	handle {
+		respond 403
+	}
+}
