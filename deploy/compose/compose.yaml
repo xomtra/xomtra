@@ -1,6 +1,8 @@
-# HAmmond stack: Caddy (TLS) + MCP server + Postgres (DuckLake catalog) + SeaweedFS (S3).
+# HAmmond stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
+# + Postgres (DuckLake catalog, Dagster and SQLMesh state) + SeaweedFS (S3).
 # Usage: cp .env.example .env && edit && docker compose up -d
-# Only Caddy is published (HTTPS); the MCP server is reachable only through it.
+# Only Caddy is published (HTTPS); the MCP server is reachable only through it. The
+# Dagster UI is published on loopback only (SSH tunnel, see docs/setup/ingest.md).
 
 name: hammond
 
@@ -13,6 +15,20 @@ x-lake-env: &lake-env
   HAMMOND_S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env}
   HAMMOND_S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env}
   HAMMOND_S3_BUCKET: ${S3_BUCKET:-hammond}
+
+x-ops-env: &ops-env
+  HAMMOND_OPS_PG_HOST: postgres
+  HAMMOND_OPS_PG_USER: ${OPS_PG_USER:-hammond_ops}
+  HAMMOND_OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
+  HAMMOND_DAGSTER_PG_DB: ${DAGSTER_PG_DB:-dagster}
+  HAMMOND_SQLMESH_PG_DB: ${SQLMESH_PG_DB:-sqlmesh}
+
+x-ingest-env: &ingest-env
+  <<: [*lake-env, *ops-env]
+  HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
+  HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
+  HAMMOND_RETENTION_DAYS: ${HAMMOND_RETENTION_DAYS:-365}
+  HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
 
 x-hardening: &hardening
   restart: unless-stopped
@@ -33,12 +49,35 @@ services:
       DUCKLAKE_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./postgres/10-ducklake.sh:/docker-entrypoint-initdb.d/10-ducklake.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 10
+    networks: [backend]
+
+  postgres-init:
+    image: postgres:17-trixie@sha256:223efeb196329b55b3b9a13db144956411dbc18e727e59f681c3e0aede6475cf
+    entrypoint: ["/bin/sh", "/ensure-databases.sh"]
+    user: "999:999"
+    environment:
+      PGHOST: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      DUCKLAKE_DB: ${DUCKLAKE_PG_DB:-ducklake}
+      DUCKLAKE_USER: ${DUCKLAKE_PG_USER:-ducklake}
+      DUCKLAKE_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
+      OPS_USER: ${OPS_PG_USER:-hammond_ops}
+      OPS_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
+      DAGSTER_DB: ${DAGSTER_PG_DB:-dagster}
+      SQLMESH_DB: ${SQLMESH_PG_DB:-sqlmesh}
+    volumes:
+      - ./postgres/ensure-databases.sh:/ensure-databases.sh:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     networks: [backend]
 
   seaweedfs:
@@ -76,7 +115,7 @@ services:
     entrypoint: ["python", "-m", "hacore.lake", "init"]
     environment: *lake-env
     depends_on:
-      postgres: { condition: service_healthy }
+      postgres-init: { condition: service_completed_successfully }
       seaweedfs-init: { condition: service_completed_successfully }
     restart: "no"
     read_only: true
@@ -106,6 +145,68 @@ services:
       ducklake-init: { condition: service_completed_successfully }
     networks: [backend, frontend]
 
+  # Live state_changed stream with catch-up (writes bronze.ha_states continuously).
+  ingest-stream:
+    <<: *hardening
+    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:main}
+    command: ["hammond-ingest", "stream"]
+    environment: *ingest-env
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    healthcheck:
+      # The heartbeat file is touched after every flush (default every 30 s).
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/hammond-stream.heartbeat') < 180 else 1)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    depends_on:
+      ducklake-init: { condition: service_completed_successfully }
+    networks: [backend, egress]
+
+  # Runs the schedules and the queued runs of all Dagster jobs (ingest, SQLMesh,
+  # retention). Runs execute in this container.
+  dagster-daemon:
+    <<: *hardening
+    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:main}
+    command: ["dagster-daemon", "run", "-w", "/app/dagster/workspace.yaml"]
+    environment: *ingest-env
+    volumes:
+      - ingest-data:/data
+      # Copies of recorder databases from backups to import (docs/setup/ingest.md).
+      - ${HAMMOND_IMPORT_DIR:-./import}:/import
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    depends_on:
+      ducklake-init: { condition: service_completed_successfully }
+    networks: [backend, egress]
+
+  # Dagster UI, loopback only: ssh -L 3000:127.0.0.1:3000 <vm>
+  dagster-webserver:
+    <<: *hardening
+    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:main}
+    command:
+      ["dagster-webserver", "-h", "0.0.0.0", "-p", "3000", "-w", "/app/dagster/workspace.yaml"]
+    environment: *ingest-env
+    ports:
+      - "${HAMMOND_DAGSTER_BIND:-127.0.0.1}:3000:3000"
+    volumes:
+      - ingest-data:/data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/server_info', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      ducklake-init: { condition: service_completed_successfully }
+    networks: [backend, egress]
+
   caddy:
     <<: *hardening
     image: ${HAMMOND_CADDY_IMAGE:-ghcr.io/zettabyte-cz/hammond-caddy:main}
@@ -132,8 +233,12 @@ volumes:
   postgres-data:
   seaweedfs-data:
   mcp-data:
+  ingest-data:
 
 networks:
   backend:
     internal: true
   frontend:
+  # Outbound for ingest (Home Assistant on the LAN) and the loopback-published
+  # Dagster UI; kept apart from the public frontend.
+  egress:

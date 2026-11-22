@@ -15,3 +15,12 @@ services:
     build:
       context: ../caddy
     image: hammond-caddy:dev
+  ingest-stream:
+    build:
+      context: ../..
+      dockerfile: services/ingest/Dockerfile
+    image: hammond-ingest:dev
+  dagster-daemon:
+    image: hammond-ingest:dev
+  dagster-webserver:
+    image: hammond-ingest:dev
