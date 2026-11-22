@@ -5,7 +5,12 @@
 
 FROM caddy:2.11.9-builder@sha256:f9beaa5ddbe7df6f26ebbcf9cbf44e05a1917b9bba464f0c3229038d7e2e6e13 AS build
 ARG CADDY_DNS_PLUGIN=github.com/caddy-dns/cloudflare@v0.2.4
-RUN xcaddy build --with "${CADDY_DNS_PLUGIN}"
+# Security floors for transitive Go modules ahead of the next Caddy release
+# (Trivy image scan). Drop an entry once Caddy ships the fixed version itself.
+ARG GO_MODULE_FLOORS="golang.org/x/net@v0.62.0"
+RUN set -eu; extra=""; \
+    for m in ${GO_MODULE_FLOORS}; do extra="$extra --replace ${m%@*}=$m"; done; \
+    xcaddy build --with "${CADDY_DNS_PLUGIN}" $extra
 
 FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
 LABEL org.opencontainers.image.source="https://github.com/zettabyte-cz/hammond" \

@@ -1,24 +1,31 @@
 # Host VM (Proxmox, Debian 13)
 
-## 1. Network
+The VM is the only Internet-facing part of HAmmond. It goes into an **existing DMZ
+network** (`<dmz-cidr>`) that is isolated from the internal networks by the router; no
+new VLAN is needed. Placeholders: `<vm-ip>` (static address of the VM in the DMZ),
+`<ha-ip>` (Home Assistant), `<admin-cidr>` (network you administer from).
 
-Put the VM into a DMZ VLAN (`<dmz-cidr>`) whose default policy towards the internal
-networks is **deny**. The VM is the only Internet-facing service of HAmmond, so a
-compromise must not reach the rest of the home network. Rules:
+## 1. Router / firewall rules
 
-| From | To | Port | Why |
-| --- | --- | --- | --- |
-| Internet | VM (port forward) | 443/tcp | Caddy: Claude's servers + your browser during sign-in |
-| DMZ (VM only) | Home Assistant | 8123/tcp | WebSocket API |
-| DMZ | Internet | 443/tcp | Entra ID, Let's Encrypt, Cloudflare API, GHCR |
-| DMZ | DNS/NTP servers | 53, 123 | |
-| Admin network | VM | 22/tcp | SSH |
+Assumed baseline of the DMZ: traffic DMZ → internal is blocked by default, only return
+traffic of connections opened from internal networks is allowed. Add or check:
 
-Everything else from the DMZ to internal VLANs: deny. Do not forward port 80 (certificates
-use the DNS-01 challenge). The port forward has to accept any source address because
-the OAuth sign-in steps run in your browser; Caddy restricts everything else to Claude's
-IP ranges (see the connector guide). Enable IPS/geo filtering on the router if you have
-it.
+| # | From | To | Protocol / port | Purpose |
+| --- | --- | --- | --- | --- |
+| 1 | DMZ `<vm-ip>` | internal `<ha-ip>` | TCP 8123 | Home Assistant WebSocket API |
+| 2 | admin network `<admin-cidr>` | DMZ `<vm-ip>` | TCP 22 | SSH |
+| 3 | WAN | `<vm-ip>` | TCP 443 (port forward) | Caddy: Claude's servers and your browser during sign-in |
+| 4 | DMZ `<vm-ip>` | Internet | TCP 443, UDP/TCP 53, UDP 123 | Entra ID, Let's Encrypt, Cloudflare API, GHCR, DNS, NTP |
+
+Rule 1 must sit above the DMZ → internal block rule. Do **not** create a reverse
+("return") rule for the SSH rule: answers to your SSH session are already covered by the
+return-traffic rule, and a reverse rule would let the VM open connections into the
+internal network on its own.
+
+Port forward: only TCP 443, no port 80 (certificates use the DNS-01 challenge). It has
+to accept any source address because the OAuth sign-in steps run in your browser; Caddy
+restricts everything else to Claude's IP ranges (see the [connector guide](claude-connector.md)).
+Enable IPS / geo filtering for the forward if your router supports it.
 
 ## 2. Create the VM in Proxmox
 
@@ -26,43 +33,55 @@ Debian 13 netinst ISO, then **Create VM**:
 
 | Setting | Value |
 | --- | --- |
-| Machine / BIOS | q35, OVMF (UEFI), EFI disk, no pre-enrolled keys needed |
+| Machine / BIOS | q35, OVMF (UEFI), EFI disk |
 | CPU | 4 vCPU, type `host` |
-| Memory | 8 GiB (no ballooning below 6 GiB) |
+| Memory | 8 GiB |
 | Disk | 64 GiB, VirtIO SCSI single, `discard=on`, `ssd=1`, `iothread=1` |
-| Network | VirtIO, bridge with **VLAN tag** of the DMZ VLAN, Proxmox firewall on |
+| Network | VirtIO on the bridge / VLAN tag of the **existing DMZ**, Proxmox firewall on |
 | Options | QEMU guest agent enabled, start at boot |
 
-Install Debian: SSH server + standard system utilities only (no desktop), create your
-admin user, put your SSH public key into `~/.ssh/authorized_keys`.
-Include the VM in your Proxmox Backup Server job.
+Debian installer: static address `<vm-ip>` in the DMZ (or a DHCP reservation), only
+*SSH server* and *standard system utilities* (no desktop), your admin user. Then put
+your SSH public key into `~/.ssh/authorized_keys` of that user.
+Add the VM to your Proxmox Backup Server job.
 
 ## 3. Bootstrap
 
 ```bash
-scp deploy/vm/bootstrap-debian13.sh <admin>@<vm>:
-ssh <admin>@<vm>
-sudo ADMIN_CIDR=<admin-network-cidr> ./bootstrap-debian13.sh
+scp deploy/vm/bootstrap-debian13.sh <admin>@<vm-ip>:
+ssh <admin>@<vm-ip>
+sudo ADMIN_CIDR=<admin-cidr> ./bootstrap-debian13.sh
 ```
 
-The script installs Docker Engine + Compose, hardens SSH (keys only, no root), enables
-ufw (inbound SSH from the admin network only) and unattended security upgrades.
+The script installs Docker Engine + Compose, hardens SSH (keys only, no root, only your
+user), enables ufw (inbound SSH from `<admin-cidr>` only) and unattended security
+upgrades. Ports published by Docker (443 of Caddy) bypass ufw by design; the router
+rules above decide who reaches them.
 
 ## 4. Deploy the stack
 
+Prerequisites: [Entra app registration](entra-app-registration.md), DNS record and
+Cloudflare token from the [connector guide](claude-connector.md), and the GHCR packages
+`hammond-mcp` and `hammond-caddy` set to *Public* (otherwise `docker login ghcr.io`
+with a read-only token first).
+
 ```bash
+git clone https://github.com/zettabyte-cz/hammond.git ~/hammond
 sudo install -d -m 750 /opt/hammond
-sudo cp -r deploy/compose/* /opt/hammond/
-sudo cp deploy/compose/.env.example /opt/hammond/.env
+sudo cp -r ~/hammond/deploy/compose/. /opt/hammond/
+sudo cp /opt/hammond/.env.example /opt/hammond/.env
 sudo chmod 600 /opt/hammond/.env && sudoedit /opt/hammond/.env   # fill in all values
-cd /opt/hammond && sudo docker compose pull && sudo docker compose up -d
-sudo docker compose ps        # ducklake-init: exited (0), mcp: healthy, caddy: up
-sudo docker compose logs caddy | grep -i certificate   # certificate obtained
+cd /opt/hammond
+sudo docker compose pull
+sudo docker compose up -d
+sudo docker compose ps                     # ducklake-init exited (0), mcp healthy, caddy up
+sudo docker compose logs caddy | grep -i "certificate obtained"
 ```
 
-Verify the image signature before the first deployment (see README, `cosign verify`) and
-pin `HAMMOND_MCP_IMAGE` to the verified digest. The pull agent that does this
-automatically comes in a later iteration.
+Before the first deployment verify the signatures of both images (README,
+`cosign verify`) and pin `HAMMOND_MCP_IMAGE` / `HAMMOND_CADDY_IMAGE` in `.env` to the
+verified digests. Automatic pull + verification comes in a later iteration.
 
-Home Assistant (optional for 1a.1): create a dedicated **non-admin** HA user, a
-long-lived access token for it, and set `HAMMOND_HA_URL` / `HAMMOND_HA_TOKEN`.
+Home Assistant (optional in 1a.1): create a dedicated **non-admin** HA user, a
+long-lived access token for it, and set `HAMMOND_HA_URL=http://<ha-ip>:8123` and
+`HAMMOND_HA_TOKEN` in `.env`.
