@@ -57,17 +57,20 @@ async def test_live_event_and_history_share_the_key(ha_url: str, tokens: Onboard
         current = next(s for s in await ha.get_states() if s["entity_id"] == SETPOINT)
         value = 12.3 if current["state"] != "12.3" else 13.3  # must be a real change
         await set_setpoint(ha_url, tokens.admin_token, value)
+        expected = str(value)
         async with asyncio.timeout(10):
-            while not received:
+            while not any(r.state == expected for r in received):
                 await asyncio.sleep(0.1)
-        event_row = received[0]
+        event_row = next(r for r in received if r.state == expected)
         history: list[StateRow] = []
-        async with asyncio.timeout(15):
-            while not any(r.last_updated_us == event_row.last_updated_us for r in history):
-                await asyncio.sleep(0.5)  # recorder commits asynchronously
-                history = await history_during_period(
-                    ha, start, datetime.now(UTC) + timedelta(seconds=1), [SETPOINT]
-                )
+        deadline = asyncio.get_running_loop().time() + 30
+        while not any(r.last_updated_us == event_row.last_updated_us for r in history):
+            # The recorder commits asynchronously.
+            assert asyncio.get_running_loop().time() < deadline, (event_row, history)
+            await asyncio.sleep(0.5)
+            history = await history_during_period(
+                ha, start, datetime.now(UTC) + timedelta(seconds=1), [SETPOINT]
+            )
     match = next(r for r in history if r.last_updated_us == event_row.last_updated_us)
     assert match.state == event_row.state == str(value)
     # The recorder drops "unrecorded" attributes of some integrations (input_number:
