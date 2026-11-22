@@ -28,7 +28,14 @@ FROM ${PYTHON_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/zettabyte-cz/hammond" \
       org.opencontainers.image.description="HAmmond MCP server" \
       org.opencontainers.image.licenses="Apache-2.0"
-RUN groupadd --system --gid 10001 hammond \
+# Apply Debian security updates on top of the pinned base image and drop pip/ensurepip:
+# the runtime installs nothing, and pip's vendored libraries only add scan findings.
+RUN apt-get update \
+ && apt-get -y upgrade \
+ && rm -rf /var/lib/apt/lists/* \
+ && python -m pip uninstall -y pip \
+ && rm -rf /usr/local/lib/python3.13/ensurepip /usr/local/bin/pip* \
+ && groupadd --system --gid 10001 hammond \
  && useradd --system --uid 10001 --gid hammond --home-dir /data --no-create-home hammond \
  && mkdir -p /data && chown hammond:hammond /data
 COPY --from=build /app /app

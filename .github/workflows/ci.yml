@@ -90,6 +90,18 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      HAMMOND_MCP_IMAGE: hammond-mcp:ci
+      POSTGRES_PASSWORD: ci-postgres
+      DUCKLAKE_PG_PASSWORD: ci-ducklake
+      S3_ACCESS_KEY: ci-access
+      S3_SECRET_KEY: ci-secret-key
+      # Dummy Entra values: the server must start and serve OAuth metadata.
+      HAMMOND_BASE_URL: http://127.0.0.1:8000
+      HAMMOND_ENTRA_TENANT_ID: 00000000-0000-0000-0000-000000000001
+      HAMMOND_ENTRA_CLIENT_ID: 00000000-0000-0000-0000-000000000002
+      HAMMOND_ENTRA_CLIENT_SECRET: ci-dummy
+      HAMMOND_JWT_SIGNING_KEY: ci-dummy-signing-key-at-least-32-characters
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -111,18 +123,6 @@ jobs:
             --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 hammond-mcp:ci
       - name: Smoke test compose stack (Postgres + SeaweedFS + DuckLake + MCP)
         working-directory: deploy/compose
-        env:
-          HAMMOND_MCP_IMAGE: hammond-mcp:ci
-          POSTGRES_PASSWORD: ci-postgres
-          DUCKLAKE_PG_PASSWORD: ci-ducklake
-          S3_ACCESS_KEY: ci-access
-          S3_SECRET_KEY: ci-secret-key
-          # Dummy Entra values: the server must start and serve OAuth metadata.
-          HAMMOND_BASE_URL: http://127.0.0.1:8000
-          HAMMOND_ENTRA_TENANT_ID: 00000000-0000-0000-0000-000000000001
-          HAMMOND_ENTRA_CLIENT_ID: 00000000-0000-0000-0000-000000000002
-          HAMMOND_ENTRA_CLIENT_SECRET: ci-dummy
-          HAMMOND_JWT_SIGNING_KEY: ci-dummy-signing-key-at-least-32-characters
         run: |
           docker compose up -d --wait --wait-timeout 180 mcp
           docker compose logs ducklake-init
