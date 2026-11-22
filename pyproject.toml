@@ -1,0 +1,66 @@
+[project]
+name = "hammond-workspace"
+version = "0.0.0"
+description = "HAmmond development workspace (not published)"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+dependencies = ["hacore", "hammond-mcp"]
+
+[dependency-groups]
+dev = [
+  "mypy>=1.18",
+  "pytest>=8.4",
+  "pytest-asyncio>=1.2",
+  "pytest-cov>=7.0",
+  "ruff>=0.14",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*", "services/*"]
+
+[tool.uv.sources]
+hacore = { workspace = true }
+hammond-mcp = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+  "E", "W", "F", "I", "B", "UP", "S", "ASYNC", "SIM", "RUF", "PT", "C4", "PL", "TRY", "N",
+]
+ignore = [
+  "TRY003",   # long messages in exceptions are fine
+  "PLR2004",  # magic values in comparisons
+  "PLR0913",  # many arguments in constructors
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["hacore", "hammond_mcp"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S104", "S105", "S106", "PLR2004", "PLC0415"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["packages/hacore/src", "services/mcp-server/src"]
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["duckdb.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["packages/hacore/tests", "services/mcp-server/tests"]
+addopts = "--import-mode=importlib -ra"
+
+[tool.coverage.run]
+source = ["hacore", "hammond_mcp"]
+branch = true

@@ -1,0 +1,10 @@
+# Local development override: build the MCP image from source instead of pulling it.
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+services:
+  ducklake-init:
+    build:
+      context: ../..
+      dockerfile: services/mcp-server/Dockerfile
+    image: hammond-mcp:dev
+  mcp:
+    image: hammond-mcp:dev

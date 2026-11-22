@@ -1,0 +1,18 @@
+[project]
+name = "hacore"
+version = "0.1.0"
+description = "HAmmond core: Home Assistant WebSocket client, registries and DuckLake access"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+dependencies = [
+  "websockets>=15.0",
+  "duckdb>=1.4",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hacore"]
