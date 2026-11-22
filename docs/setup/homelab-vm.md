@@ -48,15 +48,30 @@ Add the VM to your Proxmox Backup Server job.
 ## 3. Bootstrap
 
 ```bash
-scp deploy/vm/bootstrap-debian13.sh <admin>@<vm-ip>:
 ssh <admin>@<vm-ip>
-sudo ADMIN_CIDR=<admin-cidr> ./bootstrap-debian13.sh
+sudo apt-get update && sudo apt-get install -y git
+git clone https://github.com/zettabyte-cz/hammond.git ~/hammond
+sudo ADMIN_CIDR=<admin-cidr> ~/hammond/deploy/vm/bootstrap-debian13.sh
+```
+
+`<admin-cidr>` is the network **of the machine you are typing on** (check its address),
+not the network of Home Assistant. A wrong value locks you out of SSH as soon as ufw is
+enabled; your current session survives. Fix it from the Proxmox shell through the guest
+agent the script installs:
+
+```bash
+qm guest exec <vmid> -- ufw allow from <admin-cidr> to any port 22 proto tcp
 ```
 
 The script installs Docker Engine + Compose, hardens SSH (keys only, no root, only your
 user), enables ufw (inbound SSH from `<admin-cidr>` only) and unattended security
 upgrades. Ports published by Docker (443 of Caddy) bypass ufw by design; the router
 rules above decide who reaches them.
+
+Note: when you change the VM's cloud-init settings (`qm set --ciuser/--sshkeys/...`),
+cloud-init treats the next boot as a new instance and generates new SSH host keys.
+Compare the new fingerprint (`qm guest exec <vmid> -- ssh-keygen -lf
+/etc/ssh/ssh_host_ed25519_key.pub`) and then `ssh-keygen -R <vm-ip>` on your machine.
 
 ## 4. Deploy the stack
 
@@ -65,17 +80,20 @@ Cloudflare token from the [connector guide](claude-connector.md), and the GHCR p
 `hammond-mcp` and `hammond-caddy` set to *Public* (otherwise `docker login ghcr.io`
 with a read-only token first).
 
+`/opt/hammond` is readable by root only (it holds `.env`), so work in a root shell:
+
 ```bash
-git clone https://github.com/zettabyte-cz/hammond.git ~/hammond
-sudo install -d -m 750 /opt/hammond
-sudo cp -r ~/hammond/deploy/compose/. /opt/hammond/
-sudo cp /opt/hammond/.env.example /opt/hammond/.env
-sudo chmod 600 /opt/hammond/.env && sudoedit /opt/hammond/.env   # fill in all values
+sudo -i
+install -d -m 750 /opt/hammond
+cp -r ~<admin>/hammond/deploy/compose/. /opt/hammond/
+cp /opt/hammond/.env.example /opt/hammond/.env
+chmod 600 /opt/hammond/.env && editor /opt/hammond/.env   # fill in all values
 cd /opt/hammond
-sudo docker compose pull
-sudo docker compose up -d
-sudo docker compose ps                     # ducklake-init exited (0), mcp healthy, caddy up
-sudo docker compose logs caddy | grep -i "certificate obtained"
+docker compose pull
+docker compose up -d
+docker compose ps                     # ducklake-init exited (0), mcp healthy, caddy up
+docker compose logs caddy | grep -i "certificate obtained"
+exit
 ```
 
 Before the first deployment verify the signatures of both images (README,

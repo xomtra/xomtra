@@ -8,6 +8,10 @@ ARG CADDY_DNS_PLUGIN=github.com/caddy-dns/cloudflare@v0.2.4
 # Security floors for transitive Go modules ahead of the next Caddy release
 # (Trivy image scan). Drop an entry once Caddy ships the fixed version itself.
 ARG GO_MODULE_FLOORS="golang.org/x/net@v0.62.0"
+# The builder image sets XCADDY_SETCAP=1, which puts cap_net_bind_service on the built
+# binary. A binary with file capabilities cannot be executed under compose's
+# cap_drop: [ALL] (EPERM on exec), and Caddy listens on unprivileged ports anyway.
+ENV XCADDY_SETCAP=0
 RUN set -eu; extra=""; \
     for m in ${GO_MODULE_FLOORS}; do extra="$extra --replace ${m%@*}=$m"; done; \
     xcaddy build --with "${CADDY_DNS_PLUGIN}" $extra
@@ -16,6 +20,7 @@ FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20f
 LABEL org.opencontainers.image.source="https://github.com/zettabyte-cz/hammond" \
       org.opencontainers.image.description="HAmmond reverse proxy (Caddy + DNS-01)" \
       org.opencontainers.image.licenses="Apache-2.0"
+# CI starts the image with cap_drop ALL to catch file capabilities on the binary.
 RUN apk upgrade --no-cache \
  && addgroup -S -g 10002 caddy \
  && adduser -S -D -H -u 10002 -G caddy caddy \
