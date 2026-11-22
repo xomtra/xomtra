@@ -1,0 +1,33 @@
+# Bronze tables are written by the ingest code (hacore.bronze), not by SQLMesh.
+- name: '"lake"."bronze"."ha_states"'
+  columns:
+    entity_id: VARCHAR
+    state: VARCHAR
+    attributes: JSON
+    last_changed: TIMESTAMPTZ
+    last_updated: TIMESTAMPTZ
+    context_id: VARCHAR
+    source: VARCHAR
+    ingested_at: TIMESTAMPTZ
+- name: '"lake"."bronze"."ha_statistics"'
+  columns:
+    statistic_id: VARCHAR
+    period: VARCHAR
+    period_start: TIMESTAMPTZ
+    mean: DOUBLE
+    min: DOUBLE
+    max: DOUBLE
+    state: DOUBLE
+    sum: DOUBLE
+    last_reset: TIMESTAMPTZ
+    source: VARCHAR
+    ingested_at: TIMESTAMPTZ
+- name: '"lake"."bronze"."ha_registry"'
+  columns:
+    registry: VARCHAR
+    item_id: VARCHAR
+    payload: JSON
+    content_hash: VARCHAR
+    removed: BOOLEAN
+    source: VARCHAR
+    fetched_at: TIMESTAMPTZ
