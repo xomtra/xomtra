@@ -3,8 +3,7 @@
 #
 #   sudo ADMIN_CIDR=192.0.2.0/24 ./bootstrap-debian13.sh
 #
-# Optional:  INSTALL_TAILSCALE=1   install Tailscale (PoC connector via Tailscale Funnel)
-#            ADMIN_USER=<name>     existing user that keeps SSH access (default: $SUDO_USER)
+# Optional:  ADMIN_USER=<name>     existing user that keeps SSH access (default: $SUDO_USER)
 #
 # Idempotent: safe to run again. Installs Docker Engine + Compose from Docker's apt
 # repository, hardens SSH, enables a default-deny firewall and unattended upgrades.
@@ -12,7 +11,6 @@ set -euo pipefail
 
 : "${ADMIN_CIDR:?Set ADMIN_CIDR to the network allowed to SSH in, e.g. ADMIN_CIDR=192.0.2.0/24}"
 ADMIN_USER="${ADMIN_USER:-${SUDO_USER:-}}"
-INSTALL_TAILSCALE="${INSTALL_TAILSCALE:-0}"
 HAMMOND_DIR=/opt/hammond
 
 [[ $EUID -eq 0 ]] || { echo "Run as root (sudo)." >&2; exit 1; }
@@ -85,19 +83,8 @@ ufw default deny incoming
 ufw default allow outgoing
 ufw allow from "$ADMIN_CIDR" to any port 22 proto tcp comment 'SSH from admin network'
 ufw --force enable
-# Note: ports published by Docker bypass ufw. The compose stack therefore publishes the
-# MCP server on 127.0.0.1 only; a reverse proxy / Tailscale Funnel is the only way in.
-
-if [[ "$INSTALL_TAILSCALE" == "1" ]]; then
-  echo "==> Tailscale"
-  curl -fsSL "https://pkgs.tailscale.com/stable/debian/${VERSION_CODENAME}.noarmor.gpg" \
-    -o /usr/share/keyrings/tailscale-archive-keyring.gpg
-  curl -fsSL "https://pkgs.tailscale.com/stable/debian/${VERSION_CODENAME}.tailscale-keyring.list" \
-    -o /etc/apt/sources.list.d/tailscale.list
-  apt-get update -q
-  apt-get install -yq tailscale
-  echo "    Run 'tailscale up' to join your tailnet."
-fi
+# Note: ports published by Docker bypass ufw. The compose stack publishes only Caddy
+# (443); the router's port forward and Caddy's IP rules control who reaches it.
 
 echo "==> Application directory ${HAMMOND_DIR}"
 install -d -m 0750 -o root -g root "$HAMMOND_DIR"

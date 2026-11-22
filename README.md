@@ -14,7 +14,8 @@ Microsoft Entra ID.
 | --- | --- |
 | `packages/hacore` | Core library: Home Assistant WebSocket client, registries, DuckLake access |
 | `services/mcp-server` | MCP server (FastMCP) with OAuth proxy to Entra ID |
-| `deploy/compose` | Docker Compose stack: Postgres (DuckLake catalog) + SeaweedFS (S3) + MCP server |
+| `deploy/compose` | Docker Compose stack: Caddy + MCP server + Postgres (DuckLake catalog) + SeaweedFS (S3) |
+| `deploy/caddy` | Caddy image (TLS via ACME DNS-01) and Caddyfile with the public access rules |
 | `deploy/vm` | Bootstrap script for the Debian 13 host VM |
 | `docs/setup` | Step-by-step guides (Entra app registration, host VM, Claude connector) |
 
