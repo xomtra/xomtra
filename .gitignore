@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Local configuration and data (never commit)
+.env
+*.env
+!*.env.example
+deploy/compose/.env
+data/
+*.duckdb
+*.duckdb.wal
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
