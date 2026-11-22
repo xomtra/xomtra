@@ -9,6 +9,8 @@ from urllib.parse import quote
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from hacore.maintenance import Retention
+
 
 class IngestSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HAMMOND_", extra="ignore")
@@ -16,8 +18,10 @@ class IngestSettings(BaseSettings):
     ha_url: str = ""
     ha_token: SecretStr = SecretStr("")
 
-    # Rows older than this are deleted from bronze and silver (daily retention job).
-    retention_days: int = Field(default=365, ge=1)
+    # Rows older than this are deleted from bronze and silver (daily retention job, ADR 034).
+    states_retention_days: int = Field(default=365, ge=1)
+    statistics_5min_retention_days: int = Field(default=365, ge=1)
+    statistics_hour_retention_days: int = Field(default=5 * 365, ge=1)
     # DuckLake snapshots older than this are expired; their files are then deleted.
     snapshot_retention_days: int = Field(default=7, ge=1)
 
@@ -42,8 +46,14 @@ class IngestSettings(BaseSettings):
         return v.rstrip("/")
 
     @property
-    def retention(self) -> timedelta:
-        return timedelta(days=self.retention_days)
+    def retention(self) -> Retention:
+        return Retention(
+            states=timedelta(days=self.states_retention_days),
+            statistics={
+                "5minute": timedelta(days=self.statistics_5min_retention_days),
+                "hour": timedelta(days=self.statistics_hour_retention_days),
+            },
+        )
 
     def require_ha(self) -> tuple[str, str]:
         token = self.ha_token.get_secret_value()

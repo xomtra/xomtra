@@ -44,7 +44,7 @@ SOURCE_HISTORY = "ha_history"
 # purge_keep_days); hourly statistics are kept forever.
 DEFAULT_LOOKBACK: dict[Period, timedelta] = {
     "5minute": timedelta(days=10),
-    "hour": timedelta(days=365),
+    "hour": timedelta(days=5 * 365),
 }
 # Re-read the last stored periods: the newest one may have been compiled again.
 STATISTICS_OVERLAP: dict[Period, timedelta] = {

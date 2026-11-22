@@ -22,7 +22,7 @@ def test_ensure_schema_is_idempotent(lake: duckdb.DuckDBPyConnection) -> None:
     tables = lake.execute(
         "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'bronze' ORDER BY 1"
     ).fetchall()
-    assert [t[0] for t in tables] == ["ha_registry", "ha_states", "ha_statistics"]
+    assert [t[0] for t in tables] == ["ha_registry", "ha_states", "ha_statistics", "ingest_gaps"]
 
 
 def test_write_states_is_idempotent(lake: duckdb.DuckDBPyConnection) -> None:
@@ -69,6 +69,3 @@ def test_write_registry_change_log(lake: duckdb.DuckDBPyConnection) -> None:
     assert removed == [("hall",)]
     # hall comes back
     assert bronze.write_registry(lake, "areas", [*changed, areas[1]], source="api") == 1
-    # only_new never overrides known items
-    old = [{"area_id": "kitchen", "name": "Old"}, {"area_id": "attic", "name": "Attic"}]
-    assert bronze.write_registry(lake, "areas", old, source="backup", only_new=True) == 1

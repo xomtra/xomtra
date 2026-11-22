@@ -3,7 +3,6 @@
 hammond-ingest stream                       # live state_changed stream (service)
 hammond-ingest sync                         # registries + statistics, then transform
 hammond-ingest backfill --start 10d         # state history from the HA recorder
-hammond-ingest import-recorder FILE.db      # older history from a backup copy
 hammond-ingest transform                    # SQLMesh plan/run bronze -> silver
 hammond-ingest restate --start ... --end ...
 hammond-ingest retention | maintenance
@@ -18,7 +17,6 @@ import logging
 import signal
 import sys
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from hacore import lake
 from hacore.stream import StateStream, StreamSettings
@@ -68,16 +66,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--start", required=True, help="ISO date/time or '<n>d' (days ago)")
     p.add_argument("--end", help="ISO date/time (default now)")
     p.add_argument("--no-transform", action="store_true")
-    p = sub.add_parser("import-recorder", help="import a home-assistant_v2.db backup copy")
-    p.add_argument("path", type=Path)
-    p.add_argument("--start")
-    p.add_argument("--end")
-    p.add_argument("--no-transform", action="store_true")
     sub.add_parser("transform", help="SQLMesh plan + run (bronze -> silver)")
     p = sub.add_parser("restate", help="recompute silver for a time range")
     p.add_argument("--start", required=True)
     p.add_argument("--end", required=True)
-    sub.add_parser("retention", help="delete rows older than HAMMOND_RETENTION_DAYS")
+    sub.add_parser("retention", help="delete rows older than HAMMOND_*_RETENTION_DAYS")
     sub.add_parser("maintenance", help="compact files, expire snapshots, delete old files")
     args = parser.parse_args(argv)
 
@@ -101,15 +94,6 @@ def main(argv: list[str] | None = None) -> int:
             _print(tasks.backfill_history(start, end))
             if not args.no_transform:
                 tasks.restate(start, end)
-        case "import-recorder":
-            result = tasks.import_recorder(
-                args.path,
-                tasks.parse_time(args.start) if args.start else None,
-                tasks.parse_time(args.end) if args.end else None,
-            )
-            _print(result)
-            if not args.no_transform and result.first_state and result.last_state:
-                tasks.restate(result.first_state, result.last_state + timedelta(hours=1))
         case "transform":
             _print(tasks.run_transform())
         case "restate":

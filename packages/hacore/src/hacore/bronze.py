@@ -14,7 +14,7 @@ Tables (schema ``bronze``):
     the table stays small and keeps the full history.
 
 All writers skip rows whose key already exists, so re-running a backfill, a catch-up
-after a reconnect or an import of an overlapping recorder backup never duplicates data.
+after a reconnect never duplicates data.
 Rows are staged as newline-delimited JSON in a temporary file and inserted with one
 statement per batch; the key lookup is limited to the time range of the batch, which
 DuckLake prunes by file statistics.
@@ -31,6 +31,7 @@ import os
 import tempfile
 import time
 from collections.abc import Callable, Iterable, Mapping
+from datetime import datetime
 from typing import Any
 
 import duckdb
@@ -46,6 +47,8 @@ SCHEMA = "bronze"
 STATES = "ha_states"
 STATISTICS = "ha_statistics"
 REGISTRY = "ha_registry"
+# Ranges the stream caught up after an outage; silver is restated for them (ADR 031).
+GAPS = "ingest_gaps"
 
 # Primary key field of each registry item. Entities are keyed by their registry id, not
 # by entity_id, so that a rename shows up as a change of the same item.
@@ -121,6 +124,14 @@ def _ddl(alias: str) -> dict[str, tuple[str, str]]:
             "source VARCHAR NOT NULL, "
             "fetched_at TIMESTAMPTZ NOT NULL)",
             "registry",
+        ),
+        GAPS: (
+            f"CREATE TABLE {table(GAPS, alias)} ("
+            "range_start TIMESTAMPTZ NOT NULL, "
+            "range_end TIMESTAMPTZ NOT NULL, "
+            "states_written BIGINT NOT NULL, "
+            "recorded_at TIMESTAMPTZ NOT NULL)",
+            "year(recorded_at)",
         ),
     }
 
@@ -257,7 +268,7 @@ def insert_states_from_stage(
     alias: str = LAKE_ALIAS,
 ) -> int:
     """Insert from a staged relation with the columns entity_id, state, attributes,
-    last_changed, last_updated, context_id (shared by API writes and recorder imports)."""
+    last_changed, last_updated, context_id."""
     con.execute(
         "CREATE OR REPLACE TEMP TABLE _dedup_states AS SELECT * FROM "
         f"{stage} WHERE entity_id IS NOT NULL AND last_updated IS NOT NULL "
@@ -375,14 +386,12 @@ def write_registry(
     *,
     source: str,
     complete: bool = True,
-    only_new: bool = False,
     alias: str = LAKE_ALIAS,
 ) -> int:
     """Record new and changed items of one registry; returns the number of rows written.
 
     ``complete``: ``items`` is the whole registry, so stored items missing from it are
-    recorded as removed. ``only_new``: write only items never seen before (used for
-    metadata from old backups, which must not override current values).
+    recorded as removed.
     """
     key = REGISTRY_KEYS[registry]
     records = (
@@ -398,20 +407,43 @@ def write_registry(
         f"SELECT item_id, content_hash, removed FROM {target} WHERE registry = {reg} "
         "QUALIFY row_number() OVER (PARTITION BY item_id ORDER BY fetched_at DESC) = 1"
     )
-    if only_new:
-        condition = "l.item_id IS NULL"
-    else:
-        condition = "l.item_id IS NULL OR l.removed OR l.content_hash <> s.content_hash"
+    condition = "l.item_id IS NULL OR l.removed OR l.content_hash <> s.content_hash"
     changed = (
         f"SELECT {reg}, s.item_id, s.payload, s.content_hash, false, {src}, now() "
         f"FROM (SELECT DISTINCT ON (item_id) * FROM _stage_registry) s "
         f"LEFT JOIN ({latest}) l ON s.item_id = l.item_id WHERE {condition}"
     )
     parts = [changed]
-    if complete and not only_new:
+    if complete:
         parts.append(
             f"SELECT {reg}, l.item_id, NULL, NULL, true, {src}, now() FROM ({latest}) l "
             "WHERE NOT l.removed AND l.item_id NOT IN (SELECT item_id FROM _stage_registry)"
         )
     sql = f"INSERT INTO {target} " + " UNION ALL ".join(parts)
     return with_conflict_retry(lambda: _inserted(con.execute(sql)))
+
+
+def record_gap(
+    con: duckdb.DuckDBPyConnection,
+    start: datetime,
+    end: datetime,
+    states_written: int,
+    *,
+    alias: str = LAKE_ALIAS,
+) -> None:
+    """Note a caught-up range so that the silver layer gets restated for it."""
+    sql = f"INSERT INTO {table(GAPS, alias)} VALUES (?::TIMESTAMPTZ, ?::TIMESTAMPTZ, ?, now())"
+    params = [start.isoformat(), end.isoformat(), states_written]
+    with_conflict_retry(functools.partial(con.execute, sql, params))
+
+
+def gaps_since(
+    con: duckdb.DuckDBPyConnection, after_us: int | None, *, alias: str = LAKE_ALIAS
+) -> list[tuple[datetime, datetime, int]]:
+    """Caught-up ranges recorded after ``after_us``: (start, end, recorded_at in µs)."""
+    rows = con.execute(
+        f"SELECT range_start, range_end, epoch_us(recorded_at) FROM {table(GAPS, alias)} "
+        "WHERE epoch_us(recorded_at) > ? ORDER BY recorded_at",
+        [after_us if after_us is not None else -1],
+    ).fetchall()
+    return [(r[0], r[1], int(r[2])) for r in rows]

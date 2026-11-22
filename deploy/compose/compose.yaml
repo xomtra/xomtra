@@ -27,7 +27,9 @@ x-ingest-env: &ingest-env
   <<: [*lake-env, *ops-env]
   HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
   HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
-  HAMMOND_RETENTION_DAYS: ${HAMMOND_RETENTION_DAYS:-365}
+  HAMMOND_STATES_RETENTION_DAYS: ${HAMMOND_STATES_RETENTION_DAYS:-365}
+  HAMMOND_STATISTICS_5MIN_RETENTION_DAYS: ${HAMMOND_STATISTICS_5MIN_RETENTION_DAYS:-365}
+  HAMMOND_STATISTICS_HOUR_RETENTION_DAYS: ${HAMMOND_STATISTICS_HOUR_RETENTION_DAYS:-1825}
   HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
 
 x-hardening: &hardening
@@ -174,8 +176,6 @@ services:
     environment: *ingest-env
     volumes:
       - ingest-data:/data
-      # Copies of recorder databases from backups to import (docs/setup/ingest.md).
-      - ${HAMMOND_IMPORT_DIR:-./import}:/import
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]

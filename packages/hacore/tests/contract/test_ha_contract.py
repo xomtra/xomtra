@@ -1,19 +1,15 @@
 """What HAmmond relies on in the Home Assistant WebSocket API, as a non-admin user."""
 
 import asyncio
-import os
-import shutil
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 import duckdb
 import pytest
 
-from hacore import HAClient, HACommandError, bronze, fetch_registries, ingest
+from hacore import HAClient, HACommandError, fetch_registries, ingest
 from hacore.history import StateRow, history_during_period, statistics_during_period
 from hacore.onboarding import OnboardedTokens
-from hacore.recorder import import_recorder_db
 
 SETPOINT = "input_number.hammond_test_setpoint"
 SENSOR = "sensor.test_temperature"
@@ -133,31 +129,3 @@ async def test_ingest_into_bronze(
     assert registries.written["entities"] > 0
     assert first.written["states"] > 0
     assert again.written.get("states", 0) == 0
-
-
-def test_recorder_database_import(
-    ha_url: str, tokens: OnboardedTokens, lake: duckdb.DuckDBPyConnection, tmp_path: Path
-) -> None:
-    config_dir = os.environ.get("HAMMOND_CONTRACT_HA_CONFIG")
-    if not config_dir:
-        pytest.skip("HAMMOND_CONTRACT_HA_CONFIG not set")
-    for suffix in ("", "-wal", "-shm"):
-        src = Path(config_dir) / f"home-assistant_v2.db{suffix}"
-        if src.exists():
-            shutil.copy(src, tmp_path / src.name)
-    now = datetime.now(UTC)
-
-    async def backfill() -> int:
-        async with HAClient(ha_url, tokens.user_token) as ha:
-            result = await ingest.backfill_history(ha, lake, now - timedelta(days=1), now)
-            return result.written.get("states", 0)
-
-    asyncio.run(backfill())
-    result = import_recorder_db(tmp_path / "home-assistant_v2.db", lake, end=now)
-    assert result.states_read > 0
-    # Everything the history API returned is recognised as the same rows.
-    duplicates = lake.execute(
-        f"SELECT count(*) FROM (SELECT entity_id, last_updated FROM {bronze.table(bronze.STATES)} "
-        "GROUP BY ALL HAVING count(*) > 1)"
-    ).fetchone()
-    assert duplicates == (0,)

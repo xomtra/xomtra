@@ -1,9 +1,8 @@
 """Contract tests against a real Home Assistant in a container.
 
 Enabled by ``HAMMOND_CONTRACT_HA_URL`` (a fresh, not yet onboarded instance started with
-the configuration in ``ha-config/``). ``HAMMOND_CONTRACT_HA_CONFIG`` optionally points
-to that configuration directory on the host, for the recorder import test. See the
-``contract`` job in .github/workflows/ci.yml for how CI runs them.
+the configuration in ``ha-config/``). See the ``contract`` job in
+.github/workflows/ci.yml for how CI runs them.
 """
 
 import json

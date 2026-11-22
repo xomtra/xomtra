@@ -3,7 +3,7 @@
 All timestamps are converted to integer microseconds since the Unix epoch (UTC). Home
 Assistant keeps them as float seconds derived from microsecond datetimes, so rounding to
 microseconds recovers the exact value and the same state change from the live stream,
-the history API and a recorder backup gets the same key (``entity_id``, ``last_updated``).
+the history API and the recorder database gets the same key (``entity_id``, ``last_updated``).
 
 Large ranges are split into time windows and entity batches so that one response stays
 well below the WebSocket message limit.

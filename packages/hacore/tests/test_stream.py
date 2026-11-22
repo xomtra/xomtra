@@ -77,6 +77,7 @@ async def test_catch_up_live_and_reconnect(
 
     stream.stop()
     await asyncio.wait_for(task, 5)
+    assert bronze.gaps_since(lake, None) == []  # 1 h gap: covered by the silver lookback
     assert [(s, src) for _, s, src in stored(lake)] == [
         ("1", "ha_live"),
         ("2", "ha_history"),
@@ -97,3 +98,30 @@ async def test_no_catch_up_on_empty_lake(
     stream.stop()
     await asyncio.wait_for(task, 5)
     assert not any(m["type"] == "history/history_during_period" for m in fake.received)
+
+
+async def test_long_catch_up_records_gap(
+    fake_ha: tuple[FakeHA, str], lake: duckdb.DuckDBPyConnection
+) -> None:
+    fake, url = fake_ha
+    now = datetime.now(UTC)
+    old = now - timedelta(hours=5)
+    missed = now - timedelta(hours=4)
+    bronze.write_states(
+        lake,
+        [StateRow("sensor.a", "1", None, iso_to_us(old.isoformat()), iso_to_us(old.isoformat()))],
+        source="ha_live",
+    )
+    fake.results["get_states"] = [state_obj("sensor.a", "2", missed)]
+    fake.results["config/entity_registry/list"] = [{"entity_id": "sensor.a"}]
+    fake.handlers["history/history_during_period"] = lambda msg: {
+        "sensor.a": [{"s": "2", "a": {}, "lu": missed.timestamp()}]
+    }
+    stream = StateStream(url, VALID_TOKEN, lake.cursor, FAST)
+    task = asyncio.create_task(stream.run())
+    await wait_for(lambda: bool(bronze.gaps_since(lake, None)))
+    stream.stop()
+    await asyncio.wait_for(task, 5)
+    [(start, end, _)] = bronze.gaps_since(lake, None)
+    assert start <= old
+    assert end >= missed

@@ -6,7 +6,7 @@ MODEL (
     batch_size 720
   ),
   cron '@hourly',
-  start '1 year ago',
+  start '5 years ago',
   grain (statistic_id, period, period_start),
   description '5-minute and hourly statistics (mean/min/max for measurements, state/sum for counters).',
   audits (

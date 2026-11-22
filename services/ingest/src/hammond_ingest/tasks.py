@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 import duckdb
 
-from hacore import bronze, ingest, lake, maintenance, recorder
+from hacore import bronze, ingest, lake, maintenance
 from hacore.client import HAClient
 from hammond_ingest import transform
 from hammond_ingest.settings import IngestSettings
@@ -48,8 +48,15 @@ def sync_registries() -> dict[str, int]:
     return _with_ha(ingest.sync_registries).written
 
 
-def sync_statistics() -> dict[str, int]:
-    return _with_ha(ingest.sync_statistics).written
+def sync_statistics(settings: IngestSettings | None = None) -> dict[str, int]:
+    s = settings or IngestSettings()
+    # First run: fetch what HA still has, but nothing the retention would delete again.
+    lookback = {
+        period: min(ingest.DEFAULT_LOOKBACK[period], s.retention.statistics[period])
+        for period in ingest.DEFAULT_LOOKBACK
+    }
+    fetch = functools.partial(ingest.sync_statistics, lookback=lookback)
+    return _with_ha(fetch, s).written
 
 
 def backfill_history(start: datetime, end: datetime | None = None) -> dict[str, int]:
@@ -57,13 +64,10 @@ def backfill_history(start: datetime, end: datetime | None = None) -> dict[str, 
     return _with_ha(lambda ha, con: ingest.backfill_history(ha, con, start, stop)).written
 
 
-def import_recorder(
-    path: Path, start: datetime | None = None, end: datetime | None = None
-) -> recorder.ImportResult:
+def pending_gaps(after_us: int | None) -> list[tuple[datetime, datetime, int]]:
+    """Caught-up ranges recorded by the stream after ``after_us`` (see the sensor)."""
     with open_lake() as con:
-        result = recorder.import_recorder_db(path, con, start=start, end=end)
-    logger.info("Recorder import of %s: %s", path, result)
-    return result
+        return bronze.gaps_since(con, after_us)
 
 
 def run_transform() -> transform.TransformResult:
@@ -78,7 +82,10 @@ def retention(settings: IngestSettings | None = None) -> dict[str, Any]:
     s = settings or IngestSettings()
     with open_lake() as con:
         result = maintenance.apply_retention(con, s.retention)
-    return {"cutoff": result.cutoff.isoformat(), "deleted": result.deleted}
+    return {
+        "cutoffs": {k: v.isoformat() for k, v in result.cutoffs.items()},
+        "deleted": result.deleted,
+    }
 
 
 def lake_maintenance(settings: IngestSettings | None = None) -> None:

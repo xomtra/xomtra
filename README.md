@@ -12,7 +12,7 @@ Microsoft Entra ID.
 
 | Path | Contents |
 | --- | --- |
-| `packages/hacore` | Core library: Home Assistant WebSocket client, registries, history/statistics, bronze layer in DuckLake, live stream, recorder backup import |
+| `packages/hacore` | Core library: Home Assistant WebSocket client, registries, history/statistics, bronze layer in DuckLake, live stream |
 | `services/mcp-server` | MCP server (FastMCP) with OAuth proxy to Entra ID |
 | `services/ingest` | Ingest service: live stream, Dagster jobs and schedules, SQLMesh models (bronze → silver) |
 | `deploy/compose` | Docker Compose stack: Caddy + MCP server + ingest + Postgres (DuckLake catalog, Dagster/SQLMesh state) + SeaweedFS (S3) |

@@ -37,7 +37,7 @@ RUN apt-get update \
  && rm -rf /usr/local/lib/python3.13/ensurepip /usr/local/bin/pip* \
  && groupadd --system --gid 10001 hammond \
  && useradd --system --uid 10001 --gid hammond --home-dir /data --no-create-home hammond \
- && mkdir -p /data /import && chown hammond:hammond /data /import
+ && mkdir -p /data && chown hammond:hammond /data
 COPY --from=build /app /app
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
@@ -47,5 +47,7 @@ ENV PATH=/app/.venv/bin:$PATH \
 USER 10001:10001
 WORKDIR /data
 VOLUME ["/data"]
+# Health checks are per role (stream heartbeat, Dagster UI) and live in compose.yaml.
+HEALTHCHECK NONE
 ENTRYPOINT []
 CMD ["hammond-ingest", "--help"]

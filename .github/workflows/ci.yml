@@ -86,7 +86,7 @@ jobs:
           cp -r packages/hacore/tests/contract/ha-config "$RUNNER_TEMP/ha-config"
           docker run -d --name ha -p 127.0.0.1:8123:8123 \
             -v "$RUNNER_TEMP/ha-config:/config" "$HA_IMAGE"
-      - name: Contract tests (onboarding, non-admin token, history, statistics, recorder import)
+      - name: Contract tests (onboarding, non-admin token, history, statistics, ingest)
         env:
           HAMMOND_CONTRACT_HA_URL: http://127.0.0.1:8123
           HAMMOND_CONTRACT_HA_CONFIG: ${{ runner.temp }}/ha-config
@@ -214,6 +214,8 @@ jobs:
       - name: Smoke test ingest (HA -> stream/backfill -> bronze -> SQLMesh silver)
         working-directory: deploy/compose
         run: |
+          # Creates the egress network (and the ingest containers, started below).
+          docker compose up --no-start ingest-stream dagster-daemon dagster-webserver
           docker run -d --name ha --network hammond_egress \
             -v "$GITHUB_WORKSPACE/packages/hacore/tests/contract/ha-config:/config" \
             "$HA_IMAGE_CURRENT"

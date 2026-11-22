@@ -7,9 +7,11 @@ On every (re)connect the stream
 3. flushes the buffer to bronze every ``flush_interval`` seconds or ``max_buffer`` rows.
 
 Catch-up and events overlap on purpose; the bronze writer skips keys that already exist,
-so nothing is lost and nothing is duplicated. The gap that can be closed is limited by
+so nothing is lost and nothing is duplicated. A catch-up older than the silver lookback
+(``restate_threshold``) is recorded in ``bronze.ingest_gaps``; a Dagster sensor then
+restates silver for that range (ADR 031). The gap that can be closed is limited by
 the recorder retention of Home Assistant (``purge_keep_days``, 10 days by default);
-older gaps need an import from a backup (``hacore.recorder``).
+data of longer outages is lost (HAmmond takes data only from the running instance).
 """
 
 from __future__ import annotations
@@ -47,6 +49,8 @@ class StreamSettings:
     ping_interval: float = 30.0
     max_catchup: timedelta = timedelta(days=10)
     catchup_overlap: timedelta = timedelta(minutes=5)
+    # Silver recomputes the last 3 hours on every run; older catch-ups need a restate.
+    restate_threshold: timedelta = timedelta(hours=2)
     reconnect_min: float = 2.0
     reconnect_max: float = 300.0
     heartbeat_file: Path | None = None
@@ -149,20 +153,22 @@ class StateStream:
             start = us_to_datetime(watermark) - self._settings.catchup_overlap
             if now - start > self._settings.max_catchup:
                 logger.warning(
-                    "Gap since %s exceeds the recorder retention; catching up only %s. "
-                    "Import an HA backup to fill the rest.",
+                    "Gap since %s exceeds the recorder retention; catching up only %s.",
                     start.isoformat(),
                     self._settings.max_catchup,
                 )
                 start = now - self._settings.max_catchup
             lake = self._connection()
         result = await backfill_history(ha, lake, start, now, alias=self._alias)
-        self.written += result.written.get("states", 0)
-        logger.info(
-            "Catch-up from %s: %d states written",
-            start.isoformat(),
-            result.written.get("states", 0),
-        )
+        written = result.written.get("states", 0)
+        self.written += written
+        logger.info("Catch-up from %s: %d states written", start.isoformat(), written)
+        if written and now - start > self._settings.restate_threshold:
+            async with self._lake_lock:
+                await asyncio.to_thread(
+                    bronze.record_gap, self._connection(), start, now, written, alias=self._alias
+                )
+            logger.info("Gap recorded; silver will be restated from %s", start.isoformat())
 
     async def _pump(self, ha: HAClient) -> None:
         s = self._settings

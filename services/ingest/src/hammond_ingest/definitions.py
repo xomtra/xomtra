@@ -4,29 +4,34 @@ Jobs
     ``ingest_hourly``     registries -> statistics -> SQLMesh run (scheduled hourly)
     ``retention_daily``   retention -> DuckLake maintenance (scheduled daily)
     ``history_backfill``  state history of a range from the HA recorder (manual)
-    ``recorder_import``   history from a backup copy of the recorder database (manual)
-    ``silver_restate``    recompute silver for a range (manual)
+    ``silver_restate``    recompute silver for a range (manual, or the sensor
+                          ``restate_after_catchup`` after a long stream outage)
 
 The live ``state_changed`` stream is a separate long-running service (``hammond-ingest
 stream``), not a Dagster job. Runs are serialised by the queued run coordinator
 (``dagster.yaml``) so that heavy jobs never compete for DuckLake commits.
 """
 
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from datetime import UTC, datetime
 
 from dagster import (
     Backoff,
     Config,
     DefaultScheduleStatus,
+    DefaultSensorStatus,
     Definitions,
     In,
     Nothing,
     OpExecutionContext,
     RetryPolicy,
+    RunRequest,
     ScheduleDefinition,
+    SensorEvaluationContext,
+    SensorResult,
+    SkipReason,
     job,
     op,
+    sensor,
 )
 
 from hammond_ingest import tasks
@@ -45,13 +50,6 @@ class RangeConfig(Config):
         start = tasks.parse_time(self.start)
         end = tasks.parse_time(self.end) if self.end else datetime.now(UTC)
         return start, end
-
-
-class ImportConfig(Config):
-    path: str
-    """Path of home-assistant_v2.db inside the container (mounted under /import)."""
-    start: str = ""
-    end: str = ""
 
 
 @op(retry_policy=HA_RETRY)
@@ -75,18 +73,6 @@ def backfill_history(context: OpExecutionContext, config: RangeConfig) -> None:
     start, end = config.bounds()
     context.log.info(f"States written: {tasks.backfill_history(start, end)}")
     tasks.restate(start, end)
-
-
-@op
-def import_recorder(context: OpExecutionContext, config: ImportConfig) -> None:
-    result = tasks.import_recorder(
-        Path(config.path),
-        tasks.parse_time(config.start) if config.start else None,
-        tasks.parse_time(config.end) if config.end else None,
-    )
-    context.log.info(f"Import: {result}")
-    if result.first_state and result.last_state:
-        tasks.restate(result.first_state, result.last_state + timedelta(hours=1))
 
 
 @op
@@ -123,19 +109,41 @@ def history_backfill() -> None:
 
 
 @job
-def recorder_import() -> None:
-    import_recorder()
-
-
-@job
 def silver_restate() -> None:
     restate_silver()
+
+
+@sensor(
+    job=silver_restate,
+    minimum_interval_seconds=300,
+    default_status=DefaultSensorStatus.RUNNING,
+)
+def restate_after_catchup(context: SensorEvaluationContext) -> SensorResult | SkipReason:
+    """Restate silver for ranges the stream caught up after a long outage (ADR 031)."""
+    after = int(context.cursor) if context.cursor else None
+    gaps = tasks.pending_gaps(after)
+    if not gaps:
+        return SkipReason("No new catch-up gaps")
+    start = min(g[0] for g in gaps)
+    end = max(g[1] for g in gaps)
+    cursor = str(max(g[2] for g in gaps))
+    config = {"start": start.isoformat(), "end": end.isoformat()}
+    return SensorResult(
+        run_requests=[
+            RunRequest(
+                run_key=f"catchup-{cursor}",
+                run_config={"ops": {"restate_silver": {"config": config}}},
+            )
+        ],
+        cursor=cursor,
+    )
 
 
 def build_definitions(settings: IngestSettings | None = None) -> Definitions:
     tz = (settings or IngestSettings()).timezone
     return Definitions(
-        jobs=[ingest_hourly, retention_daily, history_backfill, recorder_import, silver_restate],
+        jobs=[ingest_hourly, retention_daily, history_backfill, silver_restate],
+        sensors=[restate_after_catchup],
         schedules=[
             ScheduleDefinition(
                 job=ingest_hourly,

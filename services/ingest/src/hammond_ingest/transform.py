@@ -157,7 +157,7 @@ def apply_and_run(config: Config | None = None) -> TransformResult:
 
 
 def restate(start: datetime, end: datetime, config: Config | None = None) -> None:
-    """Recompute the incremental silver models for a range (after a backup import)."""
+    """Recompute the incremental silver models for a range (after a backfill)."""
     # SQLMesh refuses plan ends after its execution time (now, floored to the minute).
     end = min(end, datetime.now(UTC).replace(second=0, microsecond=0))
     if end <= start:

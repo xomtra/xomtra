@@ -52,7 +52,7 @@ known-first-party = ["hacore", "hammond_ingest", "hammond_mcp"]
 "**/tests/**" = ["S101", "S104", "S105", "S106", "S608", "PLR2004", "PLC0415", "ASYNC109", "ASYNC110"]
 # SQL built from internal identifiers (schema/table constants) and values quoted with
 # hacore.lake.sql_literal; DuckDB cannot bind identifiers or ATTACH/read_json options.
-"packages/hacore/src/hacore/{bronze,maintenance,recorder}.py" = ["S608"]
+"packages/hacore/src/hacore/{bronze,maintenance}.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.13"
