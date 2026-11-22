@@ -47,7 +47,7 @@ ENV PATH=/app/.venv/bin:$PATH \
 USER 10001:10001
 WORKDIR /data
 VOLUME ["/data"]
-# Health checks are per role (stream heartbeat, Dagster UI) and live in compose.yaml.
-HEALTHCHECK NONE
+# No HEALTHCHECK here: it differs per role (stream heartbeat, Dagster UI) and lives in
+# compose.yaml; "HEALTHCHECK NONE" would make "docker compose up --wait" fail.
 ENTRYPOINT []
 CMD ["hammond-ingest", "--help"]
