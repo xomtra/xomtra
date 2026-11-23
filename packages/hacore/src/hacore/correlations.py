@@ -76,6 +76,8 @@ FINDING_COLUMNS = """
     period_start TIMESTAMPTZ,
     period_end TIMESTAMPTZ,
     method VARCHAR,
+    entity_group VARCHAR[],
+    related_group VARCHAR[],
     first_detected_at TIMESTAMPTZ,
     detected_at TIMESTAMPTZ NOT NULL
 """
@@ -85,7 +87,13 @@ FFILL_LIMIT = 3
 # A pair needs at least this many common hours to be tested.
 MIN_PAIR_HOURS = 168
 # Lag-0 correlation above this is most likely the same quantity twice.
-DUPLICATE_R = 0.97
+DUPLICATE_R = 0.95
+# Residuals are high-pass filtered: their centred moving average over this many hours
+# is subtracted, so slow trends (growing memory, uptime, a filling disk) do not
+# correlate with each other; what remains is co-movement within hours to days.
+HIGHPASS_HOURS = 168
+# Entities listed with a finding as members of the same group (near-duplicates).
+MAX_GROUP_MEMBERS = 20
 # Upper bound of series in one run (the pair matrices grow with its square).
 MAX_SERIES = 2000
 # States of an enum entity turned into share series.
@@ -161,6 +169,11 @@ class CorrelationResult:
 def ensure_schema(con: duckdb.DuckDBPyConnection, alias: str = LAKE_ALIAS) -> None:
     con.execute(f"CREATE SCHEMA IF NOT EXISTS {alias}.{SCHEMA}")
     con.execute(f"CREATE TABLE IF NOT EXISTS {alias}.{SCHEMA}.{FINDING} ({FINDING_COLUMNS})")
+    # Columns added after the first release of the table (1b.1 follow-up).
+    for column in ("entity_group", "related_group"):
+        con.execute(
+            f"ALTER TABLE {alias}.{SCHEMA}.{FINDING} ADD COLUMN IF NOT EXISTS {column} VARCHAR[]"
+        )
 
 
 # ---- 1. hourly grid ----------------------------------------------------------------
@@ -474,6 +487,9 @@ class Pairs:
     r: FloatArray
     n_eff: FloatArray
     q: FloatArray
+    # Group of each column: columns joined by a lag-0 correlation >= DUPLICATE_R share
+    # the smallest index of their group (near-duplicates: one quantity measured twice).
+    groups: npt.NDArray[np.int64] | None = None
 
 
 def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
@@ -501,6 +517,7 @@ def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
     best_r = np.zeros((n, n))
     best_lag = np.zeros((n, n), dtype=np.int64)
     best_n = np.zeros((n, n))
+    groups = np.arange(n, dtype=np.int64)
     for k in range(max_lag + 1):
         if t_len - k < MIN_PAIR_HOURS:
             break
@@ -511,6 +528,7 @@ def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
             c = np.where(cnt >= MIN_PAIR_HOURS, (a.T @ b) / np.maximum(cnt, 1), 0.0)
         c = np.clip(c, -1.0, 1.0)
         if k == 0:
+            groups = _groups(np.triu(np.abs(c) >= DUPLICATE_R, 1) & (cnt >= MIN_PAIR_HOURS))
             c = np.triu(c, 1)
         better = np.abs(c) > np.abs(best_r)
         best_r[better] = c[better]
@@ -533,7 +551,51 @@ def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
         r=r,
         n_eff=n_eff,
         q=benjamini_hochberg(p),
+        groups=groups,
     )
+
+
+def _groups(linked: npt.NDArray[np.bool_]) -> npt.NDArray[np.int64]:
+    """Connected components (union-find) of a boolean adjacency matrix; each column
+    gets the smallest index of its component."""
+    parent = np.arange(linked.shape[0], dtype=np.int64)
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = int(parent[x])
+        return x
+
+    for i, j in zip(*np.nonzero(linked), strict=True):
+        a, b = find(int(i)), find(int(j))
+        if a != b:
+            parent[max(a, b)] = min(a, b)
+    return np.array([find(i) for i in range(len(parent))], dtype=np.int64)
+
+
+def highpass(resid: FloatArray, window: int = HIGHPASS_HOURS) -> FloatArray:
+    """Subtract the centred moving average over ``window`` hours (NaN-aware); hours
+    whose window holds less than a quarter of known values become missing."""
+    if window <= 1 or resid.shape[0] == 0:
+        return resid
+    known = ~np.isnan(resid)
+    vals = np.where(known, resid, 0.0)
+    zeros = np.zeros((1, resid.shape[1]))
+    csum = np.vstack([zeros, np.cumsum(vals, axis=0)])
+    ccnt = np.vstack([zeros, np.cumsum(known, axis=0)])
+    t_len = resid.shape[0]
+    # Symmetric window, shrunk near the ends so a trend does not leak into the edges.
+    t = np.arange(t_len)
+    half = np.minimum(window // 2, np.minimum(t, t_len - 1 - t))
+    lo = t - half
+    hi = t + half + 1
+    total = csum[hi] - csum[lo]
+    count = ccnt[hi] - ccnt[lo]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        mean = total / count
+    out: FloatArray = resid - mean
+    out[count < window / 4] = np.nan
+    return out
 
 
 def benjamini_hochberg(p: FloatArray) -> FloatArray:
@@ -570,25 +632,43 @@ def select_findings(
     params: CorrelationParams,
     devices: dict[str, str],
 ) -> list[dict[str, Any]]:
-    """Significant pairs, one per pair of entities (the strongest direction, lag and
-    metric), unflagged ones first, each group by ``|r|``."""
+    """Significant pairs, unflagged ones first, each part by ``|r|``.
+
+    Near-duplicate series form groups (``Pairs.groups``); a relation between two groups
+    is reported once, by its strongest pair, with the other members listed in
+    ``entity_group``/``related_group``. A pair inside one group is ``duplicate_suspect``.
+    Every pair of entities appears at most once (strongest direction, lag and metric).
+    """
+    groups = pairs.groups if pairs.groups is not None else np.arange(len(series))
+    members: dict[int, list[str]] = {}
+    for i, g in enumerate(groups):
+        ent = series[i].entity_id
+        if ent not in members.setdefault(int(g), []):
+            members[int(g)].append(ent)
     keep = (np.abs(pairs.r) >= params.min_r) & (pairs.q <= params.max_q)
     idx = np.flatnonzero(keep)
     idx = idx[np.argsort(-np.abs(pairs.r[idx]), kind="stable")]
     candidates: list[dict[str, Any]] = []
-    seen: set[frozenset[str]] = set()
+    seen: set[frozenset[Any]] = set()
     for k in idx:
-        a, b = series[int(pairs.leader[k])], series[int(pairs.follower[k])]
+        ia, ib = int(pairs.leader[k]), int(pairs.follower[k])
+        a, b = series[ia], series[ib]
         if a.entity_id == b.entity_id:
             continue  # two states or metrics of one entity
-        key = frozenset((a.entity_id, b.entity_id))
+        ga, gb = int(groups[ia]), int(groups[ib])
+        same_group = ga == gb
+        key: frozenset[Any] = (
+            frozenset((a.entity_id, b.entity_id))
+            if same_group
+            else frozenset((("g", ga), ("g", gb)))
+        )
         if key in seen:
-            continue  # the same pair the other way round, at another lag or metric
+            continue  # the same relation the other way round, at another lag or metric
         seen.add(key)
         lag = int(pairs.lag[k])
         r = float(pairs.r[k])
         flags = []
-        if abs(r) > DUPLICATE_R:
+        if same_group:
             flags.append("duplicate_suspect")
         dev = devices.get(a.entity_id)
         if dev is not None and dev == devices.get(b.entity_id):
@@ -607,6 +687,8 @@ def select_findings(
                 "q_value": float(pairs.q[k]),
                 "n_eff": round(float(pairs.n_eff[k])),
                 "flags": flags,
+                "entity_group": [] if same_group else _others(members[ga], a.entity_id),
+                "related_group": [] if same_group else _others(members[gb], b.entity_id),
             }
         )
     # Trivial pairs (one quantity twice, two sensors of one device) go last.
@@ -617,12 +699,17 @@ def select_findings(
     return out
 
 
+def _others(group: list[str], entity_id: str) -> list[str]:
+    return sorted(e for e in group if e != entity_id)[:MAX_GROUP_MEMBERS]
+
+
 def _method(params: CorrelationParams, used_temp: bool) -> str:
     drivers = "hour of day, day of week" + (
         f", outside temperature ({params.outside_temp})" if used_temp else ""
     )
     return (
-        f"hourly residuals after {drivers}; lag 0..{params.max_lag} h; "
+        f"hourly residuals after {drivers}, minus their {HIGHPASS_HOURS} h moving average; "
+        f"lag 0..{params.max_lag} h; near-duplicates (lag-0 |r| >= {DUPLICATE_R}) grouped; "
         "entity_id leads related_entity_id by lag_hours; BH-FDR q-values"
     )
 
@@ -653,7 +740,9 @@ def write_findings(
                 "$entity_id AS entity_id, $metric AS metric, $state AS state, "
                 "$related_entity_id AS related_entity_id, $related_metric AS related_metric, "
                 "$related_state AS related_state, $lag_hours AS lag_hours, $score AS score, "
-                "$q_value AS q_value, $n_eff AS n_eff, $rank AS rank, $flags AS flags",
+                "$q_value AS q_value, $n_eff AS n_eff, $rank AS rank, $flags AS flags, "
+                "$entity_group::VARCHAR[] AS entity_group, "
+                "$related_group::VARCHAR[] AS related_group",
                 findings,
             )
         con.execute("BEGIN TRANSACTION")
@@ -728,6 +817,7 @@ def run(
             grid.series = [grid.series[i] for i in keep]
             grid.values = grid.values[:, keep]
     resid, series = residuals(grid, params.outside_temp)
+    resid = highpass(resid)
     used_temp = bool(params.outside_temp) and any(
         s.entity_id == params.outside_temp and s.metric == "mean" for s in grid.series
     )

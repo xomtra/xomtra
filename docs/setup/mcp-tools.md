@@ -51,14 +51,20 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    a `weather.*` entity (its `temperature` attribute), the outside temperature. A
    temperature covering less than 70 % of the window is not used (the run notes it);
    hours without it are left out of the analysis. Without it, everything that depends
-   on the weather correlates with everything else.
+   on the weather correlates with everything else. Their centred 7-day moving average
+   is then subtracted (a high-pass filter), so slow trends such as growing memory,
+   uptime or a filling disk do not correlate with each other.
 3. Correlation of every pair with a lag of 0–24 hours (the best lag wins), on hours
    both series have; significance corrected for autocorrelation, Bonferroni over lags
    and Benjamini–Hochberg FDR over pairs.
-4. Pairs with `|score| >= 0.3` and `q_value <= 0.01`, one row per pair of entities (the
-   strongest direction, lag and metric), at most 100 per window. Pairs of one entity
-   are skipped; `flags` marks `same_device` and `duplicate_suspect` (`|r| > 0.97`), which
-   are usually trivial and are ranked after the unflagged ones.
+4. Series with a lag-0 `|r| >= 0.95` form a group of near-duplicates (one quantity
+   measured twice: % and MB, a phase and the total, a daily and a monthly counter).
+5. Pairs with `|score| >= 0.3` and `q_value <= 0.01`, at most 100 per window. A relation
+   between two groups is one row (its strongest pair; the other members are in
+   `entity_group` and `related_group`), and every pair of entities appears once (the
+   strongest direction, lag and metric). Pairs of one entity are skipped; `flags` marks
+   `same_device` and `duplicate_suspect` (a pair inside one group), which are usually
+   trivial and are ranked after the unflagged ones.
 
 `entity_id` leads `related_entity_id` by `lag_hours`. `first_detected_at` stays from the
 first run that found the pair; every run replaces the findings of its window. A
