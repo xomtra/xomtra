@@ -43,8 +43,9 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    `[365, 30]`): hourly means of measurements and hourly increases of counters from the
    HA statistics, and for binary and enum entities the share of the hour spent in a
    state (`on`, or up to three most frequent states). Gaps of up to 3 hours are filled
-   forward; series with less than 70 % coverage or constant ones are left out. The grid
-   starts at the first hour with data.
+   forward. A series needs at least 7 days of data, 70 % coverage of its own span (an
+   entity added later still takes part) and a value that changes in at least 5 % of
+   hours (nearly constant series correlate with anything).
 2. Residuals after the hour of the day and the day of the week (in `HAMMOND_TIMEZONE`)
    and, if `HAMMOND_CORRELATION_OUTSIDE_TEMP` names an entity with hourly statistics or
    a `weather.*` entity (its `temperature` attribute), the outside temperature. A
@@ -54,9 +55,10 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
 3. Correlation of every pair with a lag of 0–24 hours (the best lag wins), on hours
    both series have; significance corrected for autocorrelation, Bonferroni over lags
    and Benjamini–Hochberg FDR over pairs.
-4. Pairs with `|score| >= 0.3` and `q_value <= 0.01`, at most 100 per window. Pairs of
-   one entity are skipped; `flags` marks `same_device` and `duplicate_suspect` (lag 0,
-   `|r| > 0.97`), which are usually trivial.
+4. Pairs with `|score| >= 0.3` and `q_value <= 0.01`, one row per pair of entities (the
+   strongest direction, lag and metric), at most 100 per window. Pairs of one entity
+   are skipped; `flags` marks `same_device` and `duplicate_suspect` (`|r| > 0.97`), which
+   are usually trivial and are ranked after the unflagged ones.
 
 `entity_id` leads `related_entity_id` by `lag_hours`. `first_detected_at` stays from the
 first run that found the pair; every run replaces the findings of its window. A

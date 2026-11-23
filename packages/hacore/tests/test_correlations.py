@@ -311,3 +311,36 @@ def test_open_meteo_archive_fills_the_driver(plain: duckdb.DuckDBPyConnection) -
     found = {pair(f) for f in findings(plain)}
     assert ("sensor.heating", "sensor.radiator") not in found
     assert ("sensor.radiator", "sensor.heating") not in found
+
+
+def test_trivial_pairs_last_and_one_row_per_pair(plain: duckdb.DuckDBPyConnection) -> None:
+    series = seed(plain)
+    hours = [END - timedelta(hours=HOURS - i) for i in range(HOURS)]
+    a = series["sensor.a"]
+    step = np.where(np.arange(HOURS) < HOURS // 2, 1.0, 2.0)  # one jump: nearly constant
+    extra = {"sensor.a_percent": a * 100 + 7, "sensor.step": step, "sensor.step_too": step * 3}
+    rows = [
+        (sid, "hour", h, float(v), None)
+        for sid, values in extra.items()
+        for h, v in zip(hours, values, strict=True)
+    ]
+    insert(
+        plain,
+        "lake.silver.statistics",
+        ["statistic_id", "period", "period_start", "mean", "sum"],
+        rows,
+    )
+    corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
+    found = findings(plain)
+    pairs = [frozenset((f["entity_id"], f["related_entity_id"])) for f in found]
+    assert len(pairs) == len(set(pairs))  # never both directions of one pair
+    assert not any("sensor.step" in p or "sensor.step_too" in p for p in pairs)
+    dup = next(
+        f
+        for f in found
+        if pair(f) in {("sensor.a", "sensor.a_percent"), ("sensor.a_percent", "sensor.a")}
+    )
+    assert "duplicate_suspect" in dup["flags"]  # type: ignore[operator]
+    flagged = [bool(f["flags"]) for f in found]
+    assert flagged == sorted(flagged)  # unflagged first
+    assert not found[0]["flags"]
