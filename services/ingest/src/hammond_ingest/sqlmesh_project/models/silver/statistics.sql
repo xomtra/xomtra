@@ -5,6 +5,8 @@ MODEL (
     lookback 6,
     batch_size 720
   ),
+  -- Same as bronze; see silver.states for why the partitioning is explicit.
+  partitioned_by (period, year(period_start)),
   cron '@hourly',
   start '5 years ago',
   grain (statistic_id, period, period_start),

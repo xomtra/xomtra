@@ -8,6 +8,10 @@ MODEL (
     -- attributes; a week per batch needed more than 8 GB of memory (deduplication)
     batch_size 6
   ),
+  -- Explicit coarse partitions: by default SQLMesh partitions an incremental model by
+  -- its time column, which on DuckLake means one directory and file per distinct
+  -- timestamp (hundreds of thousands of files per batch, memory exhaustion).
+  partitioned_by year(last_updated),
   cron '@hourly',
   -- HAmmond only has what the HA recorder still holds (10 days by default, ADR 033);
   -- an earlier start would only add empty 6-hour batches to the first plan.

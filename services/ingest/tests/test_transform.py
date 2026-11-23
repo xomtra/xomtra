@@ -84,6 +84,23 @@ def test_silver_models_build_on_ducklake(lake_paths: tuple[str, str, str]) -> No
         ).fetchone()
         assert entity == ("Kitchen", "Ground", "°C", "temperature", True, ["x", "y"])
         assert con.execute("SELECT count(*) FROM lake.silver.statistics").fetchone() == (1,)
+        # Coarse partitions, never one per timestamp (the SQLMesh default for the time
+        # column, which produced a directory per row on a real installation).
+        partitions = {
+            row[0]: row[1]
+            for row in con.execute(
+                "SELECT t.table_name, string_agg(c.column_name || ':' || p.transform, ',') "
+                "FROM __ducklake_metadata_lake.ducklake_partition_column p "
+                "JOIN __ducklake_metadata_lake.ducklake_table t USING (table_id) "
+                "JOIN __ducklake_metadata_lake.ducklake_column c "
+                "  ON c.table_id = p.table_id AND c.column_id = p.column_id "
+                "WHERE t.end_snapshot IS NULL AND c.end_snapshot IS NULL "
+                "  AND t.table_name LIKE 'silver__%' GROUP BY ALL"
+            ).fetchall()
+        }
+        timestamp_identity = ("last_updated:identity", "period_start:identity")
+        assert not any(t in v for v in partitions.values() for t in timestamp_identity), partitions
+        assert any(k.startswith("silver__states__") for k in partitions), partitions
     finally:
         con.close()
 

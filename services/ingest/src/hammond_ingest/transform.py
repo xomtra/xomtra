@@ -97,6 +97,9 @@ def build_config(
         gateways={GATEWAY: GatewayConfig(connection=connection, state_connection=state)},
         default_gateway=GATEWAY,
         model_defaults=ModelDefaultsConfig(dialect="duckdb"),
+        # No telemetry from a private installation (SQLMesh sends anonymous usage
+        # events to its vendor by default).
+        disable_anonymized_analytics=True,
         # The project ships inside the (read-only) package; the cache goes elsewhere.
         cache_dir=str(Path(tempfile.gettempdir()) / "hammond-sqlmesh-cache"),
     )
