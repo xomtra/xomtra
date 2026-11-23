@@ -59,6 +59,12 @@ class LakeSettings:
     s3_use_ssl: bool = False
     data_prefix: str = "lake/"
     extension_dir: str | None = None
+    # DuckDB resources (ADR 031): a bounded memory budget that spills to disk instead of
+    # taking the whole VM. ``temp_directory`` should be on a disk volume, not on tmpfs.
+    memory_limit: str = "2GB"
+    threads: int = 2
+    temp_directory: str | None = None
+    max_temp_directory_size: str = "8GB"
 
     def __repr__(self) -> str:  # never leak secrets into logs
         return (
@@ -99,7 +105,27 @@ class LakeSettings:
             s3_use_ssl=_bool(e.get("HAMMOND_S3_USE_SSL"), default=False),
             data_prefix=(e.get("HAMMOND_LAKE_DATA_PREFIX") or "lake/").strip("/") + "/",
             extension_dir=e.get("HAMMOND_DUCKDB_EXTENSION_DIR") or None,
+            memory_limit=e.get("HAMMOND_DUCKDB_MEMORY_LIMIT") or "2GB",
+            threads=int(e.get("HAMMOND_DUCKDB_THREADS") or "2"),
+            temp_directory=e.get("HAMMOND_DUCKDB_TEMP_DIR") or None,
+            max_temp_directory_size=e.get("HAMMOND_DUCKDB_MAX_TEMP_SIZE") or "8GB",
         )
+
+    def duckdb_config(self) -> dict[str, Any]:
+        """DuckDB connection options shared by the ingest and SQLMesh."""
+        config: dict[str, Any] = {
+            "autoinstall_known_extensions": False,
+            "memory_limit": self.memory_limit,
+            "threads": self.threads,
+            "max_temp_directory_size": self.max_temp_directory_size,
+            # Large INSERT ... SELECT need not keep the input order; saves memory.
+            "preserve_insertion_order": False,
+        }
+        if self.extension_dir:
+            config["extension_directory"] = self.extension_dir
+        if self.temp_directory:
+            config["temp_directory"] = self.temp_directory
+        return config
 
     @property
     def catalog_dsn(self) -> str:
@@ -142,10 +168,7 @@ def attach_sql(settings: LakeSettings, alias: str = LAKE_ALIAS) -> str:
 
 def connect(settings: LakeSettings, *, alias: str = LAKE_ALIAS) -> duckdb.DuckDBPyConnection:
     """Open an in-memory DuckDB connection with the lake attached as ``alias``."""
-    config: dict[str, Any] = {"autoinstall_known_extensions": False}
-    if settings.extension_dir:
-        config["extension_directory"] = settings.extension_dir
-    con = duckdb.connect(config=config)
+    con = duckdb.connect(config=settings.duckdb_config())
     try:
         # Timestamps are stored and compared in UTC regardless of the host time zone.
         con.execute("SET TimeZone = 'UTC'")

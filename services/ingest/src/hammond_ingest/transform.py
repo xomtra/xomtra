@@ -53,11 +53,16 @@ def catalog_uri(settings: LakeSettings) -> str:
     return f"postgres:postgresql://{user}:{password}@{settings.pg_host}:{settings.pg_port}/{db}"
 
 
-def _connector_config(extension_dir: str | None) -> dict[str, Any]:
-    config: dict[str, Any] = {"TimeZone": "UTC", "autoinstall_known_extensions": "false"}
+def _connector_config(
+    extension_dir: str | None, settings: LakeSettings | None = None
+) -> dict[str, Any]:
+    config: dict[str, Any] = {"TimeZone": "UTC"}
+    if settings is not None:
+        config.update(settings.duckdb_config())
+    config["autoinstall_known_extensions"] = False
     if extension_dir:
         config["extension_directory"] = extension_dir
-    return config
+    return {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in config.items()}
 
 
 def lake_connection(settings: LakeSettings) -> DuckDBConnectionConfig:
@@ -80,7 +85,7 @@ def lake_connection(settings: LakeSettings) -> DuckDBConnectionConfig:
                 data_inlining_row_limit=0,
             )
         },
-        connector_config=_connector_config(settings.extension_dir),
+        connector_config=_connector_config(settings.extension_dir, settings),
         secrets={"hammond_s3": secret},
     )
 

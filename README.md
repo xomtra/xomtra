@@ -45,11 +45,13 @@ only allowed when it listens on a loopback address (local development).
 
 Please report vulnerabilities privately, see [SECURITY.md](SECURITY.md).
 Container images are published to `ghcr.io/zettabyte-cz/` and signed with
-[cosign](https://docs.sigstore.dev/) (keyless, GitHub OIDC). Verify before deploying:
+[cosign](https://docs.sigstore.dev/) v3 (keyless, GitHub OIDC; the signature is stored
+in the new bundle format, which cosign v2 does not find). Verify with cosign v3 before
+deploying (the repository name in the identity is case-sensitive: `HAmmond`):
 
 ```bash
 cosign verify ghcr.io/zettabyte-cz/hammond-mcp@sha256:<digest> \
-  --certificate-identity-regexp '^https://github.com/zettabyte-cz/hammond/\.github/workflows/ci\.yml@refs/heads/main$' \
+  --certificate-identity-regexp '^https://github.com/zettabyte-cz/HAmmond/\.github/workflows/ci\.yml@refs/heads/main$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
