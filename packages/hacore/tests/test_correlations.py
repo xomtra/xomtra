@@ -344,3 +344,44 @@ def test_trivial_pairs_last_and_one_row_per_pair(plain: duckdb.DuckDBPyConnectio
     flagged = [bool(f["flags"]) for f in found]
     assert flagged == sorted(flagged)  # unflagged first
     assert not found[0]["flags"]
+
+
+def test_near_duplicates_grouped(plain: duckdb.DuckDBPyConnection) -> None:
+    series = seed(plain)
+    hours = [END - timedelta(hours=HOURS - i) for i in range(HOURS)]
+    rng = np.random.default_rng(7)
+    a = series["sensor.a"]
+    rows = [
+        ("sensor.a_copy", "hour", h, float(v), None)
+        for h, v in zip(hours, a * 2 + rng.normal(0, 0.01, HOURS), strict=True)
+    ]
+    insert(
+        plain,
+        "lake.silver.statistics",
+        ["statistic_id", "period", "period_start", "mean", "sum"],
+        rows,
+    )
+    corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
+    found = findings(plain)
+    to_b = [f for f in found if "sensor.b" in pair(f) and not f["flags"]]
+    # a -> b and a_copy -> b are one relation, reported once with the group listed.
+    assert len([f for f in to_b if {"sensor.a", "sensor.a_copy"} & set(pair(f))]) == 1
+    row = next(f for f in to_b if {"sensor.a", "sensor.a_copy"} & set(pair(f)))
+    groups = set(row["entity_group"]) | set(row["related_group"])  # type: ignore[arg-type]
+    assert groups & {"sensor.a", "sensor.a_copy"}
+    dup = [f for f in found if set(pair(f)) == {"sensor.a", "sensor.a_copy"}]
+    assert dup
+    assert "duplicate_suspect" in dup[0]["flags"]  # type: ignore[operator]
+
+
+def test_highpass_removes_shared_trend() -> None:
+    rng = np.random.default_rng(3)
+    n = 24 * 60
+    trend = np.linspace(0, 50, n)
+    x = np.column_stack([trend + rng.normal(0, 1, n), trend * 2 + rng.normal(0, 1, n)])
+    raw = np.corrcoef(x.T)[0, 1]
+    hp = corr.highpass(x)
+    ok = ~np.isnan(hp).any(axis=1)
+    assert raw > 0.9
+    assert abs(np.corrcoef(hp[ok].T)[0, 1]) < 0.15
+    assert corr.highpass(x, 0) is x
