@@ -28,6 +28,23 @@ class IngestSettings(BaseSettings):
     # Days of state history the daily catalog profile looks at (ADR 037).
     catalog_window_days: int = Field(default=30, ge=1, le=365)
 
+    # Correlations between entities (phase 1b.1, ADR 042): one run per window, findings
+    # in ``catalog.finding``. The outside temperature (an entity_id with hourly
+    # statistics, or a weather.* entity and its temperature attribute) is regressed out
+    # as a common driver when set.
+    correlation_windows_days: list[int] = Field(default_factory=lambda: [365, 30])
+    correlation_outside_temp: str = ""
+    correlation_max_lag_hours: int = Field(default=24, ge=0, le=168)
+    correlation_min_coverage: float = Field(default=0.7, gt=0, le=1)
+    correlation_min_r: float = Field(default=0.3, gt=0, lt=1)
+    correlation_max_q: float = Field(default=0.01, gt=0, le=1)
+    correlation_top: int = Field(default=100, ge=1, le=1000)
+    # Hourly outside temperature history from the Open-Meteo archive (ADR 043) for the
+    # hours the outside temperature entity has no data. Sends the HA home coordinates,
+    # rounded to ~1 km, to Open-Meteo; off by default.
+    open_meteo_enabled: bool = False
+    open_meteo_url: str = "https://archive-api.open-meteo.com/v1/archive"
+
     stream_flush_seconds: float = Field(default=30.0, gt=0)
     stream_max_buffer: int = Field(default=5_000, gt=0)
     stream_max_catchup_days: int = Field(default=10, ge=0)
@@ -47,6 +64,20 @@ class IngestSettings(BaseSettings):
     @classmethod
     def _strip(cls, v: str) -> str:
         return v.rstrip("/")
+
+    @field_validator("open_meteo_url")
+    @classmethod
+    def _https(cls, v: str) -> str:
+        if not v.startswith("https://"):
+            raise ValueError("HAMMOND_OPEN_METEO_URL must use https")
+        return v
+
+    @field_validator("correlation_windows_days")
+    @classmethod
+    def _windows(cls, v: list[int]) -> list[int]:
+        if not v or any(d < 7 or d > 5 * 365 for d in v):
+            raise ValueError("correlation windows must be 7..1825 days")
+        return sorted(set(v), reverse=True)
 
     @property
     def retention(self) -> Retention:

@@ -8,6 +8,7 @@ license = "Apache-2.0"
 dependencies = [
   "websockets>=15.0",
   "duckdb>=1.4",
+  "numpy>=2.2",
 ]
 
 [build-system]

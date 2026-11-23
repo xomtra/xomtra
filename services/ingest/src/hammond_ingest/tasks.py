@@ -12,7 +12,7 @@ from typing import Any
 
 import duckdb
 
-from hacore import bronze, catalog, ingest, lake, maintenance
+from hacore import bronze, catalog, correlations, ingest, lake, maintenance, weather
 from hacore.client import HAClient
 from hammond_ingest import transform
 from hammond_ingest.settings import IngestSettings
@@ -99,6 +99,51 @@ def profile_catalog(settings: IngestSettings | None = None) -> dict[str, Any]:
     with open_lake() as con:
         result = catalog.profile(con, window=timedelta(days=s.catalog_window_days))
     return {"entities": result.entities, "drift": result.drift}
+
+
+def sync_outside_temperature(settings: IngestSettings | None = None) -> dict[str, Any]:
+    """Open-Meteo archive of the outside temperature at the HA home (ADR 043).
+
+    A failure is reported, not raised: the correlations run without the older hours.
+    """
+    s = settings or IngestSettings()
+    if not s.open_meteo_enabled:
+        return {"skipped": "HAMMOND_OPEN_METEO_ENABLED is off"}
+
+    async def home(ha: HAClient, _con: duckdb.DuckDBPyConnection) -> tuple[float, float]:
+        config = await ha.get_config()
+        return float(config["latitude"]), float(config["longitude"])
+
+    try:
+        lat, lon = _with_ha(home, s)
+        fetch = functools.partial(weather.fetch_archive, url=s.open_meteo_url)
+        with open_lake() as con:
+            days = max(s.correlation_windows_days) + 1
+            result = weather.sync(con, lat, lon, days=days, fetch=fetch)
+    except (OSError, ValueError, KeyError) as err:  # network, HTTP, JSON, config
+        logger.warning("Open-Meteo archive not updated: %s", err)
+        return {"error": str(err)}
+    return result.as_dict()
+
+
+def find_correlations(settings: IngestSettings | None = None) -> list[dict[str, Any]]:
+    """Correlations for every configured window (ADR 042), findings in catalog.finding."""
+    s = settings or IngestSettings()
+    out = []
+    with open_lake() as con:
+        for days in s.correlation_windows_days:
+            params = correlations.CorrelationParams(
+                window_days=days,
+                max_lag=s.correlation_max_lag_hours,
+                min_coverage=s.correlation_min_coverage,
+                min_r=s.correlation_min_r,
+                max_q=s.correlation_max_q,
+                top=s.correlation_top,
+                outside_temp=s.correlation_outside_temp or None,
+                timezone=s.timezone,
+            )
+            out.append(correlations.run(con, params).as_dict())
+    return out
 
 
 def parse_time(value: str) -> datetime:

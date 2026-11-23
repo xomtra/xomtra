@@ -16,7 +16,7 @@ Every call passes a policy layer by Entra app role and is audited.
 | `server_info`, `ha_overview` | server version, live registry counts (Admin) |
 
 Views: `entities`, `states`, `statistics`, `statistics_meta`, `catalog_entity`,
-`catalog_drift` (Admin only by default). Times are UTC; daily buckets of
+`catalog_finding`, `catalog_drift` (Admin only by default). Times are UTC; daily buckets of
 `get_timeseries` use `HAMMOND_TIMEZONE`.
 
 ## Catalog
@@ -33,6 +33,58 @@ Run it once right after deploying (the first run records no drift):
 sudo docker compose exec dagster-daemon hammond-ingest catalog
 ```
 
+## Correlations (phase 1b.1)
+
+After the profile, `catalog_daily` looks for entities that move together and writes the
+strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
+'correlation'`). The method comes from the prototype script `ha_correlations.py`:
+
+1. An hourly grid over each window of `HAMMOND_CORRELATION_WINDOWS_DAYS` (default
+   `[365, 30]`): hourly means of measurements and hourly increases of counters from the
+   HA statistics, and for binary and enum entities the share of the hour spent in a
+   state (`on`, or up to three most frequent states). Gaps of up to 3 hours are filled
+   forward; series with less than 70 % coverage or constant ones are left out. The grid
+   starts at the first hour with data.
+2. Residuals after the hour of the day and the day of the week (in `HAMMOND_TIMEZONE`)
+   and, if `HAMMOND_CORRELATION_OUTSIDE_TEMP` names an entity with hourly statistics or
+   a `weather.*` entity (its `temperature` attribute), the outside temperature. A
+   temperature covering less than 70 % of the window is not used (the run notes it);
+   hours without it are left out of the analysis. Without it, everything that depends
+   on the weather correlates with everything else.
+3. Correlation of every pair with a lag of 0–24 hours (the best lag wins), on hours
+   both series have; significance corrected for autocorrelation, Bonferroni over lags
+   and Benjamini–Hochberg FDR over pairs.
+4. Pairs with `|score| >= 0.3` and `q_value <= 0.01`, at most 100 per window. Pairs of
+   one entity are skipped; `flags` marks `same_device` and `duplicate_suspect` (lag 0,
+   `|r| > 0.97`), which are usually trivial.
+
+`entity_id` leads `related_entity_id` by `lag_hours`. `first_detected_at` stays from the
+first run that found the pair; every run replaces the findings of its window. A
+correlation is a hint to look at, not a cause.
+
+```sh
+sudo docker compose exec dagster-daemon hammond-ingest correlations
+```
+
+### Outside temperature history from Open-Meteo
+
+A `weather.*` entity only has the history HAmmond collected. With
+`HAMMOND_OPEN_METEO_ENABLED=true`, `catalog_daily` first stores the hourly
+`temperature_2m` of the [Open-Meteo historical archive](https://open-meteo.com/en/docs/historical-weather-api)
+for the HA home location (from the HA configuration, rounded to two decimals, about
+1 km) into `bronze.ext_outside_temperature`, for the longest correlation window, and
+the correlations fill the hours the outside temperature entity lacks from it. The
+archive lags a few days; the entity covers the recent hours. The ingest needs outbound
+HTTPS to `archive-api.open-meteo.com`; a failed download is logged and the correlations
+run without it. Open-Meteo is free for non-commercial use; check its terms otherwise.
+
+```sh
+sudo docker compose exec dagster-daemon hammond-ingest outside-temperature
+```
+
+Example question for Claude: *"Which findings in catalog_finding for the 365-day
+window are not flagged, and what could explain the top five?"*
+
 ## Roles and policy
 
 The built-in policy (`services/mcp-server/src/hammond_mcp/policy.yaml`):
@@ -44,9 +96,10 @@ The built-in policy (`services/mcp-server/src/hammond_mcp/policy.yaml`):
 | no role | `whoami` only | – | – | – | – |
 
 Hidden entities and columns are filtered inside the database (the views a caller can
-query already exclude them); asking for a hidden entity directly is refused and audited
-as `denied`. State attributes are hidden from Reader because they carry free text (media
-titles, addresses, coordinates, e-mails) also outside the hidden domains. To change
+query already exclude them; a finding is hidden when either of its entities is); asking
+for a hidden entity directly is refused and audited as `denied`. State attributes are
+hidden from Reader because they carry free text (media titles, addresses, coordinates,
+e-mails) also outside the hidden domains. To change
 the policy, mount your own file into the `mcp` container and set `HAMMOND_POLICY_FILE`.
 
 Assign the roles in Entra: **Enterprise applications → HAmmond MCP → Users and groups**

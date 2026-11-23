@@ -1062,12 +1062,14 @@ version = "0.1.0"
 source = { editable = "packages/hacore" }
 dependencies = [
     { name = "duckdb" },
+    { name = "numpy" },
     { name = "websockets" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "duckdb", specifier = ">=1.4" },
+    { name = "numpy", specifier = ">=2.2" },
     { name = "websockets", specifier = ">=15.0" },
 ]
 

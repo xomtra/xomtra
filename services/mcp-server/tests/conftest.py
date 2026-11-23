@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from hacore import catalog
+from hacore import catalog, correlations
 from hacore.lake import connect_local, install_extensions
 from hammond_mcp.data import DataAccess
 
@@ -81,6 +81,43 @@ def _seed(catalog_path: str, data_path: str) -> None:
             "has_mean) VALUES ('sensor.temp', '°C', TRUE)"
         )
         catalog.profile(con, now=NOW)
+        # One correlation with a visible pair and one with a hidden related entity.
+        base = {"metric": "mean", "state": None, "related_metric": "share", "lag_hours": 0}
+        findings = [
+            {
+                **base,
+                "finding_id": "f1",
+                "entity_id": "sensor.temp",
+                "related_entity_id": "binary_sensor.door",
+                "related_state": "on",
+                "score": 0.6,
+                "q_value": 1e-6,
+                "n_eff": 500,
+                "rank": 1,
+                "flags": [],
+            },
+            {
+                **base,
+                "finding_id": "f2",
+                "entity_id": "sensor.temp",
+                "related_entity_id": "person.jana",
+                "related_state": "home",
+                "score": 0.5,
+                "q_value": 1e-5,
+                "n_eff": 500,
+                "rank": 2,
+                "flags": [],
+            },
+        ]
+        correlations.write_findings(
+            con,
+            findings,
+            window_days=30,
+            period_start=NOW - timedelta(days=30),
+            period_end=NOW,
+            method="test",
+            now=NOW,
+        )
     finally:
         con.close()
 
