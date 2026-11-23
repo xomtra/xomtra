@@ -3,7 +3,8 @@
 Jobs
     ``ingest_hourly``     registries -> statistics -> SQLMesh run (scheduled hourly)
     ``retention_daily``   retention -> DuckLake maintenance (scheduled daily)
-    ``catalog_daily``     entity profile and drift into ``catalog.*`` (scheduled daily)
+    ``catalog_daily``     entity profile and drift into ``catalog.*``, then correlations
+                          between entities into ``catalog.finding`` (scheduled daily)
     ``history_backfill``  state history of a range from the HA recorder (manual)
     ``silver_restate``    recompute silver for a range (manual, or the sensor
                           ``restate_after_catchup`` after a long stream outage)
@@ -109,9 +110,16 @@ def retention_daily() -> None:
     lake_maintenance(after=retention())
 
 
+@op(ins={"after": In(Nothing)})
+def find_correlations(context: OpExecutionContext) -> None:
+    for window in tasks.find_correlations():
+        context.log.info(f"Correlations: {window}")
+
+
 @job
 def catalog_daily() -> None:
-    profile_catalog()
+    # Correlations pick binary/enum states from the fresh profile.
+    find_correlations(after=profile_catalog())
 
 
 @job

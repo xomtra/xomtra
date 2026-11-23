@@ -12,7 +12,7 @@ from typing import Any
 
 import duckdb
 
-from hacore import bronze, catalog, ingest, lake, maintenance
+from hacore import bronze, catalog, correlations, ingest, lake, maintenance
 from hacore.client import HAClient
 from hammond_ingest import transform
 from hammond_ingest.settings import IngestSettings
@@ -99,6 +99,26 @@ def profile_catalog(settings: IngestSettings | None = None) -> dict[str, Any]:
     with open_lake() as con:
         result = catalog.profile(con, window=timedelta(days=s.catalog_window_days))
     return {"entities": result.entities, "drift": result.drift}
+
+
+def find_correlations(settings: IngestSettings | None = None) -> list[dict[str, Any]]:
+    """Correlations for every configured window (ADR 042), findings in catalog.finding."""
+    s = settings or IngestSettings()
+    out = []
+    with open_lake() as con:
+        for days in s.correlation_windows_days:
+            params = correlations.CorrelationParams(
+                window_days=days,
+                max_lag=s.correlation_max_lag_hours,
+                min_coverage=s.correlation_min_coverage,
+                min_r=s.correlation_min_r,
+                max_q=s.correlation_max_q,
+                top=s.correlation_top,
+                outside_temp=s.correlation_outside_temp or None,
+                timezone=s.timezone,
+            )
+            out.append(correlations.run(con, params).as_dict())
+    return out
 
 
 def parse_time(value: str) -> datetime:

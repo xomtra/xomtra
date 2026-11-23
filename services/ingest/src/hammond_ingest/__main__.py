@@ -7,6 +7,7 @@ hammond-ingest transform                    # SQLMesh plan/run bronze -> silver
 hammond-ingest restate --start ... --end ...
 hammond-ingest retention | maintenance
 hammond-ingest catalog                      # entity profile and drift (catalog.*)
+hammond-ingest correlations                 # correlations into catalog.finding
 """
 
 from __future__ import annotations
@@ -74,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("retention", help="delete rows older than HAMMOND_*_RETENTION_DAYS")
     sub.add_parser("maintenance", help="compact files, expire snapshots, delete old files")
     sub.add_parser("catalog", help="profile entities and record drift (catalog.*)")
+    sub.add_parser("correlations", help="correlations between entities (catalog.finding)")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -106,6 +108,8 @@ def main(argv: list[str] | None = None) -> int:
             tasks.lake_maintenance(settings)
         case "catalog":
             _print(tasks.profile_catalog(settings))
+        case "correlations":
+            _print(tasks.find_correlations(settings))
     return 0
 
 

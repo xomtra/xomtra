@@ -63,3 +63,32 @@ def test_settings_defaults_and_uri(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_cli_requires_command() -> None:
     with pytest.raises(SystemExit):
         main([])
+
+
+def test_catalog_daily_runs_correlations_after_profile() -> None:
+    defs = build_definitions(IngestSettings())
+    job = defs.resolve_job_def("catalog_daily")
+    deps = job.graph.dependencies
+    assert {n.name for n in job.graph.node_defs} == {"profile_catalog", "find_correlations"}
+    assert any("find_correlations" in str(k) for k in deps)
+
+
+def test_correlation_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = IngestSettings()
+    assert s.correlation_windows_days == [365, 30]
+    assert s.correlation_outside_temp == ""
+    monkeypatch.setenv("HAMMOND_CORRELATION_WINDOWS_DAYS", "[30, 90, 30]")
+    monkeypatch.setenv("HAMMOND_CORRELATION_OUTSIDE_TEMP", "sensor.outdoor")
+    s = IngestSettings()
+    assert s.correlation_windows_days == [90, 30]
+    assert s.correlation_outside_temp == "sensor.outdoor"
+    with pytest.raises(ValueError, match=r"7\.\.1825"):
+        IngestSettings(correlation_windows_days=[3])
+
+
+def test_cli_correlations(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(tasks, "find_correlations", lambda settings: [{"window_days": 30}])
+    assert main(["correlations"]) == 0
+    assert '"window_days": 30' in capsys.readouterr().out

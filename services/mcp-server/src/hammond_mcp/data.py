@@ -37,7 +37,7 @@ Resolution = Literal["auto", "raw", "5minute", "hour", "day"]
 class View:
     name: str
     source: str  # relative to the lake alias
-    entity_column: str
+    entity_columns: tuple[str, ...]  # a row is hidden if any of them is a denied entity
     description: str
 
 
@@ -47,43 +47,53 @@ VIEWS: dict[str, View] = {
         View(
             "entities",
             "silver.entities",
-            "entity_id",
+            ("entity_id",),
             "Current entities: name, domain, device, area, floor, labels, unit, "
             "device_class, state_class, flags.",
         ),
         View(
             "states",
             "silver.states",
-            "entity_id",
+            ("entity_id",),
             "Every state change: entity_id, state (text), state_value (number or NULL), "
             "is_missing, attributes (JSON), last_changed, last_updated (UTC).",
         ),
         View(
             "statistics",
             "silver.statistics",
-            "statistic_id",
+            ("statistic_id",),
             "Home Assistant long-term statistics per period ('5minute', 'hour'): "
             "mean/min/max for measurements, state/sum for counters; period_start in UTC.",
         ),
         View(
             "statistics_meta",
             "silver.statistics_meta",
-            "statistic_id",
+            ("statistic_id",),
             "Statistics metadata: unit the values are stored in, has_mean, has_sum.",
         ),
         View(
             "catalog_entity",
             "catalog.entity",
-            "entity_id",
+            ("entity_id",),
             "Entity catalog with a profile of the last 30 days: kind, changes per day, "
             "numeric/missing share, value quantiles, top states, stale, range_shift.",
         ),
         View(
             "catalog_drift",
             "catalog.drift",
-            "entity_id",
+            ("entity_id",),
             "Changes between daily catalog profiles: new/removed entities, metadata "
             "changes, stopped/resumed reporting, range shifts.",
+        ),
+        View(
+            "catalog_finding",
+            "catalog.finding",
+            ("entity_id", "related_entity_id"),
+            "Findings of the daily analysis. finding_type 'correlation': entity_id "
+            "(metric mean/delta/share of state) leads related_entity_id by lag_hours; "
+            "score = correlation of hourly residuals after the daily/weekly cycle and the "
+            "outside temperature; q_value = FDR; flags duplicate_suspect, same_device; "
+            "window_days, period_start/end, first_detected_at, detected_at; rank 1 = strongest.",
         ),
     )
 }
@@ -210,7 +220,10 @@ class DataAccess:
             for view in VIEWS.values():
                 if view.source not in existing:
                     continue
-                where = f" WHERE NOT ({deny.format(col=view.entity_column)})" if deny else ""
+                hidden = " OR ".join(
+                    f"coalesce({deny.format(col=col)}, FALSE)" for col in view.entity_columns
+                )
+                where = f" WHERE NOT ({hidden})" if deny else ""
                 cur.execute(
                     f"CREATE TEMP VIEW {view.name} AS "
                     f"SELECT * FROM {LAKE_ALIAS}.{view.source}{where}"

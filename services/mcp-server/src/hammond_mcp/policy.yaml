@@ -24,7 +24,7 @@ roles:
       - list_views
       - get_timeseries
       - query_sql
-    views: [entities, states, statistics, statistics_meta, catalog_entity]
+    views: [entities, states, statistics, statistics_meta, catalog_entity, catalog_finding]
     # Location, presence and security devices are personal data or attack surface.
     deny_entities:
       - "person.*"

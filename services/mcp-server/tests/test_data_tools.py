@@ -105,6 +105,14 @@ async def test_query_sql_row_level_policy(data: DataAccess) -> None:
     assert reader["columns"] == ["domain", "n"]
 
 
+async def test_findings_hide_pairs_with_a_denied_entity(data: DataAccess) -> None:
+    sql = "SELECT finding_id, related_entity_id FROM catalog_finding ORDER BY rank"
+    admin = await call(server(data, ADMIN), "query_sql", sql=sql)
+    reader = await call(server(data, READER), "query_sql", sql=sql)
+    assert [r["finding_id"] for r in admin["rows"]] == ["f1", "f2"]
+    assert [r["finding_id"] for r in reader["rows"]] == ["f1"]
+
+
 async def test_query_sql_rejections_are_audited(data: DataAccess) -> None:
     audit = MemoryAuditSink()
     srv = server(data, READER, audit)
@@ -130,7 +138,14 @@ async def test_query_sql_rejections_are_audited(data: DataAccess) -> None:
 async def test_list_views(data: DataAccess) -> None:
     res = await call(server(data, READER), "list_views")
     names = [v["name"] for v in res["views"]]
-    assert names == ["catalog_entity", "entities", "states", "statistics", "statistics_meta"]
+    assert names == [
+        "catalog_entity",
+        "catalog_finding",
+        "entities",
+        "states",
+        "statistics",
+        "statistics_meta",
+    ]
     states = next(v for v in res["views"] if v["name"] == "states")
     assert {"name": "state_value", "type": "DOUBLE"} in states["columns"]
 
