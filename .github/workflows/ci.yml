@@ -233,10 +233,18 @@ jobs:
           docker compose exec -T dagster-daemon python - <<'PY'
           from hacore import lake
           con = lake.connect(lake.LakeSettings.from_env())
-          for table in ("bronze.ha_states", "bronze.ha_registry", "silver.states", "silver.entities"):
+          for table in ("bronze.ha_states", "bronze.ha_registry", "silver.entities"):
               (n,) = con.execute(f"SELECT count(*) FROM lake.{table}").fetchone()
               print(table, n)
               assert n > 0, table
+          # silver.states holds complete hours only; HA may have started in the current hour.
+          (complete,) = con.execute(
+              "SELECT count(*) FROM lake.bronze.ha_states "
+              "WHERE last_updated < date_trunc('hour', now())"
+          ).fetchone()
+          (silver,) = con.execute("SELECT count(*) FROM lake.silver.states").fetchone()
+          print("bronze states in complete hours", complete, "silver.states", silver)
+          assert silver > 0 or complete == 0, "silver.states"
           PY
       - name: Compose logs on failure
         if: failure()
