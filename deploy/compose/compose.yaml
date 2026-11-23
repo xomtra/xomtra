@@ -31,6 +31,10 @@ x-ingest-env: &ingest-env
   HAMMOND_STATISTICS_5MIN_RETENTION_DAYS: ${HAMMOND_STATISTICS_5MIN_RETENTION_DAYS:-365}
   HAMMOND_STATISTICS_HOUR_RETENTION_DAYS: ${HAMMOND_STATISTICS_HOUR_RETENTION_DAYS:-1825}
   HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
+  # DuckDB budget per process; queries spill to HAMMOND_DUCKDB_TEMP_DIR beyond it.
+  HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_DUCKDB_MEMORY_LIMIT:-2GB}
+  HAMMOND_DUCKDB_THREADS: ${HAMMOND_DUCKDB_THREADS:-2}
+  HAMMOND_DUCKDB_MAX_TEMP_SIZE: ${HAMMOND_DUCKDB_MAX_TEMP_SIZE:-8GB}
 
 x-hardening: &hardening
   restart: unless-stopped
@@ -152,7 +156,11 @@ services:
     <<: *hardening
     image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:main}
     command: ["hammond-ingest", "stream"]
-    environment: *ingest-env
+    environment:
+      <<: *ingest-env
+      HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_STREAM_DUCKDB_MEMORY_LIMIT:-512MB}
+    # Hard caps per container: a runaway query is killed here, not the whole VM.
+    mem_limit: ${HAMMOND_STREAM_MEM_LIMIT:-1g}
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -173,7 +181,12 @@ services:
     <<: *hardening
     image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:main}
     command: ["dagster-daemon", "run", "-w", "/app/dagster/workspace.yaml"]
-    environment: *ingest-env
+    environment:
+      <<: *ingest-env
+      # DuckDB spills here (disk volume); /tmp is tmpfs and would take RAM again.
+      HAMMOND_DUCKDB_TEMP_DIR: /data/duckdb-tmp
+    # Keep above HAMMOND_DUCKDB_MEMORY_LIMIT + ~1 GB for Python, Dagster and SQLMesh.
+    mem_limit: ${HAMMOND_DAGSTER_MEM_LIMIT:-3g}
     volumes:
       - ingest-data:/data
     read_only: true
@@ -190,6 +203,7 @@ services:
     command:
       ["dagster-webserver", "-h", "0.0.0.0", "-p", "3000", "-w", "/app/dagster/workspace.yaml"]
     environment: *ingest-env
+    mem_limit: ${HAMMOND_DAGSTER_WEBSERVER_MEM_LIMIT:-1g}
     ports:
       - "${HAMMOND_DAGSTER_BIND:-127.0.0.1}:3000:3000"
     volumes:

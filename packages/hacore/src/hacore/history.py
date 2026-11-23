@@ -28,7 +28,11 @@ type Period = Literal["5minute", "hour"]
 PERIODS: tuple[Period, ...] = ("5minute", "hour")
 STATISTIC_TYPES = ["mean", "min", "max", "state", "sum", "last_reset"]
 DEFAULT_ENTITY_BATCH = 100
-DEFAULT_HISTORY_WINDOW = timedelta(days=1)
+# One history response must stay below the WebSocket message limit (64 MiB). A real
+# installation (1 700 entities, 800k state changes a day) exceeded it with 1 day x 100
+# entities; 1 hour x 50 entities leaves a wide margin even for chatty sensors.
+DEFAULT_HISTORY_WINDOW = timedelta(hours=1)
+DEFAULT_HISTORY_ENTITY_BATCH = 50
 DEFAULT_STATISTICS_WINDOW: dict[Period, timedelta] = {
     "5minute": timedelta(days=1),
     "hour": timedelta(days=30),
@@ -196,7 +200,7 @@ async def iter_history(
     entity_ids: Sequence[str],
     *,
     window: timedelta = DEFAULT_HISTORY_WINDOW,
-    entity_batch: int = DEFAULT_ENTITY_BATCH,
+    entity_batch: int = DEFAULT_HISTORY_ENTITY_BATCH,
 ) -> AsyncIterator[list[StateRow]]:
     """History of a longer range, one chunk (window x entity batch) at a time."""
     ids = sorted(set(entity_ids))

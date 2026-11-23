@@ -4,10 +4,14 @@ MODEL (
     time_column last_updated,
     -- re-read the last hours: the live stream and its catch-up may deliver late rows
     lookback 3,
-    batch_size 168
+    -- 6 hours per query: a real installation writes ~35k state changes an hour with
+    -- attributes; a week per batch needed more than 8 GB of memory (deduplication)
+    batch_size 6
   ),
   cron '@hourly',
-  start '1 year ago',
+  -- HAmmond only has what the HA recorder still holds (10 days by default, ADR 033);
+  -- an earlier start would only add empty 6-hour batches to the first plan.
+  start '14 days ago',
   grain (entity_id, last_updated),
   description 'Every state change of every entity, one row per (entity_id, last_updated).',
   audits (

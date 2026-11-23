@@ -64,14 +64,19 @@ async def test_live_event_and_history_share_the_key(ha_url: str, tokens: Onboard
         event_row = next(r for r in received if r.state == expected)
         history: list[StateRow] = []
         deadline = asyncio.get_running_loop().time() + 30
-        while not any(r.last_updated_us == event_row.last_updated_us for r in history):
+        while not any(r.state == expected for r in history):
             # The recorder commits asynchronously.
-            assert asyncio.get_running_loop().time() < deadline, (event_row, history)
+            seen = [(r.state, r.last_updated_us) for r in history]
+            assert asyncio.get_running_loop().time() < deadline, (event_row.last_updated_us, seen)
             await asyncio.sleep(0.5)
             history = await history_during_period(
                 ha, start, datetime.now(UTC) + timedelta(seconds=1), [SETPOINT]
             )
-    match = next(r for r in history if r.last_updated_us == event_row.last_updated_us)
+    match = next(r for r in history if r.state == expected)
+    assert match.last_updated_us == event_row.last_updated_us, (
+        match.last_updated_us,
+        event_row.last_updated_us,
+    )
     assert match.state == event_row.state == str(value)
     # The recorder drops "unrecorded" attributes of some integrations (input_number:
     # min/max/step/mode), so history carries a subset of what the live event has.

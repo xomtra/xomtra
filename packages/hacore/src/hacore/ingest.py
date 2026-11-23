@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from hacore import bronze
 from hacore.history import (
+    DEFAULT_HISTORY_WINDOW,
     PERIODS,
     Period,
     iter_history,
@@ -148,7 +149,7 @@ async def backfill_history(
     end: datetime,
     *,
     entity_ids: list[str] | None = None,
-    window: timedelta = timedelta(days=1),
+    window: timedelta = DEFAULT_HISTORY_WINDOW,
     alias: str = LAKE_ALIAS,
 ) -> SyncResult:
     """Copy the recorded state history of ``start``..``end`` into bronze."""

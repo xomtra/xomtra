@@ -44,3 +44,27 @@ def test_round_trip_against_stack() -> None:
     settings = LakeSettings.from_env()
     init(settings)
     check(settings)
+
+
+def test_duckdb_resource_options() -> None:
+    default = LakeSettings.from_env(ENV).duckdb_config()
+    assert default["memory_limit"] == "2GB"
+    assert default["threads"] == 2
+    assert default["preserve_insertion_order"] is False
+    assert "temp_directory" not in default
+    custom = LakeSettings.from_env(
+        {
+            **ENV,
+            "HAMMOND_DUCKDB_MEMORY_LIMIT": "512MB",
+            "HAMMOND_DUCKDB_THREADS": "1",
+            "HAMMOND_DUCKDB_TEMP_DIR": "/data/duckdb-tmp",
+        }
+    ).duckdb_config()
+    assert custom["memory_limit"] == "512MB"
+    assert custom["threads"] == 1
+    assert custom["temp_directory"] == "/data/duckdb-tmp"
+    import duckdb
+
+    con = duckdb.connect(config={k: v for k, v in custom.items() if k != "temp_directory"})
+    assert con.execute("SELECT current_setting('threads')").fetchone() == (1,)
+    con.close()
