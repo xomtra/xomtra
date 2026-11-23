@@ -743,7 +743,7 @@ def write_findings(
                 "$q_value AS q_value, $n_eff AS n_eff, $rank AS rank, $flags AS flags, "
                 "$entity_group::VARCHAR[] AS entity_group, "
                 "$related_group::VARCHAR[] AS related_group",
-                findings,
+                [{"entity_group": [], "related_group": [], **f} for f in findings],
             )
         con.execute("BEGIN TRANSACTION")
         try:
