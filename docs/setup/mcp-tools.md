@@ -55,7 +55,9 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    is then subtracted (a high-pass filter), so slow trends such as growing memory,
    uptime or a filling disk do not correlate with each other.
 3. Correlation of every pair with a lag of 0–24 hours (the best lag wins), on hours
-   both series have; significance corrected for autocorrelation, Bonferroni over lags
+   both series have (Pearson over those hours, residuals clipped to ±4 standard
+   deviations so a few spikes cannot carry a pair); significance corrected for
+   autocorrelation, Bonferroni over lags
    and Benjamini–Hochberg FDR over pairs.
 4. Series with a lag-0 `|r| >= 0.95` form a group of near-duplicates (one quantity
    measured twice: % and MB, a phase and the total, a daily and a monthly counter).

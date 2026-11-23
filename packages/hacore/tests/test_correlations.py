@@ -385,3 +385,17 @@ def test_highpass_removes_shared_trend() -> None:
     assert raw > 0.9
     assert abs(np.corrcoef(hp[ok].T)[0, 1]) < 0.15
     assert corr.highpass(x, 0) is x
+
+
+def test_correlation_is_pearson_over_the_common_hours() -> None:
+    rng = np.random.default_rng(11)
+    n = 2000
+    a = rng.normal(0, 1, n)
+    a[:300] *= 3  # the overlap has its own variance
+    b = np.full(n, np.nan)
+    b[:300] = 0.5 * a[:300] / 3 + rng.normal(0, 1, 300)
+    pairs = corr.lagged_correlations(np.column_stack([a, b]), 0)
+    expected = np.corrcoef(np.clip(a[:300] / a.std(), -4, 4), b[:300])[0, 1]
+    assert len(pairs.r) == 1
+    assert abs(float(pairs.r[0]) - expected) < 0.02
+    assert abs(float(pairs.r[0])) < 0.9

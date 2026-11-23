@@ -103,6 +103,10 @@ MIN_SERIES_HOURS = 168
 # ... and its value must change in at least this share of consecutive known hours:
 # a nearly constant series with a few steps correlates perfectly with any other one.
 MIN_CHANGE_SHARE = 0.05
+# Standardised residuals are clipped to this many standard deviations.
+Z_CLIP = 4.0
+# Minimum variance (in standardised units) of each series over a pair's common hours.
+MIN_OVERLAP_VAR = 0.05
 
 
 @dataclass(frozen=True, slots=True)
@@ -503,7 +507,9 @@ def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
     mean = np.nanmean(resid, axis=0)
     std = np.nanstd(resid, axis=0)
     std[std == 0] = 1.0
-    z = np.nan_to_num((resid - mean) / std)
+    # Winsorised: a few spikes (a backup, a reboot) must not carry a correlation alone.
+    z = np.clip(np.nan_to_num((resid - mean) / std), -Z_CLIP, Z_CLIP)
+    z2 = z**2
 
     r1 = np.zeros(n)
     for i in range(n):
@@ -524,9 +530,14 @@ def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
         a, b = z[: t_len - k], z[k:]
         ma, mb = mask[: t_len - k], mask[k:]
         cnt = ma.T @ mb
-        with np.errstate(invalid="ignore", divide="ignore"):
-            c = np.where(cnt >= MIN_PAIR_HOURS, (a.T @ b) / np.maximum(cnt, 1), 0.0)
-        c = np.clip(c, -1.0, 1.0)
+        c = _pearson(
+            cnt,
+            a.T @ b,
+            sa=a.T @ mb,
+            sb=ma.T @ b,
+            saa=z2[: t_len - k].T @ mb,
+            sbb=ma.T @ z2[k:],
+        )
         if k == 0:
             groups = _groups(np.triu(np.abs(c) >= DUPLICATE_R, 1) & (cnt >= MIN_PAIR_HOURS))
             c = np.triu(c, 1)
@@ -553,6 +564,28 @@ def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
         q=benjamini_hochberg(p),
         groups=groups,
     )
+
+
+def _pearson(
+    cnt: FloatArray,
+    sab: FloatArray,
+    *,
+    sa: FloatArray,
+    sb: FloatArray,
+    saa: FloatArray,
+    sbb: FloatArray,
+) -> FloatArray:
+    """Pearson correlation over the hours both series have, from sums over those hours
+    (the overlap of two series can have its own mean and variance)."""
+    n = np.maximum(cnt, 1)
+    cov = sab - sa * sb / n
+    va = saa - sa**2 / n
+    vb = sbb - sb**2 / n
+    # A series (nearly) constant over the overlap correlates with nothing there.
+    ok = (cnt >= MIN_PAIR_HOURS) & (va > MIN_OVERLAP_VAR * n) & (vb > MIN_OVERLAP_VAR * n)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        r = np.where(ok, cov / np.sqrt(np.maximum(va * vb, 1e-300)), 0.0)
+    return np.clip(np.nan_to_num(r), -1.0, 1.0)
 
 
 def _groups(linked: npt.NDArray[np.bool_]) -> npt.NDArray[np.int64]:
