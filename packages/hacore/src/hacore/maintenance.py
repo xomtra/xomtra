@@ -119,4 +119,6 @@ def compact_and_expire(
     interval = f"INTERVAL '{int(snapshot_retention.total_seconds())} seconds'"
     con.execute(f"CALL ducklake_expire_snapshots({lit}, older_than => now() - {interval})")
     con.execute(f"CALL ducklake_cleanup_old_files({lit}, older_than => now() - {interval})")
+    # Files of aborted writes (e.g. a run killed for memory) are in no snapshot at all.
+    con.execute(f"CALL ducklake_delete_orphaned_files({lit}, older_than => now() - {interval})")
     logger.info("DuckLake maintenance done (snapshots older than %s expired)", snapshot_retention)
