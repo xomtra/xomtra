@@ -69,7 +69,11 @@ def test_catalog_daily_runs_correlations_after_profile() -> None:
     defs = build_definitions(IngestSettings())
     job = defs.resolve_job_def("catalog_daily")
     deps = job.graph.dependencies
-    assert {n.name for n in job.graph.node_defs} == {"profile_catalog", "find_correlations"}
+    assert {n.name for n in job.graph.node_defs} == {
+        "profile_catalog",
+        "sync_outside_temperature",
+        "find_correlations",
+    }
     assert any("find_correlations" in str(k) for k in deps)
 
 
@@ -92,3 +96,11 @@ def test_cli_correlations(
     monkeypatch.setattr(tasks, "find_correlations", lambda settings: [{"window_days": 30}])
     assert main(["correlations"]) == 0
     assert '"window_days": 30' in capsys.readouterr().out
+
+
+def test_outside_temperature_off_by_default() -> None:
+    assert tasks.sync_outside_temperature(IngestSettings()) == {
+        "skipped": "HAMMOND_OPEN_METEO_ENABLED is off"
+    }
+    with pytest.raises(ValueError, match="https"):
+        IngestSettings(open_meteo_url="http://example.org")

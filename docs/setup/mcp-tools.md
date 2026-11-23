@@ -48,9 +48,9 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
 2. Residuals after the hour of the day and the day of the week (in `HAMMOND_TIMEZONE`)
    and, if `HAMMOND_CORRELATION_OUTSIDE_TEMP` names an entity with hourly statistics or
    a `weather.*` entity (its `temperature` attribute), the outside temperature. A
-   temperature covering less than 70 % of the window is not used (the run notes it).
-   Without it, everything that depends on the weather
-   correlates with everything else.
+   temperature covering less than 70 % of the window is not used (the run notes it);
+   hours without it are left out of the analysis. Without it, everything that depends
+   on the weather correlates with everything else.
 3. Correlation of every pair with a lag of 0–24 hours (the best lag wins), on hours
    both series have; significance corrected for autocorrelation, Bonferroni over lags
    and Benjamini–Hochberg FDR over pairs.
@@ -64,6 +64,22 @@ correlation is a hint to look at, not a cause.
 
 ```sh
 sudo docker compose exec dagster-daemon hammond-ingest correlations
+```
+
+### Outside temperature history from Open-Meteo
+
+A `weather.*` entity only has the history HAmmond collected. With
+`HAMMOND_OPEN_METEO_ENABLED=true`, `catalog_daily` first stores the hourly
+`temperature_2m` of the [Open-Meteo historical archive](https://open-meteo.com/en/docs/historical-weather-api)
+for the HA home location (from the HA configuration, rounded to two decimals, about
+1 km) into `bronze.ext_outside_temperature`, for the longest correlation window, and
+the correlations fill the hours the outside temperature entity lacks from it. The
+archive lags a few days; the entity covers the recent hours. The ingest needs outbound
+HTTPS to `archive-api.open-meteo.com`; a failed download is logged and the correlations
+run without it. Open-Meteo is free for non-commercial use; check its terms otherwise.
+
+```sh
+sudo docker compose exec dagster-daemon hammond-ingest outside-temperature
 ```
 
 Example question for Claude: *"Which findings in catalog_finding for the 365-day

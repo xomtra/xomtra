@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from hacore import correlations as corr
+from hacore import weather
 
 NOW = datetime(2026, 6, 1, 12, 30, tzinfo=UTC)
 END = NOW.replace(minute=0)
@@ -276,3 +277,37 @@ def test_short_outside_temperature_is_not_used(plain: duckdb.DuckDBPyConnection)
     assert res.notes == [
         "outside temperature sensor.outside covers only 17% of the window, not used"
     ]
+
+
+def test_open_meteo_archive_fills_the_driver(plain: duckdb.DuckDBPyConnection) -> None:
+    series = seed(plain)
+    outside = series["sensor.outside"]
+    hours = [END - timedelta(hours=HOURS - i) for i in range(HOURS)]
+    archive = dict(zip(hours, (float(v) for v in outside), strict=True))
+    # The entity itself only has the last 10 days.
+    plain.execute(
+        "DELETE FROM lake.silver.statistics WHERE statistic_id = 'sensor.outside' "
+        "AND period_start < $cut",
+        {"cut": END - timedelta(days=10)},
+    )
+    calls: list[tuple[float, float, object, object]] = []
+
+    def fetch(lat: float, lon: float, start: object, end: object) -> list[tuple[datetime, float]]:
+        calls.append((lat, lon, start, end))
+        return [(h, v) for h, v in archive.items() if start <= h.date() <= end]  # type: ignore[operator]
+
+    res = weather.sync(plain, 50.08812, 14.42076, days=DAYS - 1, now=NOW, fetch=fetch)
+    assert calls[0][:2] == (50.09, 14.42)  # rounded before leaving the installation
+    assert res.hours > (DAYS - 2) * 24
+    # A second sync only re-fetches the recent days.
+    weather.sync(plain, 50.08812, 14.42076, days=DAYS - 1, now=NOW, fetch=fetch)
+    assert calls[1][2] == (END - weather.REFETCH).date()
+    stored = plain.execute("SELECT count(*) FROM lake.bronze.ext_outside_temperature").fetchone()
+    assert stored == (res.hours,)
+
+    result = corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
+    assert result.notes == []
+    assert result.temperature_archive_hours > (DAYS - 12) * 24
+    found = {pair(f) for f in findings(plain)}
+    assert ("sensor.heating", "sensor.radiator") not in found
+    assert ("sensor.radiator", "sensor.heating") not in found

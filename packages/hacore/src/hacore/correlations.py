@@ -46,6 +46,7 @@ import duckdb
 import numpy as np
 import numpy.typing as npt
 
+from hacore import weather
 from hacore.lake import LAKE_ALIAS, sql_literal
 
 logger = logging.getLogger(__name__)
@@ -132,6 +133,7 @@ class CorrelationResult:
     hours: int = 0
     pairs_tested: int = 0
     findings: int = 0
+    temperature_archive_hours: int = 0
     period_start: datetime | None = None
     period_end: datetime | None = None
     notes: list[str] = field(default_factory=list)
@@ -144,6 +146,7 @@ class CorrelationResult:
             "hours": self.hours,
             "pairs_tested": self.pairs_tested,
             "findings": self.findings,
+            "temperature_archive_hours": self.temperature_archive_hours,
             "period_start": self.period_start.isoformat() if self.period_start else None,
             "period_end": self.period_end.isoformat() if self.period_end else None,
             "notes": self.notes,
@@ -414,8 +417,12 @@ def residuals(grid: Grid, outside_temp: str | None) -> tuple[FloatArray, list[Se
             ),
             None,
         )
+    # Hours without a (forward-filled) outside temperature are left out: a guessed
+    # temperature would leave the weather in the residuals of exactly those hours.
+    known = np.ones(n, dtype=bool)
     if driver is not None:
-        t = _interpolate(grid.values[:, driver])
+        known = ~np.isnan(grid.values[:, driver])
+        t = np.nan_to_num(grid.values[:, driver])
         cols += [t, t**2]
     x = np.column_stack(cols)
     out = np.full(grid.values.shape, np.nan)
@@ -424,21 +431,13 @@ def residuals(grid: Grid, outside_temp: str | None) -> tuple[FloatArray, list[Se
         if j == driver:
             continue  # the driver is explained away, not a candidate
         y = grid.values[:, j]
-        ok = ~np.isnan(y)
+        ok = ~np.isnan(y) & known
         if ok.sum() < x.shape[1] * 5:
             continue
         beta, *_ = np.linalg.lstsq(x[ok], y[ok], rcond=None)
         out[ok, j] = y[ok] - x[ok] @ beta
         keep.append(j)
     return out[:, keep], [grid.series[j] for j in keep]
-
-
-def _interpolate(y: FloatArray) -> FloatArray:
-    ok = ~np.isnan(y)
-    if not ok.any():
-        return np.zeros_like(y)
-    idx = np.arange(len(y))
-    return np.interp(idx, idx[ok], y[ok])
 
 
 # ---- 3.+4. lagged correlations and significance ---------------------------------------
@@ -678,6 +677,10 @@ def run(
         result.notes.append("not enough data in the window")
         logger.info("Correlations (%d d): not enough data", params.window_days)
         return result
+    if params.outside_temp:
+        result.temperature_archive_hours = fill_from_archive(
+            con, grid, params.outside_temp, alias=alias
+        )
     result.series_total = len(grid.series)
     temp_coverage = _coverage(grid, params.outside_temp)
     grid = clean(grid, params.min_coverage)
@@ -716,6 +719,35 @@ def run(
     result.findings = len(findings)
     logger.info("Correlations: %s", result.as_dict())
     return result
+
+
+def fill_from_archive(
+    con: duckdb.DuckDBPyConnection, grid: Grid, entity_id: str, *, alias: str = LAKE_ALIAS
+) -> int:
+    """Fill the hours the outside temperature series lacks from the stored Open-Meteo
+    archive (ADR 043); add the series if the entity has no data at all. Returns the
+    number of filled hours."""
+    if len(grid.hours) == 0:
+        return 0
+    hours = [_to_dt(h) for h in grid.hours]
+    archive = weather.load(con, hours[0], hours[-1] + timedelta(hours=1), alias)
+    if not archive:
+        return 0
+    j = next(
+        (i for i, s in enumerate(grid.series) if s.entity_id == entity_id and s.metric == "mean"),
+        None,
+    )
+    if j is None:
+        grid.series.append(Series(entity_id, "mean"))
+        grid.values = np.hstack([grid.values, np.full((len(hours), 1), np.nan)])
+        j = len(grid.series) - 1
+    filled = 0
+    column = grid.values[:, j]
+    for i, h in enumerate(hours):
+        if np.isnan(column[i]) and h in archive:
+            column[i] = archive[h]
+            filled += 1
+    return filled
 
 
 def _coverage(grid: Grid, entity_id: str | None) -> float:

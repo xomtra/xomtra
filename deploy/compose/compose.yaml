@@ -37,6 +37,9 @@ x-ingest-env: &ingest-env
   # common driver) and the analysed windows in days.
   HAMMOND_CORRELATION_OUTSIDE_TEMP: ${HAMMOND_CORRELATION_OUTSIDE_TEMP:-}
   HAMMOND_CORRELATION_WINDOWS_DAYS: ${HAMMOND_CORRELATION_WINDOWS_DAYS:-[365, 30]}
+  # Outside temperature history from the Open-Meteo archive (ADR 043); sends the HA
+  # home coordinates rounded to ~1 km to archive-api.open-meteo.com.
+  HAMMOND_OPEN_METEO_ENABLED: ${HAMMOND_OPEN_METEO_ENABLED:-false}
   # DuckDB budget per process; queries spill to HAMMOND_DUCKDB_TEMP_DIR beyond it.
   HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_DUCKDB_MEMORY_LIMIT:-2GB}
   HAMMOND_DUCKDB_THREADS: ${HAMMOND_DUCKDB_THREADS:-2}
