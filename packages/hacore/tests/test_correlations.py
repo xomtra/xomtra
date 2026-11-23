@@ -103,9 +103,13 @@ def seed(con: duckdb.DuckDBPyConnection) -> dict[str, np.ndarray]:
         ["entity_id", "domain", "state", "is_missing", "last_updated"],
         [(e, e.split(".")[0], s, m, ts) for e, s, m, ts in states],
     )
-    con.execute("CREATE TABLE lake.silver.entities (entity_id VARCHAR, device_id VARCHAR)")
     con.execute(
-        "INSERT INTO lake.silver.entities VALUES ('sensor.a', 'dev1'), ('sensor.energy', 'dev1')"
+        "CREATE TABLE lake.silver.entities "
+        "(entity_id VARCHAR, device_id VARCHAR, label_ids VARCHAR[])"
+    )
+    con.execute(
+        "INSERT INTO lake.silver.entities (entity_id, device_id) "
+        "VALUES ('sensor.a', 'dev1'), ('sensor.energy', 'dev1')"
     )
     return series
 
@@ -430,3 +434,16 @@ def test_clocks_and_removed_entities_are_left_out(plain: duckdb.DuckDBPyConnecti
     entities = {e for f in findings(plain) for e in pair(f)}
     assert not entities & set(extra)
     assert {"sensor.a", "sensor.b"} <= entities
+
+
+def test_label_leaves_an_entity_out_of_the_analysis(plain: duckdb.DuckDBPyConnection) -> None:
+    seed(plain)
+    plain.execute(
+        "INSERT INTO lake.silver.entities VALUES "
+        "('sensor.b', 'dev2', ['hammond_no_analysis']), "
+        "('sensor.outside', NULL, ['hammond_no_analysis'])"
+    )
+    result = corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
+    assert result.series_excluded == 1  # the outside temperature stays a driver
+    assert result.notes == []
+    assert not any("sensor.b" in pair(f) for f in findings(plain))

@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from hacore import bronze
+from hacore.exclusions import fetch_no_ingest
 from hacore.history import (
     DEFAULT_HISTORY_WINDOW,
     PERIODS,
@@ -30,6 +31,8 @@ from hacore.lake import LAKE_ALIAS
 from hacore.registry import REGISTRY_COMMANDS
 
 if TYPE_CHECKING:
+    from collections.abc import Collection
+
     import duckdb
 
     from hacore.client import HAClient
@@ -104,12 +107,19 @@ async def sync_statistics(
     start: datetime | None = None,
     end: datetime | None = None,
     lookback: dict[Period, timedelta] | None = None,
+    exclude: Collection[str] | None = None,
     alias: str = LAKE_ALIAS,
 ) -> SyncResult:
-    """Fetch statistics newer than what is stored (or ``start``..``end`` if given)."""
+    """Fetch statistics newer than what is stored (or ``start``..``end`` if given).
+
+    Statistics of entities in ``exclude`` (by default those labelled
+    ``hammond_no_ingest``) are skipped."""
     result = SyncResult()
     now = end or datetime.now(UTC)
-    ids = [m["statistic_id"] for m in await list_statistic_ids(client)]
+    skip = await fetch_no_ingest(client) if exclude is None else exclude
+    ids = [
+        m["statistic_id"] for m in await list_statistic_ids(client) if m["statistic_id"] not in skip
+    ]
     for period in periods:
         lower = start
         if lower is None:
@@ -150,11 +160,17 @@ async def backfill_history(
     *,
     entity_ids: list[str] | None = None,
     window: timedelta = DEFAULT_HISTORY_WINDOW,
+    exclude: Collection[str] | None = None,
     alias: str = LAKE_ALIAS,
 ) -> SyncResult:
-    """Copy the recorded state history of ``start``..``end`` into bronze."""
+    """Copy the recorded state history of ``start``..``end`` into bronze, without the
+    entities in ``exclude`` (by default those labelled ``hammond_no_ingest``)."""
     result = SyncResult()
-    ids = entity_ids or await known_entity_ids(client)
+    skip = await fetch_no_ingest(client) if exclude is None else exclude
+    ids = entity_ids if entity_ids is not None else await known_entity_ids(client)
+    ids = [i for i in ids if i not in skip]
+    if not ids:
+        return result
     async for rows in iter_history(client, start, end, ids, window=window):
         written = await asyncio.to_thread(
             bronze.write_states, lake, rows, source=SOURCE_HISTORY, alias=alias

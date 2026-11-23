@@ -47,6 +47,7 @@ import numpy as np
 import numpy.typing as npt
 
 from hacore import weather
+from hacore.exclusions import load_no_analysis
 from hacore.lake import LAKE_ALIAS, sql_literal
 
 logger = logging.getLogger(__name__)
@@ -154,6 +155,7 @@ class CorrelationResult:
     hours: int = 0
     pairs_tested: int = 0
     findings: int = 0
+    series_excluded: int = 0
     temperature_archive_hours: int = 0
     period_start: datetime | None = None
     period_end: datetime | None = None
@@ -167,6 +169,7 @@ class CorrelationResult:
             "hours": self.hours,
             "pairs_tested": self.pairs_tested,
             "findings": self.findings,
+            "series_excluded": self.series_excluded,
             "temperature_archive_hours": self.temperature_archive_hours,
             "period_start": self.period_start.isoformat() if self.period_start else None,
             "period_end": self.period_end.isoformat() if self.period_end else None,
@@ -402,6 +405,31 @@ def ffill(values: FloatArray, limit: int = FFILL_LIMIT) -> FloatArray:
             break
         out[fill] = prev[fill]
     return out
+
+
+def _drop_excluded(
+    grid: Grid, excluded: frozenset[str], keep_entity: str | None
+) -> tuple[Grid, int]:
+    """Leave out series of entities labelled for no analysis (ADR 044); the outside
+    temperature stays a driver."""
+    idx = [
+        i
+        for i, s in enumerate(grid.series)
+        if s.entity_id not in excluded or s.entity_id == keep_entity
+    ]
+    dropped = len(grid.series) - len(idx)
+    if not dropped:
+        return grid, 0
+    return (
+        Grid(
+            hours=grid.hours,
+            local_hour=grid.local_hour,
+            local_dow=grid.local_dow,
+            series=[grid.series[i] for i in idx],
+            values=grid.values[:, idx],
+        ),
+        dropped,
+    )
 
 
 def clean(grid: Grid, min_coverage: float, keep_entity: str | None = None) -> Grid:
@@ -862,6 +890,9 @@ def run(
         result.notes.append("not enough data in the window")
         logger.info("Correlations (%d d): not enough data", params.window_days)
         return result
+    grid, result.series_excluded = _drop_excluded(
+        grid, load_no_analysis(con, alias), params.outside_temp
+    )
     if params.outside_temp:
         result.temperature_archive_hours = fill_from_archive(
             con, grid, params.outside_temp, alias=alias

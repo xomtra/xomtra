@@ -125,3 +125,38 @@ async def test_long_catch_up_records_gap(
     [(start, end, _)] = bronze.gaps_since(lake, None)
     assert start <= old
     assert end >= missed
+
+
+async def test_labelled_entities_are_not_stored(
+    fake_ha: tuple[FakeHA, str], lake: duckdb.DuckDBPyConnection
+) -> None:
+    fake, url = fake_ha
+    now = datetime.now(UTC)
+    old = now - timedelta(minutes=10)
+    bronze.write_states(
+        lake,
+        [StateRow("sensor.a", "1", None, iso_to_us(old.isoformat()), iso_to_us(old.isoformat()))],
+        source="ha_live",
+    )
+    fake.results["get_states"] = []
+    fake.results["config/entity_registry/list"] = [
+        {"entity_id": "sensor.a"},
+        {"entity_id": "sensor.secret", "labels": ["hammond_no_ingest"]},
+    ]
+    asked: set[str] = set()
+
+    def history(msg: dict[str, Any]) -> dict[str, Any]:
+        asked.update(msg["entity_ids"])
+        return {"sensor.a": [{"s": "2", "a": {}, "lu": (old + timedelta(minutes=1)).timestamp()}]}
+
+    fake.handlers["history/history_during_period"] = history
+    stream = StateStream(url, VALID_TOKEN, lake.cursor, FAST)
+    task = asyncio.create_task(stream.run())
+    await wait_for(lambda: len(stored(lake)) == 2)  # catch-up done, labels known
+    await fake.fire("state_changed", {"new_state": state_obj("sensor.secret", "x", now)})
+    await fake.fire("state_changed", {"new_state": state_obj("sensor.a", "3", now)})
+    await wait_for(lambda: len(stored(lake)) == 3)
+    stream.stop()
+    await asyncio.wait_for(task, 5)
+    assert asked == {"sensor.a"}
+    assert all(e == "sensor.a" for e, _, _ in stored(lake))
