@@ -52,7 +52,7 @@ Then **Grant admin consent for <tenant>**.
 reminder in your calendar). Copy the *Value* → `.env`: `HAMMOND_ENTRA_CLIENT_SECRET`.
 `chmod 600 .env`. Never paste the secret into chats, issues or commits.
 
-## 6. App roles and assignment (used from phase 1a.3, create now)
+## 6. App roles and assignment
 
 **App roles → Create app role** (allowed member types: *Users/Groups*):
 
@@ -64,6 +64,8 @@ reminder in your calendar). Copy the *Value* → `.env`: `HAMMOND_ENTRA_CLIENT_S
 **Enterprise applications → HAmmond MCP → Properties → Assignment required? = Yes**
 (only assigned users can sign in), then **Users and groups → Add user/group** and assign
 yourself the `HAmmond.Admin` role. The `whoami` tool shows the roles from the token.
+What each role may do is described in [Catalog and MCP data tools](mcp-tools.md); a user
+without a role can only call `whoami`.
 
 ## 7. Recommended hardening
 

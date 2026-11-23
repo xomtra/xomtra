@@ -7,6 +7,7 @@ always come from the environment (``deploy/compose/.env``).
 from __future__ import annotations
 
 import ipaddress
+from pathlib import Path
 from typing import Annotated, Literal, Self
 
 from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
@@ -50,13 +51,33 @@ class Settings(BaseSettings):
     ha_url: str | None = None
     ha_token: SecretStr | None = None
 
+    # Access policy (ADR 038); default: the packaged policy.yaml.
+    policy_file: Path | None = None
+    # Roles of the (unauthenticated) caller with HAMMOND_AUTH_MODE=none, local dev only.
+    dev_roles: Annotated[list[str], NoDecode] = ["HAmmond.Admin"]
+
+    # Data tools over the lake (connection from HAMMOND_LAKE_* / HAMMOND_S3_*).
+    data_enabled: bool = True
+    query_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    # Time zone of daily buckets in get_timeseries.
+    timezone: str = "UTC"
+
+    # Audit database (ADR 040). Required with Entra auth: every call must be audited.
+    audit_pg_host: str | None = None
+    audit_pg_port: int = 5432
+    audit_pg_db: str = "audit"
+    audit_pg_user: str = "hammond_audit"
+    audit_pg_password: SecretStr | None = None
+
     @model_validator(mode="before")
     @classmethod
     def _csv_lists(cls, data: object) -> object:
         if isinstance(data, dict):
-            for key in ("entra_required_scopes", "allowed_client_redirect_uris"):
+            for key in ("entra_required_scopes", "allowed_client_redirect_uris", "dev_roles"):
                 if key in data:
                     data[key] = _split_csv(data[key])
+            if data.get("policy_file") == "":
+                data["policy_file"] = None
         return data
 
     @model_validator(mode="after")
@@ -76,6 +97,8 @@ class Settings(BaseSettings):
                 "entra_client_id",
                 "entra_client_secret",
                 "jwt_signing_key",
+                "audit_pg_host",
+                "audit_pg_password",
             )
             if getattr(self, name) is None
         ]
@@ -92,6 +115,24 @@ class Settings(BaseSettings):
     @property
     def ha_configured(self) -> bool:
         return bool(self.ha_url and self.ha_token)
+
+    @property
+    def audit_dsn(self) -> str | None:
+        if not (self.audit_pg_host and self.audit_pg_password):
+            return None
+        parts = {
+            "host": self.audit_pg_host,
+            "port": str(self.audit_pg_port),
+            "dbname": self.audit_pg_db,
+            "user": self.audit_pg_user,
+            "password": self.audit_pg_password.get_secret_value(),
+            "application_name": "hammond-mcp",
+        }
+        return " ".join(f"{k}={_libpq(v)}" for k, v in parts.items())
+
+
+def _libpq(value: str) -> str:
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
 def _is_loopback(host: str) -> bool:

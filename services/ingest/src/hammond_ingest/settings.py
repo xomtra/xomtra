@@ -25,6 +25,9 @@ class IngestSettings(BaseSettings):
     # DuckLake snapshots older than this are expired; their files are then deleted.
     snapshot_retention_days: int = Field(default=7, ge=1)
 
+    # Days of state history the daily catalog profile looks at (ADR 037).
+    catalog_window_days: int = Field(default=30, ge=1, le=365)
+
     stream_flush_seconds: float = Field(default=30.0, gt=0)
     stream_max_buffer: int = Field(default=5_000, gt=0)
     stream_max_catchup_days: int = Field(default=10, ge=0)

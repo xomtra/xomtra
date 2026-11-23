@@ -7,6 +7,7 @@ The ingest copies the history of Home Assistant into the lake and keeps it curre
 | Live stream | every `state_changed` event into `bronze.ha_states`; after a reconnect it fills the gap from the HA history API (catch-up) | service `ingest-stream` |
 | Hourly ingest | registries and statistics metadata (change log), 5-minute and hourly statistics, then SQLMesh `bronze → silver` | Dagster job `ingest_hourly`, every hour at :07 |
 | Retention | deletes old rows (states 365 days, 5-minute statistics 365 days, hourly statistics 5 years by default), compacts files, expires snapshots | Dagster job `retention_daily`, 03:30 |
+| Catalog | profile of every entity over 30 days and drift against the previous day into `catalog.entity` / `catalog.drift` (see [mcp-tools.md](mcp-tools.md)) | Dagster job `catalog_daily`, 04:15 |
 | Restate after outage | recomputes silver for a range the stream caught up after a longer outage | Dagster sensor `restate_after_catchup` → job `silver_restate` |
 | Backfill | the state history Home Assistant still has (recorder, 10 days by default) | Dagster job `history_backfill` or CLI, once |
 

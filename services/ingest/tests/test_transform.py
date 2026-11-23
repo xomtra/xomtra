@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from hacore import bronze
+from hacore import catalog as entity_catalog
 from hacore.history import StateRow, StatisticRow, iso_to_us
 from hacore.lake import LakeSettings, connect_local, install_extensions
 from hammond_ingest import transform
@@ -101,6 +102,14 @@ def test_silver_models_build_on_ducklake(lake_paths: tuple[str, str, str]) -> No
         timestamp_identity = ("last_updated:identity", "period_start:identity")
         assert not any(t in v for v in partitions.values() for t in timestamp_identity), partitions
         assert any(k.startswith("silver__states__") for k in partitions), partitions
+
+        # The catalog profile runs on the real silver views (column names and types).
+        profiled = entity_catalog.profile(con)
+        assert profiled.entities == 1
+        kind = con.execute(
+            "SELECT kind, area_name, statistics_unit FROM lake.catalog.entity"
+        ).fetchone()
+        assert kind == ("measurement", "Kitchen", None)
     finally:
         con.close()
 

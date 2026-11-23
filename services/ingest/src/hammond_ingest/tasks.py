@@ -12,7 +12,7 @@ from typing import Any
 
 import duckdb
 
-from hacore import bronze, ingest, lake, maintenance
+from hacore import bronze, catalog, ingest, lake, maintenance
 from hacore.client import HAClient
 from hammond_ingest import transform
 from hammond_ingest.settings import IngestSettings
@@ -92,6 +92,13 @@ def lake_maintenance(settings: IngestSettings | None = None) -> None:
     s = settings or IngestSettings()
     with open_lake() as con:
         maintenance.compact_and_expire(con, timedelta(days=s.snapshot_retention_days))
+
+
+def profile_catalog(settings: IngestSettings | None = None) -> dict[str, Any]:
+    s = settings or IngestSettings()
+    with open_lake() as con:
+        result = catalog.profile(con, window=timedelta(days=s.catalog_window_days))
+    return {"entities": result.entities, "drift": result.drift}
 
 
 def parse_time(value: str) -> datetime:

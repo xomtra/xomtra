@@ -6,6 +6,7 @@ hammond-ingest backfill --start 10d         # state history from the HA recorder
 hammond-ingest transform                    # SQLMesh plan/run bronze -> silver
 hammond-ingest restate --start ... --end ...
 hammond-ingest retention | maintenance
+hammond-ingest catalog                      # entity profile and drift (catalog.*)
 """
 
 from __future__ import annotations
@@ -72,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--end", required=True)
     sub.add_parser("retention", help="delete rows older than HAMMOND_*_RETENTION_DAYS")
     sub.add_parser("maintenance", help="compact files, expire snapshots, delete old files")
+    sub.add_parser("catalog", help="profile entities and record drift (catalog.*)")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -102,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
             _print(tasks.retention(settings))
         case "maintenance":
             tasks.lake_maintenance(settings)
+        case "catalog":
+            _print(tasks.profile_catalog(settings))
     return 0
 
 

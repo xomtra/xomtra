@@ -4,8 +4,25 @@ from __future__ import annotations
 
 import logging
 
+from hacore.lake import LakeSettings
 from hammond_mcp.config import Settings
+from hammond_mcp.data import DataAccess
 from hammond_mcp.server import create_server
+
+logger = logging.getLogger("hammond_mcp")
+
+
+def build_data(settings: Settings) -> DataAccess | None:
+    if not settings.data_enabled:
+        return None
+    try:
+        lake = LakeSettings.from_env()
+    except ValueError as err:
+        logger.warning("Data tools disabled: %s", err)
+        return None
+    return DataAccess.from_settings(
+        lake, timezone=settings.timezone, query_timeout=settings.query_timeout_seconds
+    )
 
 
 def main() -> None:
@@ -14,7 +31,7 @@ def main() -> None:
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    server = create_server(settings)
+    server = create_server(settings, data=build_data(settings))
     server.run(transport="http", host=settings.host, port=settings.port, show_banner=False)
 
 

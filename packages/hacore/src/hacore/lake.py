@@ -157,16 +157,19 @@ def secret_sql(settings: LakeSettings) -> str:
     )
 
 
-def attach_sql(settings: LakeSettings, alias: str = LAKE_ALIAS) -> str:
+def attach_sql(settings: LakeSettings, alias: str = LAKE_ALIAS, *, read_only: bool = False) -> str:
     # Data inlining is disabled: all rows go to object storage, so that access control
     # on storage prefixes (phase 2) covers all data, not only larger inserts.
+    mode = ", READ_ONLY" if read_only else ""
     return (
         f"ATTACH {sql_literal('ducklake:postgres:' + settings.catalog_dsn)} AS {alias} "
-        f"(DATA_PATH {sql_literal(settings.data_path)}, DATA_INLINING_ROW_LIMIT 0)"
+        f"(DATA_PATH {sql_literal(settings.data_path)}, DATA_INLINING_ROW_LIMIT 0{mode})"
     )
 
 
-def connect(settings: LakeSettings, *, alias: str = LAKE_ALIAS) -> duckdb.DuckDBPyConnection:
+def connect(
+    settings: LakeSettings, *, alias: str = LAKE_ALIAS, read_only: bool = False
+) -> duckdb.DuckDBPyConnection:
     """Open an in-memory DuckDB connection with the lake attached as ``alias``."""
     con = duckdb.connect(config=settings.duckdb_config())
     try:
@@ -175,7 +178,7 @@ def connect(settings: LakeSettings, *, alias: str = LAKE_ALIAS) -> duckdb.DuckDB
         for ext in REQUIRED_EXTENSIONS:
             con.load_extension(ext)
         con.execute(secret_sql(settings))
-        con.execute(attach_sql(settings, alias))
+        con.execute(attach_sql(settings, alias, read_only=read_only))
     except Exception:
         con.close()
         raise
@@ -188,6 +191,7 @@ def connect_local(
     *,
     alias: str = LAKE_ALIAS,
     extension_dir: str | None = None,
+    read_only: bool = False,
 ) -> duckdb.DuckDBPyConnection:
     """DuckLake with a local DuckDB catalog and local data files (tests, development)."""
     config: dict[str, Any] = {"autoinstall_known_extensions": False}
@@ -199,7 +203,8 @@ def connect_local(
         con.load_extension("ducklake")
         con.execute(
             f"ATTACH {sql_literal('ducklake:' + catalog_path)} AS {alias} "
-            f"(DATA_PATH {sql_literal(data_path)}, DATA_INLINING_ROW_LIMIT 0)"
+            f"(DATA_PATH {sql_literal(data_path)}, DATA_INLINING_ROW_LIMIT 0"
+            f"{', READ_ONLY' if read_only else ''})"
         )
     except Exception:
         con.close()
