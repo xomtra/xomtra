@@ -3,6 +3,7 @@
 Jobs
     ``ingest_hourly``     registries -> statistics -> SQLMesh run (scheduled hourly)
     ``retention_daily``   retention -> DuckLake maintenance (scheduled daily)
+    ``catalog_daily``     entity profile and drift into ``catalog.*`` (scheduled daily)
     ``history_backfill``  state history of a range from the HA recorder (manual)
     ``silver_restate``    recompute silver for a range (manual, or the sensor
                           ``restate_after_catchup`` after a long stream outage)
@@ -93,6 +94,11 @@ def lake_maintenance(context: OpExecutionContext) -> None:
     context.log.info("DuckLake maintenance done")
 
 
+@op
+def profile_catalog(context: OpExecutionContext) -> None:
+    context.log.info(f"Catalog: {tasks.profile_catalog()}")
+
+
 @job(tags={"dagster/max_retries": 1})
 def ingest_hourly() -> None:
     transform(after=sync_statistics(after=sync_registries()))
@@ -101,6 +107,11 @@ def ingest_hourly() -> None:
 @job
 def retention_daily() -> None:
     lake_maintenance(after=retention())
+
+
+@job
+def catalog_daily() -> None:
+    profile_catalog()
 
 
 @job
@@ -142,7 +153,7 @@ def restate_after_catchup(context: SensorEvaluationContext) -> SensorResult | Sk
 def build_definitions(settings: IngestSettings | None = None) -> Definitions:
     tz = (settings or IngestSettings()).timezone
     return Definitions(
-        jobs=[ingest_hourly, retention_daily, history_backfill, silver_restate],
+        jobs=[ingest_hourly, retention_daily, catalog_daily, history_backfill, silver_restate],
         sensors=[restate_after_catchup],
         schedules=[
             ScheduleDefinition(
@@ -154,6 +165,13 @@ def build_definitions(settings: IngestSettings | None = None) -> Definitions:
             ScheduleDefinition(
                 job=retention_daily,
                 cron_schedule="30 3 * * *",
+                execution_timezone=tz,
+                default_status=DefaultScheduleStatus.RUNNING,
+            ),
+            # After retention and maintenance, before the morning.
+            ScheduleDefinition(
+                job=catalog_daily,
+                cron_schedule="15 4 * * *",
                 execution_timezone=tz,
                 default_status=DefaultScheduleStatus.RUNNING,
             ),

@@ -1101,14 +1101,20 @@ source = { editable = "services/mcp-server" }
 dependencies = [
     { name = "fastmcp" },
     { name = "hacore" },
+    { name = "psycopg2-binary" },
     { name = "pydantic-settings" },
+    { name = "pyyaml" },
+    { name = "sqlglot" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.0" },
     { name = "hacore", editable = "packages/hacore" },
+    { name = "psycopg2-binary", specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.10" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "sqlglot", specifier = ">=27" },
 ]
 
 [[package]]

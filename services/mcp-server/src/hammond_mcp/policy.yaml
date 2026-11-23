@@ -1,0 +1,39 @@
+# HAmmond access policy (ADR 038): what each Entra app role may do through MCP.
+#
+#   tools          tool names the role may list and call ("*" = all)
+#   views          data views the role may read in query_sql and get_timeseries ("*" = all)
+#   deny_entities  entity_id patterns (shell-style, e.g. "person.*") whose rows the role
+#                  never sees in any tool; filtered in the database, not after the query
+#   max_rows       upper bound of rows returned by one call
+#
+# A user with several roles gets the union of tools and views, the largest max_rows and
+# only the entity patterns denied by every role. A user with no listed role can only
+# call `whoami`. Replace this file with HAMMOND_POLICY_FILE to adapt it.
+roles:
+  HAmmond.Admin:
+    tools: ["*"]
+    views: ["*"]
+    deny_entities: []
+    max_rows: 10000
+  HAmmond.Reader:
+    tools:
+      - whoami
+      - server_info
+      - search_catalog
+      - describe_entity
+      - list_views
+      - get_timeseries
+      - query_sql
+    views: [entities, states, statistics, statistics_meta, catalog_entity]
+    # Location, presence and security devices are personal data or attack surface.
+    deny_entities:
+      - "person.*"
+      - "device_tracker.*"
+      - "zone.*"
+      - "camera.*"
+      - "image.*"
+      - "lock.*"
+      - "alarm_control_panel.*"
+      - "*_location"
+      - "*_geocoded_location"
+    max_rows: 1000

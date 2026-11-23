@@ -60,6 +60,8 @@ def test_build_auth_entra() -> None:
         entra_client_id="00000000-0000-0000-0000-000000000002",
         entra_client_secret=SecretStr("secret"),
         jwt_signing_key=SecretStr("k" * 48),
+        audit_pg_host="postgres",
+        audit_pg_password=SecretStr("pw"),
     )
     auth = build_auth(settings)
     assert isinstance(auth, AzureProvider)

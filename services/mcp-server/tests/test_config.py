@@ -9,6 +9,8 @@ ENTRA = {
     "HAMMOND_ENTRA_CLIENT_ID": "00000000-0000-0000-0000-000000000002",
     "HAMMOND_ENTRA_CLIENT_SECRET": "s3cr3t-value",
     "HAMMOND_JWT_SIGNING_KEY": "x" * 48,
+    "HAMMOND_AUDIT_PG_HOST": "postgres",
+    "HAMMOND_AUDIT_PG_PASSWORD": "audit-pw",
 }
 
 
@@ -65,3 +67,19 @@ def test_no_auth_only_on_loopback(monkeypatch: pytest.MonkeyPatch) -> None:
         Settings()
     monkeypatch.setenv("HAMMOND_HOST", "127.0.0.1")
     assert Settings().auth_mode == "none"
+
+
+def test_entra_requires_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    env = {k: v for k, v in ENTRA.items() if not k.startswith("HAMMOND_AUDIT")}
+    _set(monkeypatch, env)
+    with pytest.raises(ValidationError, match="HAMMOND_AUDIT_PG_PASSWORD"):
+        Settings()
+
+
+def test_audit_dsn_and_empty_policy_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    _set(monkeypatch, ENTRA | {"HAMMOND_POLICY_FILE": "", "HAMMOND_AUDIT_PG_PASSWORD": "p'w"})
+    s = Settings()
+    assert s.policy_file is None
+    assert s.audit_dsn is not None
+    assert "password='p\\'w'" in s.audit_dsn
+    assert "dbname='audit'" in s.audit_dsn

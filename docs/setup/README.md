@@ -8,6 +8,8 @@ Order for the proof of concept "Claude connector authenticated by Entra ID":
 4. [Claude connector](claude-connector.md) – DNS, port forward, Caddy/TLS and the connector in claude.ai.
 5. [Data ingest](ingest.md) – live stream, Dagster jobs, backfill from the running
    Home Assistant (phase 1a.2).
+6. [Catalog and MCP data tools](mcp-tools.md) – catalog, tools, roles and policy, SQL
+   limits, audit (phase 1a.3).
 
 Placeholders used in all guides: `<public-host>` (public DNS name of the MCP server),
 `<public-ip>`, `<dmz-cidr>`, `<tenant-id>`, `<client-id>`. Keep real values in `.env` only, never in the repository.

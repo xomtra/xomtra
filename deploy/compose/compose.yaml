@@ -1,7 +1,8 @@
 # HAmmond stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
 # + Postgres (DuckLake catalog, Dagster and SQLMesh state) + SeaweedFS (S3).
 # Usage: cp .env.example .env && edit && docker compose up -d
-# Only Caddy is published (HTTPS); the MCP server is reachable only through it. The
+# Only Caddy is published (HTTPS); the MCP server is reachable only through it and
+# audits every tool call into the Postgres DB "audit" (INSERT-only role). The
 # Dagster UI is published on loopback only (SSH tunnel, see docs/setup/ingest.md).
 
 name: hammond
@@ -31,6 +32,7 @@ x-ingest-env: &ingest-env
   HAMMOND_STATISTICS_5MIN_RETENTION_DAYS: ${HAMMOND_STATISTICS_5MIN_RETENTION_DAYS:-365}
   HAMMOND_STATISTICS_HOUR_RETENTION_DAYS: ${HAMMOND_STATISTICS_HOUR_RETENTION_DAYS:-1825}
   HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
+  HAMMOND_CATALOG_WINDOW_DAYS: ${HAMMOND_CATALOG_WINDOW_DAYS:-30}
   # DuckDB budget per process; queries spill to HAMMOND_DUCKDB_TEMP_DIR beyond it.
   HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_DUCKDB_MEMORY_LIMIT:-2GB}
   HAMMOND_DUCKDB_THREADS: ${HAMMOND_DUCKDB_THREADS:-2}
@@ -76,6 +78,9 @@ services:
       OPS_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
       DAGSTER_DB: ${DAGSTER_PG_DB:-dagster}
       SQLMESH_DB: ${SQLMESH_PG_DB:-sqlmesh}
+      AUDIT_DB: ${AUDIT_PG_DB:-audit}
+      AUDIT_USER: ${AUDIT_PG_USER:-hammond_audit}
+      AUDIT_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD in .env}
     volumes:
       - ./postgres/ensure-databases.sh:/ensure-databases.sh:ro
     depends_on:
@@ -142,6 +147,20 @@ services:
       HAMMOND_JWT_SIGNING_KEY: ${HAMMOND_JWT_SIGNING_KEY:-}
       HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
       HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
+      # Audit of every tool call (INSERT-only role, ADR 040).
+      HAMMOND_AUDIT_PG_HOST: postgres
+      HAMMOND_AUDIT_PG_DB: ${AUDIT_PG_DB:-audit}
+      HAMMOND_AUDIT_PG_USER: ${AUDIT_PG_USER:-hammond_audit}
+      HAMMOND_AUDIT_PG_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD in .env}
+      HAMMOND_POLICY_FILE: ${HAMMOND_POLICY_FILE:-}
+      HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
+      HAMMOND_QUERY_TIMEOUT_SECONDS: ${HAMMOND_QUERY_TIMEOUT_SECONDS:-30}
+      # DuckDB of query_sql/get_timeseries; spills to /data beyond the memory limit.
+      HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_MCP_DUCKDB_MEMORY_LIMIT:-768MB}
+      HAMMOND_DUCKDB_THREADS: ${HAMMOND_DUCKDB_THREADS:-2}
+      HAMMOND_DUCKDB_TEMP_DIR: /data/duckdb-tmp
+      HAMMOND_DUCKDB_MAX_TEMP_SIZE: ${HAMMOND_MCP_DUCKDB_MAX_TEMP_SIZE:-2GB}
+    mem_limit: ${HAMMOND_MCP_MEM_LIMIT:-1536m}
     volumes:
       - mcp-data:/data
     read_only: true

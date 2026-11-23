@@ -134,6 +134,7 @@ jobs:
       POSTGRES_PASSWORD: ci-postgres
       DUCKLAKE_PG_PASSWORD: ci-ducklake
       OPS_PG_PASSWORD: ci-ops-'quote
+      AUDIT_PG_PASSWORD: ci-audit-'quote
       HAMMOND_HA_URL: http://ha:8123
       S3_ACCESS_KEY: ci-access
       S3_SECRET_KEY: ci-secret-key
@@ -246,6 +247,52 @@ jobs:
           print("bronze states in complete hours", complete, "silver.states", silver)
           assert silver > 0 or complete == 0, "silver.states"
           PY
+      - name: Smoke test catalog and MCP data tools (policy, SQL guard, lockdown, audit)
+        working-directory: deploy/compose
+        run: |
+          docker compose exec -T dagster-daemon hammond-ingest catalog
+          # The MCP container runs the real lockdown (read-only DuckLake on Postgres +
+          # SeaweedFS, external access off) and writes to the INSERT-only audit role.
+          docker compose exec -T mcp python - <<'PY'
+          import asyncio
+          from hacore.lake import LakeSettings
+          from hammond_mcp.audit import AuditRecord, PostgresAuditSink
+          from hammond_mcp.config import Settings
+          from hammond_mcp.data import KNOWN_VIEWS, DataAccess
+          from hammond_mcp.identity import Identity
+          from hammond_mcp.policy import Policy
+          from hammond_mcp.sqlguard import SQLRejected
+
+          data = DataAccess.from_settings(LakeSettings.from_env())
+          policy = Policy.load()
+          admin = policy.access_for(Identity(True, "ci", roles=("HAmmond.Admin",)), KNOWN_VIEWS)
+          reader = policy.access_for(Identity(True, "ci", roles=("HAmmond.Reader",)), KNOWN_VIEWS)
+          found = data.search_catalog(admin)
+          print("catalog entities", found["row_count"])
+          assert found["row_count"] > 0
+          entity = found["entities"][0]["entity_id"]
+          print(data.describe_entity(admin, entity)["entity"]["kind"])
+          res = data.query_sql(reader, "SELECT domain, count(*) n FROM states GROUP BY ALL")
+          print(res["rows"])
+          assert not any(r["domain"] in ("person", "device_tracker") for r in res["rows"])
+          for bad in ("SELECT * FROM read_csv('/etc/passwd')", "SELECT * FROM lake.bronze.ha_states"):
+              try:
+                  data.query_sql(admin, bad)
+                  raise SystemExit(f"accepted: {bad}")
+              except SQLRejected:
+                  pass
+          con = data._con.cursor()
+          for bad in ("SELECT * FROM read_text('/etc/passwd')", "SET enable_external_access = true"):
+              try:
+                  con.execute(bad)
+                  raise SystemExit(f"engine accepted: {bad}")
+              except Exception as err:
+                  print("engine refused:", type(err).__name__)
+          sink = PostgresAuditSink(Settings().audit_dsn)
+          asyncio.run(sink.write(AuditRecord(tool="ci", decision="allowed", outcome="ok")))
+          PY
+          docker compose exec -T postgres psql -U postgres -d audit -tAc \
+            "SELECT count(*) FROM audit.tool_call WHERE tool = 'ci'" | grep -qx 1
       - name: Compose logs on failure
         if: failure()
         working-directory: deploy/compose

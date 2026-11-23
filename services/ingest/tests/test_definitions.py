@@ -12,9 +12,16 @@ from hammond_ingest.settings import IngestSettings
 def test_definitions_load_with_schedules() -> None:
     defs = build_definitions(IngestSettings(timezone="Europe/Prague"))
     jobs = {j.name for j in defs.resolve_all_job_defs()}
-    assert {"ingest_hourly", "retention_daily", "history_backfill", "silver_restate"} <= jobs
+    assert {
+        "ingest_hourly",
+        "retention_daily",
+        "catalog_daily",
+        "history_backfill",
+        "silver_restate",
+    } <= jobs
     schedules = {s.job_name: s for s in defs.schedules or []}  # type: ignore[union-attr]
     assert schedules["ingest_hourly"].execution_timezone == "Europe/Prague"
+    assert schedules["catalog_daily"].cron_schedule == "15 4 * * *"
 
 
 def test_restate_sensor(monkeypatch: pytest.MonkeyPatch) -> None:
