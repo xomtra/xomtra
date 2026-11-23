@@ -252,7 +252,8 @@ services:
   admin:
     <<: *hardening
     image: ${HAMMOND_MCP_IMAGE:-ghcr.io/zettabyte-cz/hammond-mcp:main}
-    command: ["hammond-admin"]
+    # The image entrypoint is hammond-mcp; the admin GUI is another program in it.
+    entrypoint: ["hammond-admin"]
     environment:
       <<: *lake-env
       HAMMOND_AUTH_MODE: ${HAMMOND_AUTH_MODE:-entra}
