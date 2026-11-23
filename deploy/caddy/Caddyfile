@@ -6,12 +6,16 @@
 #   CLOUDFLARE_API_TOKEN  token with Zone:DNS:Edit on that zone only
 #   CLAUDE_IP_RANGES      space separated CIDRs Claude's servers connect from
 #                         (see docs/setup/claude-connector.md)
+#   ADMIN_CIDR            space separated CIDRs of the admin network (admin GUI)
 #
 # Access model:
 #   - OAuth browser steps (/authorize, /consent, /auth/callback) come from the user's own
 #     device and are reachable from anywhere; they only start or finish an Entra sign-in.
 #   - Everything else (MCP endpoint, token/registration endpoints, metadata) is called by
 #     Claude's servers and is accepted only from CLAUDE_IP_RANGES.
+#   - /admin (admin GUI and Dagster UI) only from ADMIN_CIDR; the admin app then requires
+#     an Entra sign-in with the role HAmmond.Admin and guards the Dagster UI through
+#     forward_auth (ADR 041).
 {
 	admin off
 	email {$ACME_EMAIL}
@@ -36,6 +40,27 @@
 	log {
 		output stdout
 		format json
+	}
+
+	@admin path /admin /admin/*
+	handle @admin {
+		@admin_net remote_ip {$ADMIN_CIDR}
+		handle @admin_net {
+			@dagster path /admin/dagster /admin/dagster/*
+			handle @dagster {
+				forward_auth admin:8100 {
+					uri /admin/auth/check
+					copy_headers X-Hammond-User
+				}
+				reverse_proxy dagster-webserver:3000
+			}
+			handle {
+				reverse_proxy admin:8100
+			}
+		}
+		handle {
+			respond 403
+		}
 	}
 
 	@browser path /authorize /consent /auth/callback

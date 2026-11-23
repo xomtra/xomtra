@@ -10,6 +10,8 @@ Order for the proof of concept "Claude connector authenticated by Entra ID":
    Home Assistant (phase 1a.2).
 6. [Catalog and MCP data tools](mcp-tools.md) – catalog, tools, roles and policy, SQL
    limits, audit (phase 1a.3).
+7. [Admin GUI and Dagster UI](admin-gui.md) – from the admin network with Entra role
+   `HAmmond.Admin` (phase 1a.3).
 
 Placeholders used in all guides: `<public-host>` (public DNS name of the MCP server),
 `<public-ip>`, `<dmz-cidr>`, `<tenant-id>`, `<client-id>`. Keep real values in `.env` only, never in the repository.

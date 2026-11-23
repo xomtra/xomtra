@@ -81,6 +81,8 @@ services:
       AUDIT_DB: ${AUDIT_PG_DB:-audit}
       AUDIT_USER: ${AUDIT_PG_USER:-hammond_audit}
       AUDIT_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD in .env}
+      AUDIT_ADMIN_USER: ${AUDIT_ADMIN_PG_USER:-hammond_audit_admin}
+      AUDIT_ADMIN_PASSWORD: ${AUDIT_ADMIN_PG_PASSWORD:?set AUDIT_ADMIN_PG_PASSWORD in .env}
     volumes:
       - ./postgres/ensure-databases.sh:/ensure-databases.sh:ro
     depends_on:
@@ -215,12 +217,17 @@ services:
       ducklake-init: { condition: service_completed_successfully }
     networks: [backend, egress]
 
-  # Dagster UI, loopback only: ssh -L 3000:127.0.0.1:3000 <vm>
+  # Dagster UI under /admin/dagster/ through Caddy (admin network + Entra Admin role,
+  # ADR 041). Also on loopback as a fallback: ssh -L 3000:127.0.0.1:3000 <vm>, then
+  # http://127.0.0.1:3000/admin/dagster/
   dagster-webserver:
     <<: *hardening
     image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:main}
     command:
-      ["dagster-webserver", "-h", "0.0.0.0", "-p", "3000", "-w", "/app/dagster/workspace.yaml"]
+      [
+        "dagster-webserver", "-h", "0.0.0.0", "-p", "3000",
+        "--path-prefix", "/admin/dagster", "-w", "/app/dagster/workspace.yaml",
+      ]
     environment: *ingest-env
     mem_limit: ${HAMMOND_DAGSTER_WEBSERVER_MEM_LIMIT:-1g}
     ports:
@@ -231,14 +238,56 @@ services:
     tmpfs: [/tmp]
     cap_drop: [ALL]
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/server_info', timeout=4).status == 200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/admin/dagster/server_info', timeout=4).status == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 60s
     depends_on:
       ducklake-init: { condition: service_completed_successfully }
-    networks: [backend, egress]
+    networks: [backend, egress, admin]
+
+  # Admin GUI under /admin (ADR 041): Home Assistant and ingest status, catalog,
+  # retention, audit; guards the Dagster UI for Caddy (forward_auth).
+  admin:
+    <<: *hardening
+    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/zettabyte-cz/hammond-mcp:main}
+    command: ["hammond-admin"]
+    environment:
+      <<: *lake-env
+      HAMMOND_AUTH_MODE: ${HAMMOND_AUTH_MODE:-entra}
+      HAMMOND_BASE_URL: ${HAMMOND_BASE_URL:-}
+      HAMMOND_ENTRA_TENANT_ID: ${HAMMOND_ENTRA_TENANT_ID:-}
+      HAMMOND_ENTRA_CLIENT_ID: ${HAMMOND_ENTRA_CLIENT_ID:-}
+      HAMMOND_ENTRA_CLIENT_SECRET: ${HAMMOND_ENTRA_CLIENT_SECRET:-}
+      HAMMOND_ADMIN_SESSION_KEY: ${HAMMOND_ADMIN_SESSION_KEY:?set HAMMOND_ADMIN_SESSION_KEY in .env}
+      HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
+      HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
+      HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
+      HAMMOND_AUDIT_PG_HOST: postgres
+      HAMMOND_AUDIT_PG_DB: ${AUDIT_PG_DB:-audit}
+      HAMMOND_AUDIT_ADMIN_USER: ${AUDIT_ADMIN_PG_USER:-hammond_audit_admin}
+      HAMMOND_AUDIT_ADMIN_PASSWORD: ${AUDIT_ADMIN_PG_PASSWORD:?set AUDIT_ADMIN_PG_PASSWORD in .env}
+      HAMMOND_STATES_RETENTION_DAYS: ${HAMMOND_STATES_RETENTION_DAYS:-365}
+      HAMMOND_STATISTICS_5MIN_RETENTION_DAYS: ${HAMMOND_STATISTICS_5MIN_RETENTION_DAYS:-365}
+      HAMMOND_STATISTICS_HOUR_RETENTION_DAYS: ${HAMMOND_STATISTICS_HOUR_RETENTION_DAYS:-1825}
+      HAMMOND_CATALOG_WINDOW_DAYS: ${HAMMOND_CATALOG_WINDOW_DAYS:-30}
+      HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_ADMIN_DUCKDB_MEMORY_LIMIT:-256MB}
+      HAMMOND_DUCKDB_THREADS: "1"
+      HAMMOND_DUCKDB_TEMP_DIR: /tmp/duckdb
+    mem_limit: ${HAMMOND_ADMIN_MEM_LIMIT:-512m}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8100/healthz', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      ducklake-init: { condition: service_completed_successfully }
+    networks: [backend, egress, admin]
 
   caddy:
     <<: *hardening
@@ -248,6 +297,7 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN in .env}
       CLAUDE_IP_RANGES: ${CLAUDE_IP_RANGES:?set CLAUDE_IP_RANGES in .env}
+      ADMIN_CIDR: ${ADMIN_CIDR:?set ADMIN_CIDR in .env}
     ports:
       - "${HAMMOND_HTTPS_BIND:-0.0.0.0}:443:8443"
     volumes:
@@ -258,7 +308,8 @@ services:
     cap_drop: [ALL]
     depends_on:
       mcp: { condition: service_healthy }
-    networks: [frontend]
+      admin: { condition: service_healthy }
+    networks: [frontend, admin]
 
 volumes:
   caddy-data:
@@ -272,6 +323,9 @@ networks:
   backend:
     internal: true
   frontend:
+  # Caddy -> admin GUI and Dagster UI only.
+  admin:
+    internal: true
   # Outbound for ingest (Home Assistant on the LAN) and the loopback-published
   # Dagster UI; kept apart from the public frontend.
   egress:

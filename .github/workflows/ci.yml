@@ -135,6 +135,9 @@ jobs:
       DUCKLAKE_PG_PASSWORD: ci-ducklake
       OPS_PG_PASSWORD: ci-ops-'quote
       AUDIT_PG_PASSWORD: ci-audit-'quote
+      AUDIT_ADMIN_PG_PASSWORD: ci-audit-admin
+      HAMMOND_ADMIN_SESSION_KEY: ci-dummy-admin-session-key-at-least-32-chars
+      ADMIN_CIDR: 192.0.2.0/24
       HAMMOND_HA_URL: http://ha:8123
       S3_ACCESS_KEY: ci-access
       S3_SECRET_KEY: ci-secret-key
@@ -194,7 +197,7 @@ jobs:
         # file capabilities, which the plain `docker run` default would hide.
         run: |
           docker run --rm --cap-drop ALL --security-opt no-new-privileges --read-only \
-            -e HAMMOND_PUBLIC_HOST -e ACME_EMAIL -e CLAUDE_IP_RANGES \
+            -e HAMMOND_PUBLIC_HOST -e ACME_EMAIL -e CLAUDE_IP_RANGES -e ADMIN_CIDR \
             hammond-caddy:ci caddy adapt --config /etc/caddy/Caddyfile >/dev/null
       - name: Smoke test compose stack (Postgres + SeaweedFS + DuckLake + MCP)
         working-directory: deploy/compose
@@ -293,6 +296,31 @@ jobs:
           PY
           docker compose exec -T postgres psql -U postgres -d audit -tAc \
             "SELECT count(*) FROM audit.tool_call WHERE tool = 'ci'" | grep -qx 1
+      - name: Smoke test admin GUI (sign-in required, Dagster UI under /admin/dagster)
+        working-directory: deploy/compose
+        run: |
+          docker compose up -d --wait --wait-timeout 120 admin
+          docker compose exec -T admin python - <<'PY'
+          import urllib.error, urllib.request
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+
+          opener = urllib.request.build_opener(NoRedirect)
+          for path, code, target in [
+              ("/admin/", 303, "/admin/login"),
+              ("/admin/auth/check", 302, "/admin/login"),
+              ("/admin/login", 303, "login.microsoftonline.com"),
+          ]:
+              try:
+                  opener.open("http://127.0.0.1:8100" + path)
+                  raise SystemExit(f"{path} answered without sign-in")
+              except urllib.error.HTTPError as err:
+                  assert err.code == code, (path, err.code)
+                  assert target in err.headers["location"], (path, err.headers["location"])
+          print(urllib.request.urlopen("http://dagster-webserver:3000/admin/dagster/server_info").read())
+          PY
       - name: Compose logs on failure
         if: failure()
         working-directory: deploy/compose

@@ -179,6 +179,16 @@ class DataAccess:
     def close(self) -> None:
         self._con.close()
 
+    @contextmanager
+    def trusted_cursor(self) -> Iterator[duckdb.DuckDBPyConnection]:
+        """Cursor on the whole (read-only, locked-down) lake for fixed internal SQL of the
+        admin GUI. Never pass user SQL here; that goes through :meth:`query_sql`."""
+        cur = self._con.cursor()
+        try:
+            yield cur
+        finally:
+            cur.close()
+
     # ---- per-call cursor -----------------------------------------------------------
 
     @contextmanager

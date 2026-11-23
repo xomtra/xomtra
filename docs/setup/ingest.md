@@ -71,14 +71,17 @@ the DuckLake catalog. It also keeps the role passwords in sync with `.env`.
 
 ## 4. Dagster UI
 
-The UI is published on the VM's loopback only. From the admin machine:
+Open `https://<public-host>/admin/dagster/` from the admin network after signing in to
+the [admin GUI](admin-gui.md). As a fallback the UI is also published on the VM's
+loopback:
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 <admin>@<vm-ip>
-# then open http://127.0.0.1:3000
+# then open http://127.0.0.1:3000/admin/dagster/
 ```
 
-The schedules `ingest_hourly` and `retention_daily` are active from the start. Jobs
+The schedules `ingest_hourly`, `retention_daily` and `catalog_daily` are active from the
+start. Jobs
 run one at a time (queued run coordinator); the live stream runs next to them.
 
 ## 5. First backfill
