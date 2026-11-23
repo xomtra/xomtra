@@ -1,0 +1,163 @@
+name: Release
+
+# A signed tag vX.Y.Z (or vX.Y.Z-rc.N) on a commit of main releases that commit
+# (docs/releasing.md, ADR 045). Nothing is rebuilt: the images the main CI built,
+# tested, scanned and signed for exactly this commit are promoted to the release tags,
+# signed again with the identity of this workflow and the tag, and listed with their
+# digests in the GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-26.04
+    # Protect it in Settings -> Environments (deployment tags v*, optional reviewer).
+    environment: release
+    timeout-minutes: 60
+    permissions:
+      contents: write # create the GitHub release
+      packages: write # add the release tags in GHCR
+      id-token: write # keyless cosign signature of the release
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      REGISTRY: ghcr.io/zettabyte-cz
+      IMAGES: hammond-mcp hammond-ingest hammond-caddy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # origin/main for the ancestry check
+          persist-credentials: false
+
+      - name: Check the tag (signed, on main, matches versions and CHANGELOG)
+        run: |
+          set -euo pipefail
+          python3 scripts/release.py check "$TAG"
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::$TAG does not point to a commit of main"; exit 1; }
+          ref=$(gh api "repos/$GH_REPO/git/ref/tags/$TAG")
+          [ "$(jq -r .object.type <<<"$ref")" = tag ] \
+            || { echo "::error::$TAG is a lightweight tag; use git tag -s"; exit 1; }
+          verified=$(gh api "repos/$GH_REPO/git/tags/$(jq -r .object.sha <<<"$ref")" \
+            --jq '.verification.verified')
+          [ "$verified" = true ] \
+            || { echo "::error::$TAG has no signature GitHub can verify"; exit 1; }
+          version=$(python3 scripts/release.py image-tags "$TAG" | head -n 1)
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          case "$version" in *-*) echo "PRERELEASE=true" ;; *) echo "PRERELEASE=false" ;; esac \
+            >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for the main CI images of this commit and verify their signatures
+        run: |
+          set -euo pipefail
+          digest_of() {
+            docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' 2>/dev/null \
+              | jq -r .digest
+          }
+          : > digests.txt
+          for image in $IMAGES; do
+            ref="$REGISTRY/$image:sha-$GITHUB_SHA"
+            # The main CI publishes only after lint, test, trivy, build and contract
+            # passed, so the image's existence is the green-CI gate.
+            for _ in $(seq 1 90); do
+              digest=$(digest_of "$ref" || true)
+              [ -n "$digest" ] && break
+              echo "waiting for $ref (main CI still running?)"
+              sleep 20
+            done
+            [ -n "$digest" ] \
+              || { echo "::error::$ref not found: did the main CI pass for this commit?"; exit 1; }
+            # Built and signed by the CI workflow on main for exactly this commit.
+            cosign verify "$REGISTRY/$image@$digest" \
+              --certificate-identity "https://github.com/$GH_REPO/.github/workflows/ci.yml@refs/heads/main" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              --certificate-github-workflow-sha "$GITHUB_SHA" > /dev/null
+            # A published version is immutable: never move X.Y.Z to another digest.
+            existing=$(digest_of "$REGISTRY/$image:$VERSION" || true)
+            if [ -n "$existing" ] && [ "$existing" != "$digest" ]; then
+              echo "::error::$image:$VERSION already exists with $existing"; exit 1
+            fi
+            echo "$image $digest" >> digests.txt
+          done
+          cat digests.txt
+
+      - name: Promote and sign the images
+        run: |
+          set -euo pipefail
+          mapfile -t tags < <(python3 scripts/release.py image-tags "$TAG")
+          while read -r image digest; do
+            args=()
+            for t in "${tags[@]}"; do args+=(--tag "$REGISTRY/$image:$t"); done
+            docker buildx imagetools create "${args[@]}" "$REGISTRY/$image@$digest"
+            promoted=$(docker buildx imagetools inspect "$REGISTRY/$image:$VERSION" \
+              --format '{{json .Manifest}}' | jq -r .digest)
+            [ "$promoted" = "$digest" ] \
+              || { echo "::error::$image:$VERSION is $promoted, expected $digest"; exit 1; }
+            # Second signature on the same digest: identity release.yml@refs/tags/$TAG.
+            cosign sign --yes "$REGISTRY/$image@$digest"
+          done < digests.txt
+
+      - name: Release notes and assets
+        run: |
+          set -euo pipefail
+          mkdir dist
+          {
+            echo "# Images of HAmmond $VERSION"
+            echo "# Put these lines into deploy/compose/.env (docs/releasing.md)."
+            while read -r image digest; do
+              var=$(tr 'a-z-' 'A-Z_' <<<"$image")_IMAGE
+              echo "$var=$REGISTRY/$image:$VERSION@$digest"
+            done < digests.txt
+          } > "dist/hammond-$VERSION-images.env"
+          {
+            python3 scripts/release.py notes "$TAG"
+            echo
+            echo "## Images"
+            echo
+            echo "| Image | Digest |"
+            echo "| --- | --- |"
+            while read -r image digest; do
+              echo "| \`$REGISTRY/$image:$VERSION\` | \`$digest\` |"
+            done < digests.txt
+            echo
+            echo "Pin them with the attached \`hammond-$VERSION-images.env\` and verify"
+            echo "the release signature with cosign v3 before deploying:"
+            echo
+            echo '```bash'
+            image=$(head -n 1 digests.txt | cut -d' ' -f1)
+            digest=$(head -n 1 digests.txt | cut -d' ' -f2)
+            echo "cosign verify $REGISTRY/$image@$digest \\"
+            echo "  --certificate-identity https://github.com/$GH_REPO/.github/workflows/release.yml@refs/tags/$TAG \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+            echo '```'
+            echo
+            echo "Upgrade: see [docs/releasing.md](https://github.com/$GH_REPO/blob/$TAG/docs/releasing.md#upgrading-an-installation)."
+          } > notes.md
+          (cd dist && sha256sum -- * > SHA256SUMS)
+
+      - name: Publish the GitHub release
+        run: |
+          set -euo pipefail
+          flags=(--prerelease --latest=false)
+          [ "$PRERELEASE" = true ] || flags=(--latest)
+          # Draft first: with immutable releases the assets cannot be added after publishing.
+          gh release create "$TAG" --verify-tag --draft --title "HAmmond $VERSION" \
+            --notes-file notes.md "${flags[@]}" dist/*
+          gh release edit "$TAG" --draft=false

@@ -5,7 +5,7 @@ into a queryable data platform and exposes it to AI assistants (e.g. Claude) thr
 [Model Context Protocol](https://modelcontextprotocol.io/), with identity and roles from
 Microsoft Entra ID.
 
-> **Status:** early development (phase 1a.2 – data ingest: backfill, live stream, bronze/silver).
+> **Status:** early development (phase 1b – analysis: correlations on top of the data ingest).
 > Nothing here is production ready yet. APIs, layout and configuration will change.
 
 ## Repository layout
@@ -41,13 +41,22 @@ docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.dev.yaml
 Without Entra configuration the MCP server can run with `HAMMOND_AUTH_MODE=none`, which is
 only allowed when it listens on a loopback address (local development).
 
+## Releases and installation
+
+Releases follow Semantic Versioning; each one lists its images pinned by digest and the
+changes in [CHANGELOG.md](CHANGELOG.md). Install and upgrade from a release tag as
+described in [docs/releasing.md](docs/releasing.md), then follow the
+[setup guides](docs/setup/README.md).
+
 ## Security
 
 Please report vulnerabilities privately, see [SECURITY.md](SECURITY.md).
 Container images are published to `ghcr.io/zettabyte-cz/` and signed with
 [cosign](https://docs.sigstore.dev/) v3 (keyless, GitHub OIDC; the signature is stored
 in the new bundle format, which cosign v2 does not find). Verify with cosign v3 before
-deploying (the repository name in the identity is case-sensitive: `HAmmond`):
+deploying (the repository name in the identity is case-sensitive: `HAmmond`). Released
+images carry a second signature from the release workflow, see
+[docs/releasing.md](docs/releasing.md); development builds of `main` only this one:
 
 ```bash
 cosign verify ghcr.io/zettabyte-cz/hammond-mcp@sha256:<digest> \
