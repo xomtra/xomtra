@@ -26,7 +26,7 @@ env:
 jobs:
   lint:
     name: lint
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -45,7 +45,7 @@ jobs:
 
   test:
     name: test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -62,7 +62,7 @@ jobs:
 
   contract:
     name: contract (HA ${{ matrix.ha }})
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     strategy:
@@ -97,7 +97,7 @@ jobs:
 
   trivy:
     name: trivy
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       security-events: write # upload SARIF to code scanning
@@ -125,7 +125,7 @@ jobs:
   build:
     name: build
     needs: [lint, test]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     env:
@@ -335,7 +335,7 @@ jobs:
     name: publish (${{ matrix.image }})
     needs: [build, trivy, contract]
     if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       matrix:
         include:
