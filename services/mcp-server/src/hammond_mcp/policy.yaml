@@ -4,10 +4,11 @@
 #   views          data views the role may read in query_sql and get_timeseries ("*" = all)
 #   deny_entities  entity_id patterns (shell-style, e.g. "person.*") whose rows the role
 #                  never sees in any tool; filtered in the database, not after the query
+#   hide_columns   per view, columns the role never sees (removed from the view itself)
 #   max_rows       upper bound of rows returned by one call
 #
 # A user with several roles gets the union of tools and views, the largest max_rows and
-# only the entity patterns denied by every role. A user with no listed role can only
+# only the entity patterns and columns hidden by every role. A user with no listed role can only
 # call `whoami`. Replace this file with HAMMOND_POLICY_FILE to adapt it.
 roles:
   HAmmond.Admin:
@@ -36,4 +37,8 @@ roles:
       - "alarm_control_panel.*"
       - "*_location"
       - "*_geocoded_location"
+    # Attributes carry free text (media titles, addresses, coordinates, e-mails) also
+    # outside the hidden domains; state values, units and the catalog stay visible.
+    hide_columns:
+      states: [attributes]
     max_rows: 1000

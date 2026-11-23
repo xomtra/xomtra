@@ -254,6 +254,9 @@ jobs:
         working-directory: deploy/compose
         run: |
           docker compose exec -T dagster-daemon hammond-ingest catalog
+          # A record past the audit retention (default 90 days) must be purged on first write.
+          docker compose exec -T postgres psql -U postgres -d audit -c \
+            "INSERT INTO audit.tool_call (ts, tool, decision, outcome) VALUES (now() - interval '100 days', 'ci-old', 'allowed', 'ok')"
           # The MCP container runs the real lockdown (read-only DuckLake on Postgres +
           # SeaweedFS, external access off) and writes to the INSERT-only audit role.
           docker compose exec -T mcp python - <<'PY'
@@ -296,6 +299,8 @@ jobs:
           PY
           docker compose exec -T postgres psql -U postgres -d audit -tAc \
             "SELECT count(*) FROM audit.tool_call WHERE tool = 'ci'" | grep -qx 1
+          docker compose exec -T postgres psql -U postgres -d audit -tAc \
+            "SELECT count(*) FROM audit.tool_call WHERE tool = 'ci-old'" | grep -qx 0
       - name: Smoke test admin GUI (sign-in required, Dagster UI under /admin/dagster)
         working-directory: deploy/compose
         run: |

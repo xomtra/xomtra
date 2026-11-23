@@ -19,6 +19,7 @@ import asyncio
 import json
 import logging
 import threading
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
@@ -97,13 +98,39 @@ VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
 """
 
 
+PURGE_INTERVAL_SECONDS = 24 * 3600
+
+
 class PostgresAuditSink(LogAuditSink):
-    """INSERT-only writer to ``audit.tool_call`` (psycopg2, one connection, serialised)."""
+    """INSERT-only writer to ``audit.tool_call`` (psycopg2, one connection, serialised).
+
+    Once a day (on the first write after start, then every 24 h) it also calls
+    ``audit.purge_expired()``, which deletes only records older than the retention set in
+    the database; a failed purge is logged and never fails the call.
+    """
 
     def __init__(self, dsn: str) -> None:
         self._dsn = dsn
         self._conn: Any = None
         self._lock = threading.Lock()
+        self._last_purge: float | None = None
+
+    def _purge_if_due(self) -> None:
+        import psycopg2  # noqa: PLC0415
+
+        now = time.monotonic()
+        if self._last_purge is not None and now - self._last_purge < PURGE_INTERVAL_SECONDS:
+            return
+        self._last_purge = now
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute("SELECT audit.purge_expired()")
+                row = cur.fetchone()
+        except psycopg2.Error:
+            logger.warning("Audit retention purge failed", exc_info=True)
+            return
+        if row and row[0]:
+            logger.info("Audit retention: purged %d expired records", row[0])
 
     def _insert(self, record: AuditRecord) -> None:
         import psycopg2  # noqa: PLC0415 - only needed when the database sink is used
@@ -137,6 +164,7 @@ class PostgresAuditSink(LogAuditSink):
                     if attempt == 2:
                         raise AuditError("Audit database unavailable") from err
                 else:
+                    self._purge_if_due()
                     return
 
     async def write(self, record: AuditRecord) -> None:

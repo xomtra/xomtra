@@ -33,12 +33,15 @@ def test_reader_and_admin() -> None:
     with pytest.raises(AccessDenied):
         reader.require_entity("device_tracker.phone")
     assert reader.max_rows == 1000
+    assert reader.columns_hidden_in("states") == ["attributes"]
+    assert reader.columns_hidden_in("entities") == []
 
     both = POLICY.access_for(ident("HAmmond.Reader", "HAmmond.Admin"), KNOWN_VIEWS)
     assert both.entity_allowed("person.jana")  # only what every role denies stays denied
     assert both.can_call("ha_overview")
     assert both.allowed_views == sorted(KNOWN_VIEWS)
     assert both.max_rows == 10000
+    assert both.columns_hidden_in("states") == []  # Admin sees attributes
 
 
 def test_unknown_role_ignored() -> None:
@@ -52,6 +55,10 @@ def test_invalid_policies(tmp_path: Path) -> None:
         Policy.parse({"roles": {"R": {"deny_entities": ["x'; drop"]}}})
     with pytest.raises(PolicyError, match="max_rows"):
         Policy.parse({"roles": {"R": {"max_rows": 0}}})
+    with pytest.raises(PolicyError, match="hide_columns"):
+        Policy.parse({"roles": {"R": {"hide_columns": {"states": ["a) FROM x; --"]}}}})
+    with pytest.raises(PolicyError, match="hide_columns"):
+        Policy.parse({"roles": {"R": {"hide_columns": ["states"]}}})
     f = tmp_path / "p.yaml"
     f.write_text("roles:\n  R:\n    tools: [whoami, list_views]\n    views: [states]\n")
     access = Policy.load(f).access_for(ident("R"), KNOWN_VIEWS)
