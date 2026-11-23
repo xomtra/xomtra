@@ -103,6 +103,10 @@ MIN_SERIES_HOURS = 168
 # ... and its value must change in at least this share of consecutive known hours:
 # a nearly constant series with a few steps correlates perfectly with any other one.
 MIN_CHANGE_SHARE = 0.05
+# A series must have data within this many hours of the window's end.
+MAX_STALE_HOURS = 72
+# Share of hours with the same positive step that makes a mean series a clock.
+CLOCK_SHARE = 0.8
 # Standardised residuals are clipped to this many standard deviations.
 Z_CLIP = 4.0
 # Minimum variance (in standardised units) of each series over a pair's common hours.
@@ -400,12 +404,18 @@ def ffill(values: FloatArray, limit: int = FFILL_LIMIT) -> FloatArray:
     return out
 
 
-def clean(grid: Grid, min_coverage: float) -> Grid:
-    """Keep series with enough, dense and changing data.
+def clean(grid: Grid, min_coverage: float, keep_entity: str | None = None) -> Grid:
+    """Keep series with enough, dense, current and changing data.
 
     Coverage is measured over the series' own span (first to last known hour), not the
     whole grid: an entity added half a year ago still takes part in a yearly window;
     pairs are then compared only on the hours both have (``MIN_PAIR_HOURS``).
+
+    A series must reach the last ``MAX_STALE_HOURS`` of the window: entities that were
+    removed (statistics of a deleted integration stay in HA) are not current findings.
+    Clocks (an uptime: the hourly mean grows by the same step nearly every hour) only
+    correlate through common restarts and are left out. ``keep_entity`` (the outside
+    temperature) is exempt from both.
     """
     values = ffill(grid.values)
     known = ~np.isnan(values)
@@ -419,10 +429,13 @@ def clean(grid: Grid, min_coverage: float) -> Grid:
     with np.errstate(invalid="ignore"):
         changed = both & (np.abs(np.diff(values, axis=0)) > 1e-9)
         change_share = changed.sum(axis=0) / np.maximum(both.sum(axis=0), 1)
+    current = last >= t_len - MAX_STALE_HOURS
+    exempt = np.array([s.entity_id == keep_entity for s in grid.series], dtype=bool)
     keep = (
         (n_known >= MIN_SERIES_HOURS)
         & (coverage >= min_coverage)
         & (change_share >= MIN_CHANGE_SHARE)
+        & ((current & ~_clocks(values, grid.series)) | exempt)
     )
     keep = np.asarray(keep, dtype=bool)
     if keep.sum() > MAX_SERIES:
@@ -439,6 +452,25 @@ def clean(grid: Grid, min_coverage: float) -> Grid:
         series=[grid.series[i] for i in idx],
         values=values[:, idx],
     )
+
+
+def _clocks(values: FloatArray, series: list[Series]) -> npt.NDArray[np.bool_]:
+    """Mean series whose hourly step equals their median positive step in at least
+    ``CLOCK_SHARE`` of the hours (uptime counters)."""
+    out = np.zeros(len(series), dtype=bool)
+    with np.errstate(invalid="ignore"):
+        diff = np.diff(values, axis=0)
+    for i, s in enumerate(series):
+        if s.metric != "mean":
+            continue
+        d = diff[:, i]
+        d = d[~np.isnan(d)]
+        pos = d[d > 0]
+        if len(d) < MIN_SERIES_HOURS or len(pos) == 0:
+            continue
+        step = float(np.median(pos))
+        out[i] = float(np.mean(np.abs(d - step) <= 0.01 * step)) >= CLOCK_SHARE
+    return out
 
 
 def residuals(grid: Grid, outside_temp: str | None) -> tuple[FloatArray, list[Series]]:
@@ -836,7 +868,7 @@ def run(
         )
     result.series_total = len(grid.series)
     temp_coverage = _coverage(grid, params.outside_temp)
-    grid = clean(grid, params.min_coverage)
+    grid = clean(grid, params.min_coverage, params.outside_temp)
     if temp_coverage < params.min_coverage:
         # The driver must cover the whole grid (hours without it are left out of the
         # regression); a short one is not used, nor taken as a candidate.
