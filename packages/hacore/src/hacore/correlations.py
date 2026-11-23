@@ -90,6 +90,11 @@ DUPLICATE_R = 0.97
 MAX_SERIES = 2000
 # States of an enum entity turned into share series.
 MAX_STATES_PER_ENTITY = 3
+# A series needs at least this many hours of data (after the forward fill).
+MIN_SERIES_HOURS = 168
+# ... and its value must change in at least this share of consecutive known hours:
+# a nearly constant series with a few steps correlates perfectly with any other one.
+MIN_CHANGE_SHARE = 0.05
 
 
 @dataclass(frozen=True, slots=True)
@@ -379,15 +384,33 @@ def ffill(values: FloatArray, limit: int = FFILL_LIMIT) -> FloatArray:
 
 
 def clean(grid: Grid, min_coverage: float) -> Grid:
+    """Keep series with enough, dense and changing data.
+
+    Coverage is measured over the series' own span (first to last known hour), not the
+    whole grid: an entity added half a year ago still takes part in a yearly window;
+    pairs are then compared only on the hours both have (``MIN_PAIR_HOURS``).
+    """
     values = ffill(grid.values)
-    coverage = (~np.isnan(values)).mean(axis=0) if values.size else np.zeros(0)
+    known = ~np.isnan(values)
+    n_known = known.sum(axis=0)
+    t_len = values.shape[0]
+    first = np.where(n_known > 0, known.argmax(axis=0), 0)
+    last = np.where(n_known > 0, t_len - 1 - known[::-1].argmax(axis=0), -1)
+    span = np.maximum(last - first + 1, 1)
+    coverage = n_known / span
+    both = known[1:] & known[:-1]
     with np.errstate(invalid="ignore"):
-        std = np.nanstd(values, axis=0) if values.size else np.zeros(0)
-    keep = (coverage >= min_coverage) & np.nan_to_num(std > 1e-9, nan=False)
+        changed = both & (np.abs(np.diff(values, axis=0)) > 1e-9)
+        change_share = changed.sum(axis=0) / np.maximum(both.sum(axis=0), 1)
+    keep = (
+        (n_known >= MIN_SERIES_HOURS)
+        & (coverage >= min_coverage)
+        & (change_share >= MIN_CHANGE_SHARE)
+    )
     keep = np.asarray(keep, dtype=bool)
     if keep.sum() > MAX_SERIES:
-        # Keep the best covered series; the order is stable (load order breaks ties).
-        order = np.argsort(-coverage, kind="stable")
+        # Keep the longest series; the order is stable (load order breaks ties).
+        order = np.argsort(-n_known, kind="stable")
         chosen = np.zeros_like(keep)
         chosen[order[keep[order]][:MAX_SERIES]] = True
         keep = chosen
@@ -547,23 +570,30 @@ def select_findings(
     params: CorrelationParams,
     devices: dict[str, str],
 ) -> list[dict[str, Any]]:
+    """Significant pairs, one per pair of entities (the strongest direction, lag and
+    metric), unflagged ones first, each group by ``|r|``."""
     keep = (np.abs(pairs.r) >= params.min_r) & (pairs.q <= params.max_q)
     idx = np.flatnonzero(keep)
     idx = idx[np.argsort(-np.abs(pairs.r[idx]), kind="stable")]
-    out: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
+    seen: set[frozenset[str]] = set()
     for k in idx:
         a, b = series[int(pairs.leader[k])], series[int(pairs.follower[k])]
         if a.entity_id == b.entity_id:
             continue  # two states or metrics of one entity
+        key = frozenset((a.entity_id, b.entity_id))
+        if key in seen:
+            continue  # the same pair the other way round, at another lag or metric
+        seen.add(key)
         lag = int(pairs.lag[k])
         r = float(pairs.r[k])
         flags = []
-        if lag == 0 and abs(r) > DUPLICATE_R:
+        if abs(r) > DUPLICATE_R:
             flags.append("duplicate_suspect")
         dev = devices.get(a.entity_id)
         if dev is not None and dev == devices.get(b.entity_id):
             flags.append("same_device")
-        out.append(
+        candidates.append(
             {
                 "finding_id": finding_id(params.window_days, a, b),
                 "entity_id": a.entity_id,
@@ -579,8 +609,9 @@ def select_findings(
                 "flags": flags,
             }
         )
-        if len(out) >= params.top:
-            break
+    # Trivial pairs (one quantity twice, two sensors of one device) go last.
+    candidates.sort(key=lambda f: bool(f["flags"]))  # stable: |r| order kept within
+    out = candidates[: params.top]
     for rank, f in enumerate(out, start=1):
         f["rank"] = rank
     return out
@@ -684,6 +715,18 @@ def run(
     result.series_total = len(grid.series)
     temp_coverage = _coverage(grid, params.outside_temp)
     grid = clean(grid, params.min_coverage)
+    if temp_coverage < params.min_coverage:
+        # The driver must cover the whole grid (hours without it are left out of the
+        # regression); a short one is not used, nor taken as a candidate.
+        drop = [
+            i
+            for i, s in enumerate(grid.series)
+            if s.entity_id == params.outside_temp and s.metric == "mean"
+        ]
+        if drop:
+            keep = [i for i in range(len(grid.series)) if i not in drop]
+            grid.series = [grid.series[i] for i in keep]
+            grid.values = grid.values[:, keep]
     resid, series = residuals(grid, params.outside_temp)
     used_temp = bool(params.outside_temp) and any(
         s.entity_id == params.outside_temp and s.metric == "mean" for s in grid.series
