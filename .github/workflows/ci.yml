@@ -4,7 +4,6 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
 
 # Everything is read-only unless a job asks for more.
@@ -331,6 +330,8 @@ jobs:
         working-directory: deploy/compose
         run: docker compose logs --no-color || true
 
+  # Every commit of main gets signed images tagged main and sha-<commit>. Releases do not
+  # rebuild: release.yml promotes these images to the version tags (ADR 045).
   publish:
     name: publish (${{ matrix.image }})
     needs: [build, trivy, contract]
@@ -373,7 +374,6 @@ jobs:
           tags: |
             type=raw,value=main,enable={{is_default_branch}}
             type=sha,format=long
-            type=semver,pattern={{version}}
       - id: push
         name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0

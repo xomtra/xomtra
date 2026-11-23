@@ -59,7 +59,9 @@ known-first-party = ["hacore", "hammond_ingest", "hammond_mcp"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["packages/hacore/src", "services/mcp-server/src", "services/ingest/src"]
+files = [
+  "packages/hacore/src", "services/mcp-server/src", "services/ingest/src", "scripts/release.py",
+]
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
@@ -69,7 +71,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = ["packages/hacore/tests", "services/mcp-server/tests", "services/ingest/tests"]
+testpaths = [
+  "packages/hacore/tests", "services/mcp-server/tests", "services/ingest/tests", "scripts/tests",
+]
 addopts = "--import-mode=importlib -ra"
 markers = ["contract: needs a real Home Assistant (HAMMOND_CONTRACT_HA_URL)"]
 

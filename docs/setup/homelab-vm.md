@@ -96,9 +96,9 @@ docker compose logs caddy | grep -i "certificate obtained"
 exit
 ```
 
-Before the first deployment verify the signatures of both images (README,
-`cosign verify`) and pin `HAMMOND_MCP_IMAGE` / `HAMMOND_CADDY_IMAGE` in `.env` to the
-verified digests. Automatic pull + verification comes in a later iteration.
+Before the first deployment take the `*_IMAGE` lines from the release asset
+`hammond-<version>-images.env` and verify the signatures ([Releases](../releasing.md)).
+Automatic pull + verification comes in a later iteration.
 
 Home Assistant: create a dedicated **non-admin** HA user, a long-lived access token
 for it, and set `HAMMOND_HA_URL=http://<ha-ip>:8123` and `HAMMOND_HA_TOKEN` in `.env`.
