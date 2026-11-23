@@ -39,9 +39,24 @@ DEFAULT_STATISTICS_WINDOW: dict[Period, timedelta] = {
 }
 
 
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+
 def to_us(seconds: float) -> int:
-    """Float epoch seconds -> integer epoch microseconds."""
-    return round(seconds * 1_000_000)
+    """Float epoch seconds -> integer epoch microseconds, rounded exactly like HA.
+
+    Home Assistant keeps the raw ``time.time()`` float (with sub-microsecond digits) in
+    the recorder and derives the state's datetime with ``datetime.fromtimestamp``, which
+    rounds the exact binary value half-to-even. ``round(seconds * 1e6)`` rounds the
+    product of a float multiplication instead and is 1 µs off in rare half-way cases,
+    which would give a live event and its history row different keys.
+    """
+    return _us(datetime.fromtimestamp(seconds, UTC))
+
+
+def _us(dt: datetime) -> int:
+    delta = dt - _EPOCH
+    return (delta.days * 86_400 + delta.seconds) * 1_000_000 + delta.microseconds
 
 
 def iso_to_us(value: str) -> int:
@@ -49,12 +64,11 @@ def iso_to_us(value: str) -> int:
     dt = datetime.fromisoformat(value)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
-    delta = dt - datetime(1970, 1, 1, tzinfo=UTC)
-    return (delta.days * 86_400 + delta.seconds) * 1_000_000 + delta.microseconds
+    return _us(dt)
 
 
 def us_to_datetime(us: int) -> datetime:
-    return datetime(1970, 1, 1, tzinfo=UTC) + timedelta(microseconds=us)
+    return _EPOCH + timedelta(microseconds=us)
 
 
 @dataclass(frozen=True, slots=True)
