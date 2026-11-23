@@ -103,9 +103,13 @@ def seed(con: duckdb.DuckDBPyConnection) -> dict[str, np.ndarray]:
         ["entity_id", "domain", "state", "is_missing", "last_updated"],
         [(e, e.split(".")[0], s, m, ts) for e, s, m, ts in states],
     )
-    con.execute("CREATE TABLE lake.silver.entities (entity_id VARCHAR, device_id VARCHAR)")
     con.execute(
-        "INSERT INTO lake.silver.entities VALUES ('sensor.a', 'dev1'), ('sensor.energy', 'dev1')"
+        "CREATE TABLE lake.silver.entities "
+        "(entity_id VARCHAR, device_id VARCHAR, label_ids VARCHAR[])"
+    )
+    con.execute(
+        "INSERT INTO lake.silver.entities (entity_id, device_id) "
+        "VALUES ('sensor.a', 'dev1'), ('sensor.energy', 'dev1')"
     )
     return series
 
@@ -399,3 +403,47 @@ def test_correlation_is_pearson_over_the_common_hours() -> None:
     assert len(pairs.r) == 1
     assert abs(float(pairs.r[0]) - expected) < 0.02
     assert abs(float(pairs.r[0])) < 0.9
+
+
+def test_clocks_and_removed_entities_are_left_out(plain: duckdb.DuckDBPyConnection) -> None:
+    series = seed(plain)
+    hours = [END - timedelta(hours=HOURS - i) for i in range(HOURS)]
+    rng = np.random.default_rng(5)
+    up = np.arange(HOURS, dtype=float)
+    for restart in (300, 700, 1100):  # both hosts restart together after an outage
+        up[restart:] -= up[restart]
+    stale = series["sensor.a"] * 3 + rng.normal(0, 0.05, HOURS)
+    extra = {
+        "sensor.host1_uptime": up * 3600,
+        "sensor.host2_uptime": up * 60,
+        "sensor.removed": np.where(np.arange(HOURS) < HOURS - 240, stale, np.nan),
+    }
+    rows = [
+        (sid, "hour", h, float(v), None)
+        for sid, values in extra.items()
+        for h, v in zip(hours, values, strict=True)
+        if not np.isnan(v)
+    ]
+    insert(
+        plain,
+        "lake.silver.statistics",
+        ["statistic_id", "period", "period_start", "mean", "sum"],
+        rows,
+    )
+    corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
+    entities = {e for f in findings(plain) for e in pair(f)}
+    assert not entities & set(extra)
+    assert {"sensor.a", "sensor.b"} <= entities
+
+
+def test_label_leaves_an_entity_out_of_the_analysis(plain: duckdb.DuckDBPyConnection) -> None:
+    seed(plain)
+    plain.execute(
+        "INSERT INTO lake.silver.entities VALUES "
+        "('sensor.b', 'dev2', ['hammond_no_analysis']), "
+        "('sensor.outside', NULL, ['hammond_no_analysis'])"
+    )
+    result = corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
+    assert result.series_excluded == 1  # the outside temperature stays a driver
+    assert result.notes == []
+    assert not any("sensor.b" in pair(f) for f in findings(plain))

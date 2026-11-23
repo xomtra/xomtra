@@ -32,6 +32,7 @@ import duckdb
 from hacore import bronze
 from hacore.client import HAClient
 from hacore.errors import HAAuthError, HAError
+from hacore.exclusions import fetch_no_ingest
 from hacore.history import StateRow, us_to_datetime
 from hacore.ingest import backfill_history
 from hacore.lake import LAKE_ALIAS
@@ -54,6 +55,8 @@ class StreamSettings:
     reconnect_min: float = 2.0
     reconnect_max: float = 300.0
     heartbeat_file: Path | None = None
+    # How often the hammond_no_ingest labels are re-read from the registries.
+    exclusions_refresh: float = 300.0
 
 
 class StateStream:
@@ -75,6 +78,7 @@ class StateStream:
         self._lake: duckdb.DuckDBPyConnection | None = None
         self._lake_lock = asyncio.Lock()
         self._stop = asyncio.Event()
+        self._exclude: frozenset[str] = frozenset()
         self.written = 0
 
     # -- public ------------------------------------------------------------------
@@ -112,6 +116,7 @@ class StateStream:
         async with HAClient(self._url, self._token) as ha:
             unsubscribe = await ha.subscribe_events(self._on_event, "state_changed")
             try:
+                await self._refresh_exclusions(ha)
                 await self._catch_up(ha)
                 await self._pump(ha)
             finally:
@@ -125,10 +130,20 @@ class StateStream:
         new_state = (event.get("data") or {}).get("new_state")
         if not new_state:  # entity removed
             return
+        if new_state.get("entity_id") in self._exclude:
+            return
         try:
             self._buffer.append(StateRow.from_state_object(new_state))
         except (KeyError, ValueError, TypeError):
             logger.warning("Ignoring malformed state_changed event")
+
+    async def _refresh_exclusions(self, ha: HAClient) -> None:
+        exclude = await fetch_no_ingest(ha)
+        if exclude != self._exclude:
+            logger.info("Entities labelled hammond_no_ingest: %d", len(exclude))
+        self._exclude = exclude
+        # Drop buffered states of entities that were just labelled.
+        self._buffer = [r for r in self._buffer if r.entity_id not in exclude]
 
     def _connection(self) -> duckdb.DuckDBPyConnection:
         if self._lake is None:
@@ -159,7 +174,9 @@ class StateStream:
                 )
                 start = now - self._settings.max_catchup
             lake = self._connection()
-        result = await backfill_history(ha, lake, start, now, alias=self._alias)
+        result = await backfill_history(
+            ha, lake, start, now, exclude=self._exclude, alias=self._alias
+        )
         written = result.written.get("states", 0)
         self.written += written
         logger.info("Catch-up from %s: %d states written", start.isoformat(), written)
@@ -172,7 +189,7 @@ class StateStream:
 
     async def _pump(self, ha: HAClient) -> None:
         s = self._settings
-        last_flush = last_ping = time.monotonic()
+        last_flush = last_ping = last_refresh = time.monotonic()
         while not self._stop.is_set():
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._stop.wait(), timeout=1.0)
@@ -182,6 +199,9 @@ class StateStream:
             if now - last_ping >= s.ping_interval:
                 await ha.ping()
                 last_ping = now
+            if now - last_refresh >= s.exclusions_refresh:
+                await self._refresh_exclusions(ha)
+                last_refresh = now
             if len(self._buffer) >= s.max_buffer or now - last_flush >= s.flush_interval:
                 await self._flush()
                 last_flush = now

@@ -45,7 +45,11 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    state (`on`, or up to three most frequent states). Gaps of up to 3 hours are filled
    forward. A series needs at least 7 days of data, 70 % coverage of its own span (an
    entity added later still takes part) and a value that changes in at least 5 % of
-   hours (nearly constant series correlate with anything).
+   hours (nearly constant series correlate with anything) and data in the last 3 days
+   of the window (statistics of removed entities stay in HA). Clocks such as an uptime
+   (the hourly mean grows by the same step) are left out: they only correlate through
+   common restarts. Entities labelled `hammond_no_analysis` or `hammond_no_ingest` in Home
+   Assistant (on the entity or its device) are left out; see `ingest.md`.
 2. Residuals after the hour of the day and the day of the week (in `HAMMOND_TIMEZONE`)
    and, if `HAMMOND_CORRELATION_OUTSIDE_TEMP` names an entity with hourly statistics or
    a `weather.*` entity (its `temperature` attribute), the outside temperature. A

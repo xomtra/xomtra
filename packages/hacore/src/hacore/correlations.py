@@ -47,6 +47,7 @@ import numpy as np
 import numpy.typing as npt
 
 from hacore import weather
+from hacore.exclusions import load_no_analysis
 from hacore.lake import LAKE_ALIAS, sql_literal
 
 logger = logging.getLogger(__name__)
@@ -103,6 +104,10 @@ MIN_SERIES_HOURS = 168
 # ... and its value must change in at least this share of consecutive known hours:
 # a nearly constant series with a few steps correlates perfectly with any other one.
 MIN_CHANGE_SHARE = 0.05
+# A series must have data within this many hours of the window's end.
+MAX_STALE_HOURS = 72
+# Share of hours with the same positive step that makes a mean series a clock.
+CLOCK_SHARE = 0.8
 # Standardised residuals are clipped to this many standard deviations.
 Z_CLIP = 4.0
 # Minimum variance (in standardised units) of each series over a pair's common hours.
@@ -150,6 +155,7 @@ class CorrelationResult:
     hours: int = 0
     pairs_tested: int = 0
     findings: int = 0
+    series_excluded: int = 0
     temperature_archive_hours: int = 0
     period_start: datetime | None = None
     period_end: datetime | None = None
@@ -163,6 +169,7 @@ class CorrelationResult:
             "hours": self.hours,
             "pairs_tested": self.pairs_tested,
             "findings": self.findings,
+            "series_excluded": self.series_excluded,
             "temperature_archive_hours": self.temperature_archive_hours,
             "period_start": self.period_start.isoformat() if self.period_start else None,
             "period_end": self.period_end.isoformat() if self.period_end else None,
@@ -400,12 +407,43 @@ def ffill(values: FloatArray, limit: int = FFILL_LIMIT) -> FloatArray:
     return out
 
 
-def clean(grid: Grid, min_coverage: float) -> Grid:
-    """Keep series with enough, dense and changing data.
+def _drop_excluded(
+    grid: Grid, excluded: frozenset[str], keep_entity: str | None
+) -> tuple[Grid, int]:
+    """Leave out series of entities labelled for no analysis (ADR 044); the outside
+    temperature stays a driver."""
+    idx = [
+        i
+        for i, s in enumerate(grid.series)
+        if s.entity_id not in excluded or s.entity_id == keep_entity
+    ]
+    dropped = len(grid.series) - len(idx)
+    if not dropped:
+        return grid, 0
+    return (
+        Grid(
+            hours=grid.hours,
+            local_hour=grid.local_hour,
+            local_dow=grid.local_dow,
+            series=[grid.series[i] for i in idx],
+            values=grid.values[:, idx],
+        ),
+        dropped,
+    )
+
+
+def clean(grid: Grid, min_coverage: float, keep_entity: str | None = None) -> Grid:
+    """Keep series with enough, dense, current and changing data.
 
     Coverage is measured over the series' own span (first to last known hour), not the
     whole grid: an entity added half a year ago still takes part in a yearly window;
     pairs are then compared only on the hours both have (``MIN_PAIR_HOURS``).
+
+    A series must reach the last ``MAX_STALE_HOURS`` of the window: entities that were
+    removed (statistics of a deleted integration stay in HA) are not current findings.
+    Clocks (an uptime: the hourly mean grows by the same step nearly every hour) only
+    correlate through common restarts and are left out. ``keep_entity`` (the outside
+    temperature) is exempt from both.
     """
     values = ffill(grid.values)
     known = ~np.isnan(values)
@@ -419,10 +457,13 @@ def clean(grid: Grid, min_coverage: float) -> Grid:
     with np.errstate(invalid="ignore"):
         changed = both & (np.abs(np.diff(values, axis=0)) > 1e-9)
         change_share = changed.sum(axis=0) / np.maximum(both.sum(axis=0), 1)
+    current = last >= t_len - MAX_STALE_HOURS
+    exempt = np.array([s.entity_id == keep_entity for s in grid.series], dtype=bool)
     keep = (
         (n_known >= MIN_SERIES_HOURS)
         & (coverage >= min_coverage)
         & (change_share >= MIN_CHANGE_SHARE)
+        & ((current & ~_clocks(values, grid.series)) | exempt)
     )
     keep = np.asarray(keep, dtype=bool)
     if keep.sum() > MAX_SERIES:
@@ -439,6 +480,25 @@ def clean(grid: Grid, min_coverage: float) -> Grid:
         series=[grid.series[i] for i in idx],
         values=values[:, idx],
     )
+
+
+def _clocks(values: FloatArray, series: list[Series]) -> npt.NDArray[np.bool_]:
+    """Mean series whose hourly step equals their median positive step in at least
+    ``CLOCK_SHARE`` of the hours (uptime counters)."""
+    out = np.zeros(len(series), dtype=bool)
+    with np.errstate(invalid="ignore"):
+        diff = np.diff(values, axis=0)
+    for i, s in enumerate(series):
+        if s.metric != "mean":
+            continue
+        d = diff[:, i]
+        d = d[~np.isnan(d)]
+        pos = d[d > 0]
+        if len(d) < MIN_SERIES_HOURS or len(pos) == 0:
+            continue
+        step = float(np.median(pos))
+        out[i] = float(np.mean(np.abs(d - step) <= 0.01 * step)) >= CLOCK_SHARE
+    return out
 
 
 def residuals(grid: Grid, outside_temp: str | None) -> tuple[FloatArray, list[Series]]:
@@ -830,13 +890,16 @@ def run(
         result.notes.append("not enough data in the window")
         logger.info("Correlations (%d d): not enough data", params.window_days)
         return result
+    grid, result.series_excluded = _drop_excluded(
+        grid, load_no_analysis(con, alias), params.outside_temp
+    )
     if params.outside_temp:
         result.temperature_archive_hours = fill_from_archive(
             con, grid, params.outside_temp, alias=alias
         )
     result.series_total = len(grid.series)
     temp_coverage = _coverage(grid, params.outside_temp)
-    grid = clean(grid, params.min_coverage)
+    grid = clean(grid, params.min_coverage, params.outside_temp)
     if temp_coverage < params.min_coverage:
         # The driver must cover the whole grid (hours without it are left out of the
         # regression); a short one is not used, nor taken as a candidate.

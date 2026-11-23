@@ -101,3 +101,37 @@ async def test_backfill_uses_states_and_registry_ids(
         result = await ingest.backfill_history(ha, lake, NOW - timedelta(days=2), NOW)
     assert seen == {"sensor.t", "sensor.gone"}
     assert result.written == {"states": 1}
+
+
+async def test_no_ingest_label_skips_states_and_statistics(
+    fake_ha: tuple[FakeHA, str], lake: duckdb.DuckDBPyConnection
+) -> None:
+    fake, url = fake_ha
+    setup_registries(fake)
+    # Labelled on the device: every entity of the device is left out.
+    fake.results["config/device_registry/list"].append(
+        {"id": "d2", "name": "Noisy", "labels": ["hammond_no_ingest"]}
+    )
+    fake.results["config/entity_registry/list"] += [
+        {"id": "e2", "entity_id": "sensor.noisy", "device_id": "d2"},
+        {"id": "e3", "entity_id": "sensor.private", "labels": ["hammond_no_ingest"]},
+    ]
+    fake.results["recorder/list_statistic_ids"].append({"statistic_id": "sensor.noisy"})
+    seen: set[str] = set()
+    stat_ids: set[str] = set()
+
+    def history(msg: dict[str, Any]) -> dict[str, Any]:
+        seen.update(msg["entity_ids"])
+        return {}
+
+    def stats(msg: dict[str, Any]) -> dict[str, Any]:
+        stat_ids.update(msg["statistic_ids"])
+        return {}
+
+    fake.handlers["history/history_during_period"] = history
+    fake.handlers["recorder/statistics_during_period"] = stats
+    async with HAClient(url, VALID_TOKEN) as ha:
+        await ingest.backfill_history(ha, lake, NOW - timedelta(days=1), NOW)
+        await ingest.sync_statistics(ha, lake, periods=("hour",), end=NOW)
+    assert seen == {"sensor.t"}
+    assert stat_ids == {"sensor.t"}

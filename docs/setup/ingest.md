@@ -98,6 +98,22 @@ sudo docker compose -f /opt/hammond/compose.yaml exec dagster-daemon hammond-ing
 Or in the UI: *Jobs → history_backfill → Launchpad*, config `start: "10d"`. The backfill
 recomputes the affected silver range at the end.
 
+## Leaving entities out (labels in Home Assistant)
+
+Create these labels in Home Assistant (Settings → Areas, labels & zones → Labels) and put
+them on an entity or on a device (a device label also covers its future entities):
+
+| Label | Effect |
+|-------|--------|
+| `hammond_no_ingest` | Not stored at all: live stream, catch-up, history backfill, statistics. Data stored before stays. |
+| `hammond_no_analysis` | Stored and queryable, but left out of correlations (and later anomalies). |
+
+`hammond_no_ingest` implies `hammond_no_analysis`. The stream re-reads the labels every
+5 minutes; the correlations on every run (from `silver.entities`, i.e. after the next
+hourly ingest). Removing `hammond_no_ingest` later backfills only what the HA recorder
+still keeps (its retention, 10 days by default). Who sees what over MCP stays with
+`policy.yaml`.
+
 ## 6. Operations
 
 | Task | Command (in `dagster-daemon`) |
