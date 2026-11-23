@@ -89,15 +89,17 @@ window are not flagged, and what could explain the top five?"*
 
 The built-in policy (`services/mcp-server/src/hammond_mcp/policy.yaml`):
 
-| Role | Tools | Views | Hidden entities | Rows per call |
-| --- | --- | --- | --- | --- |
-| `HAmmond.Admin` | all | all | none | 10 000 |
-| `HAmmond.Reader` | catalog and data tools | all but `catalog_drift` | `person.*`, `device_tracker.*`, `zone.*`, `camera.*`, `image.*`, `lock.*`, `alarm_control_panel.*`, `*_location` | 1 000 |
-| no role | `whoami` only | – | – | – |
+| Role | Tools | Views | Hidden entities | Hidden columns | Rows per call |
+| --- | --- | --- | --- | --- | --- |
+| `HAmmond.Admin` | all | all | none | none | 10 000 |
+| `HAmmond.Reader` | catalog and data tools | all but `catalog_drift` | `person.*`, `device_tracker.*`, `zone.*`, `camera.*`, `image.*`, `lock.*`, `alarm_control_panel.*`, `*_location` | `states.attributes` | 1 000 |
+| no role | `whoami` only | – | – | – | – |
 
-Hidden entities are filtered inside the database (the views a caller can query already
-exclude them; a finding is hidden when either of its entities is); asking for one
-directly is refused and audited as `denied`. To change
+Hidden entities and columns are filtered inside the database (the views a caller can
+query already exclude them; a finding is hidden when either of its entities is); asking
+for a hidden entity directly is refused and audited as `denied`. State attributes are
+hidden from Reader because they carry free text (media titles, addresses, coordinates,
+e-mails) also outside the hidden domains. To change
 the policy, mount your own file into the `mcp` container and set `HAMMOND_POLICY_FILE`.
 
 Assign the roles in Entra: **Enterprise applications → HAmmond MCP → Users and groups**
@@ -120,6 +122,11 @@ id, username, roles, OAuth client, tool, arguments (SQL included), decision, out
 error, rows and duration. The MCP server's role `hammond_audit` may only `INSERT`. The
 same record is logged as a JSON line by the `hammond.audit` logger. If the database
 cannot store the record, the call fails instead of returning data.
+
+Records are kept for `AUDIT_RETENTION_DAYS` (default 90, `0` keeps everything). Once a day
+the MCP server calls `audit.purge_expired()`, a function owned by `postgres` that deletes
+only records older than that; the retention is set when `postgres-init` runs, so change
+it in `.env` and run `sudo docker compose up -d`.
 
 ```sh
 sudo docker compose exec postgres psql -U postgres -d audit -c \

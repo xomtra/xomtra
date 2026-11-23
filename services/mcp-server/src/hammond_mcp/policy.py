@@ -24,6 +24,8 @@ ALL = "*"
 ALWAYS_ALLOWED = frozenset({"whoami"})
 # Entity patterns are inlined into SQL (GLOB); keep them to a safe alphabet.
 _PATTERN = re.compile(r"^[a-z0-9_.*?]+$")
+# Column names are inlined into SQL (EXCLUDE); plain identifiers only.
+_COLUMN = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
 class PolicyError(ValueError):
@@ -40,6 +42,7 @@ class RoleGrant:
     views: frozenset[str]
     deny_entities: frozenset[str]
     max_rows: int
+    hide_columns: frozenset[tuple[str, str]] = frozenset()  # (view, column)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +55,7 @@ class Access:
     deny_entities: tuple[str, ...] = ()
     max_rows: int = 0
     known_views: frozenset[str] = field(default_factory=frozenset)
+    hidden_columns: frozenset[tuple[str, str]] = frozenset()  # (view, column)
 
     def can_call(self, tool: str) -> bool:
         return ALL in self.tools or tool in self.tools
@@ -62,6 +66,9 @@ class Access:
     @property
     def allowed_views(self) -> list[str]:
         return sorted(v for v in self.known_views if self.can_view(v))
+
+    def columns_hidden_in(self, view: str) -> list[str]:
+        return sorted(c for v, c in self.hidden_columns if v == view)
 
     def entity_allowed(self, entity_id: str) -> bool:
         return not any(fnmatch.fnmatchcase(entity_id, p) for p in self.deny_entities)
@@ -102,11 +109,23 @@ class Policy:
             max_rows = int(grant.get("max_rows", 1000))
             if not 1 <= max_rows <= 100_000:
                 raise PolicyError(f"role {name}: max_rows must be 1..100000")
+            hidden = grant.get("hide_columns") or {}
+            if not isinstance(hidden, dict):
+                raise PolicyError(f"role {name}: hide_columns must map view -> columns")
+            hide_columns = frozenset(
+                (str(view), str(col)) for view, cols in hidden.items() for col in cols or []
+            )
+            bad = [
+                f"{v}.{c}" for v, c in hide_columns if not (_COLUMN.match(v) and _COLUMN.match(c))
+            ]
+            if bad:
+                raise PolicyError(f"role {name}: invalid hide_columns {sorted(bad)}")
             roles[str(name)] = RoleGrant(
                 tools=frozenset(str(t) for t in grant.get("tools") or []),
                 views=frozenset(str(v) for v in grant.get("views") or []),
                 deny_entities=patterns,
                 max_rows=max_rows,
+                hide_columns=hide_columns,
             )
         return cls(roles=roles)
 
@@ -115,6 +134,7 @@ class Policy:
         if not identity.authenticated or not grants:
             return Access(roles=identity.roles, known_views=known_views)
         denied = frozenset.intersection(*(g.deny_entities for g in grants))
+        hidden = frozenset.intersection(*(g.hide_columns for g in grants))
         return Access(
             roles=identity.roles,
             tools=frozenset().union(*(g.tools for g in grants)) | ALWAYS_ALLOWED,
@@ -122,6 +142,7 @@ class Policy:
             deny_entities=tuple(sorted(denied)),
             max_rows=max(g.max_rows for g in grants),
             known_views=known_views,
+            hidden_columns=hidden,
         )
 
 

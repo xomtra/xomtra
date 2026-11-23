@@ -51,6 +51,20 @@ async def test_search_catalog_hides_denied_entities(data: DataAccess) -> None:
     assert [e["entity_id"] for e in counters["entities"]] == ["sensor.energy"]
 
 
+async def test_reader_does_not_see_attributes(data: DataAccess) -> None:
+    sql = "SELECT * FROM states LIMIT 1"
+    admin = await call(server(data, ADMIN), "query_sql", sql=sql)
+    reader = await call(server(data, READER), "query_sql", sql=sql)
+    assert "attributes" in admin["columns"]
+    assert "attributes" not in reader["columns"]
+    assert "state_value" in reader["columns"]
+    with pytest.raises(ToolError, match="attributes"):
+        await call(server(data, READER), "query_sql", sql="SELECT attributes FROM states")
+    views = await call(server(data, READER), "list_views")
+    states = next(v for v in views["views"] if v["name"] == "states")
+    assert "attributes" not in {c["name"] for c in states["columns"]}
+
+
 async def test_describe_entity(data: DataAccess) -> None:
     result = await call(server(data, READER), "describe_entity", entity_id="sensor.temp")
     assert result["entity"]["value_max"] == 23.0

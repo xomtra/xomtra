@@ -8,6 +8,10 @@ set -eu
 : "${OPS_USER:?}" "${OPS_PASSWORD:?}" "${DAGSTER_DB:?}" "${SQLMESH_DB:?}"
 : "${AUDIT_DB:?}" "${AUDIT_USER:?}" "${AUDIT_PASSWORD:?}"
 : "${AUDIT_ADMIN_USER:?}" "${AUDIT_ADMIN_PASSWORD:?}"
+AUDIT_RETENTION_DAYS=${AUDIT_RETENTION_DAYS:-90}
+case $AUDIT_RETENTION_DAYS in
+  '' | *[!0-9]*) echo "AUDIT_RETENTION_DAYS must be a whole number of days" >&2; exit 1 ;;
+esac
 
 ensure() { # role password database...
   role=$1 pwd=$2
@@ -40,7 +44,7 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db') \gexec
 SELECT format('REVOKE ALL ON DATABASE %I FROM PUBLIC', :'db') \gexec
 SQL
 psql -v ON_ERROR_STOP=1 -U postgres -d "$AUDIT_DB" -v usr="$AUDIT_USER" -v db="$AUDIT_DB" \
-  -v adm="$AUDIT_ADMIN_USER" <<'SQL'
+  -v adm="$AUDIT_ADMIN_USER" -v days="$AUDIT_RETENTION_DAYS" <<'SQL'
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 CREATE SCHEMA IF NOT EXISTS audit AUTHORIZATION postgres;
 CREATE TABLE IF NOT EXISTS audit.tool_call (
@@ -65,5 +69,19 @@ SELECT format('GRANT INSERT ON audit.tool_call TO %I', :'usr') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'db', :'adm') \gexec
 SELECT format('GRANT USAGE ON SCHEMA audit TO %I', :'adm') \gexec
 SELECT format('GRANT SELECT, INSERT ON audit.tool_call TO %I', :'adm') \gexec
+-- Retention (ADR 040): only records older than AUDIT_RETENTION_DAYS (0 = keep all) can be
+-- deleted, by a function owned by postgres. The MCP server calls it once a day; its role
+-- still cannot delete or read anything else, so recent history cannot be erased.
+SELECT format($f$
+CREATE OR REPLACE FUNCTION audit.purge_expired() RETURNS bigint
+LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $b$
+  WITH gone AS (
+    DELETE FROM audit.tool_call
+    WHERE %1$s > 0 AND ts < now() - make_interval(days => %1$s)
+    RETURNING 1)
+  SELECT count(*) FROM gone
+$b$$f$, :'days'::integer) \gexec
+REVOKE ALL ON FUNCTION audit.purge_expired() FROM PUBLIC;
+SELECT format('GRANT EXECUTE ON FUNCTION audit.purge_expired() TO %I, %I', :'usr', :'adm') \gexec
 SQL
 echo "Postgres roles and databases are in place."

@@ -56,7 +56,8 @@ VIEWS: dict[str, View] = {
             "silver.states",
             ("entity_id",),
             "Every state change: entity_id, state (text), state_value (number or NULL), "
-            "is_missing, attributes (JSON), last_changed, last_updated (UTC).",
+            "is_missing, attributes (JSON; hidden for some roles), last_changed, "
+            "last_updated (UTC).",
         ),
         View(
             "statistics",
@@ -220,13 +221,15 @@ class DataAccess:
             for view in VIEWS.values():
                 if view.source not in existing:
                     continue
-                hidden = " OR ".join(
+                hidden_rows = " OR ".join(
                     f"coalesce({deny.format(col=col)}, FALSE)" for col in view.entity_columns
                 )
-                where = f" WHERE NOT ({hidden})" if deny else ""
+                where = f" WHERE NOT ({hidden_rows})" if deny else ""
+                hidden = access.columns_hidden_in(view.name)
+                exclude = f" EXCLUDE ({', '.join(hidden)})" if hidden else ""
                 cur.execute(
                     f"CREATE TEMP VIEW {view.name} AS "
-                    f"SELECT * FROM {LAKE_ALIAS}.{view.source}{where}"
+                    f"SELECT *{exclude} FROM {LAKE_ALIAS}.{view.source}{where}"
                 )
             yield cur
         finally:
