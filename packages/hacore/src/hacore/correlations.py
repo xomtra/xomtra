@@ -566,6 +566,7 @@ def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
     )
 
 
+<<<<<<< HEAD
 def _pearson(
     cnt: FloatArray,
     sab: FloatArray,
@@ -588,6 +589,8 @@ def _pearson(
     return np.clip(np.nan_to_num(r), -1.0, 1.0)
 
 
+=======
+>>>>>>> e6889c8ff9938a7f9560967f7aae800e542b9072
 def _groups(linked: npt.NDArray[np.bool_]) -> npt.NDArray[np.int64]:
     """Connected components (union-find) of a boolean adjacency matrix; each column
     gets the smallest index of its component."""
