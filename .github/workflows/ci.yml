@@ -18,6 +18,10 @@ env:
   # Renovate keeps the digest current (see renovate.json).
   TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
   UV_VERSION: "0.13.9"
+  # Home Assistant versions of the contract tests: current and previous stable release.
+  # Renovate keeps both current (see renovate.json).
+  HA_IMAGE_CURRENT: homeassistant/home-assistant:2026.11.2@sha256:493a07e8f6530fc640223f4a0a5248f20a61ca2f718bb1d31efbf08a2c5ea28f
+  HA_IMAGE_PREVIOUS: homeassistant/home-assistant:2026.10.4@sha256:23f4dfbb69ce76315dbc4de7915504f1c2dcecd7ca2648113a493a385972e133
 
 jobs:
   lint:
@@ -56,6 +60,41 @@ jobs:
       - run: uv sync --locked
       - run: uv run pytest --cov --cov-report=term-missing
 
+  contract:
+    name: contract (HA ${{ matrix.ha }})
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        ha: [current, previous]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Start Home Assistant
+        env:
+          HA_IMAGE: ${{ matrix.ha == 'current' && env.HA_IMAGE_CURRENT || env.HA_IMAGE_PREVIOUS }}
+        run: |
+          cp -r packages/hacore/tests/contract/ha-config "$RUNNER_TEMP/ha-config"
+          docker run -d --name ha -p 127.0.0.1:8123:8123 \
+            -v "$RUNNER_TEMP/ha-config:/config" "$HA_IMAGE"
+      - name: Contract tests (onboarding, non-admin token, history, statistics, ingest)
+        env:
+          HAMMOND_CONTRACT_HA_URL: http://127.0.0.1:8123
+          HAMMOND_CONTRACT_HA_CONFIG: ${{ runner.temp }}/ha-config
+        run: uv run pytest packages/hacore/tests/contract -m contract
+      - name: Home Assistant log on failure
+        if: failure()
+        run: docker logs ha 2>&1 | tail -200
+
   trivy:
     name: trivy
     runs-on: ubuntu-24.04
@@ -91,8 +130,11 @@ jobs:
       contents: read
     env:
       HAMMOND_MCP_IMAGE: hammond-mcp:ci
+      HAMMOND_INGEST_IMAGE: hammond-ingest:ci
       POSTGRES_PASSWORD: ci-postgres
       DUCKLAKE_PG_PASSWORD: ci-ducklake
+      OPS_PG_PASSWORD: ci-ops-'quote
+      HAMMOND_HA_URL: http://ha:8123
       S3_ACCESS_KEY: ci-access
       S3_SECRET_KEY: ci-secret-key
       # Dummy Entra values: the server must start and serve OAuth metadata.
@@ -121,6 +163,16 @@ jobs:
           tags: hammond-mcp:ci
           cache-from: type=gha,scope=hammond-mcp
           cache-to: type=gha,mode=max,scope=hammond-mcp
+      - name: Build ingest image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: services/ingest/Dockerfile
+          load: true
+          push: false
+          tags: hammond-ingest:ci
+          cache-from: type=gha,scope=hammond-ingest
+          cache-to: type=gha,mode=max,scope=hammond-ingest
       - name: Build Caddy image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -132,7 +184,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=hammond-caddy
       - name: Scan images
         run: |
-          for image in hammond-mcp:ci hammond-caddy:ci; do
+          for image in hammond-mcp:ci hammond-ingest:ci hammond-caddy:ci; do
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" image \
               --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$image"
           done
@@ -159,6 +211,41 @@ jobs:
               assert err.code == 401, err.code
           print(urllib.request.urlopen("http://127.0.0.1:8000/.well-known/oauth-protected-resource/mcp").read())
           PY
+      - name: Smoke test ingest (HA -> stream/backfill -> bronze -> SQLMesh silver)
+        working-directory: deploy/compose
+        run: |
+          # Creates the egress network (and the ingest containers, started below).
+          docker compose up --no-start ingest-stream dagster-daemon dagster-webserver
+          docker run -d --name ha --network hammond_egress \
+            -v "$GITHUB_WORKSPACE/packages/hacore/tests/contract/ha-config:/config" \
+            "$HA_IMAGE_CURRENT"
+          HAMMOND_HA_TOKEN=$(docker compose run --rm --no-deps -T ingest-stream \
+            python -c "from hacore.onboarding import onboard; print(onboard('http://ha:8123').user_token)" \
+            | tail -n 1)
+          export HAMMOND_HA_TOKEN
+          echo "::add-mask::$HAMMOND_HA_TOKEN"
+          docker compose up -d --wait --wait-timeout 240 ingest-stream dagster-daemon dagster-webserver
+          docker compose exec -T dagster-daemon hammond-ingest sync
+          docker compose exec -T dagster-daemon hammond-ingest backfill --start 1d
+          # Through Dagster (Postgres run storage, read-only image): retention + maintenance.
+          docker compose exec -T dagster-daemon dagster job execute \
+            -m hammond_ingest.definitions -a defs -j retention_daily
+          docker compose exec -T dagster-daemon python - <<'PY'
+          from hacore import lake
+          con = lake.connect(lake.LakeSettings.from_env())
+          for table in ("bronze.ha_states", "bronze.ha_registry", "silver.entities"):
+              (n,) = con.execute(f"SELECT count(*) FROM lake.{table}").fetchone()
+              print(table, n)
+              assert n > 0, table
+          # silver.states holds complete hours only; HA may have started in the current hour.
+          (complete,) = con.execute(
+              "SELECT count(*) FROM lake.bronze.ha_states "
+              "WHERE last_updated < date_trunc('hour', now())"
+          ).fetchone()
+          (silver,) = con.execute("SELECT count(*) FROM lake.silver.states").fetchone()
+          print("bronze states in complete hours", complete, "silver.states", silver)
+          assert silver > 0 or complete == 0, "silver.states"
+          PY
       - name: Compose logs on failure
         if: failure()
         working-directory: deploy/compose
@@ -166,7 +253,7 @@ jobs:
 
   publish:
     name: publish (${{ matrix.image }})
-    needs: [build, trivy]
+    needs: [build, trivy, contract]
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     strategy:
@@ -175,6 +262,9 @@ jobs:
           - image: hammond-mcp
             context: .
             file: services/mcp-server/Dockerfile
+          - image: hammond-ingest
+            context: .
+            file: services/ingest/Dockerfile
           - image: hammond-caddy
             context: deploy/caddy
             file: deploy/caddy/Dockerfile

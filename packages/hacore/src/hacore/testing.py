@@ -17,6 +17,8 @@ type Handler = Callable[[dict[str, Any]], Any]
 class FakeHA:
     def __init__(self) -> None:
         self.results: dict[str, Any] = {}
+        # Computed results: command type -> function of the request message.
+        self.handlers: dict[str, Handler] = {}
         self.errors: dict[str, tuple[str, str]] = {}
         self.received: list[dict[str, Any]] = []
         self.connections: list[ServerConnection] = []
@@ -58,9 +60,18 @@ class FakeHA:
                 "id": msg_id,
                 "type": "result",
                 "success": True,
-                "result": self.results.get(kind),
+                "result": self.handlers[kind](msg)
+                if kind in self.handlers
+                else self.results.get(kind),
             }
         return [result] if self.coalesce else result
+
+    async def drop_connections(self) -> None:
+        """Simulate a Home Assistant restart: close all client connections."""
+        for ws in self.connections:
+            await ws.close()
+        self.connections.clear()
+        self.subscriptions.clear()
 
     async def fire(self, event_type: str, data: dict[str, Any]) -> None:
         for sub_id, wanted in list(self.subscriptions.items()):

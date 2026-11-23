@@ -1,0 +1,45 @@
+name: Contract tests (HA beta)
+
+# Weekly early warning: the hacore contract tests against the current Home Assistant
+# beta. The image is deliberately not pinned (it is the moving target under test) and
+# nothing from this workflow is published.
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  UV_VERSION: "0.13.9"
+
+jobs:
+  contract-beta:
+    name: contract (HA beta)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Start Home Assistant beta
+        run: |
+          cp -r packages/hacore/tests/contract/ha-config "$RUNNER_TEMP/ha-config"
+          docker run -d --name ha -p 127.0.0.1:8123:8123 \
+            -v "$RUNNER_TEMP/ha-config:/config" homeassistant/home-assistant:beta
+          docker inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' ha
+      - name: Contract tests
+        env:
+          HAMMOND_CONTRACT_HA_URL: http://127.0.0.1:8123
+          HAMMOND_CONTRACT_HA_CONFIG: ${{ runner.temp }}/ha-config
+        run: uv run pytest packages/hacore/tests/contract -m contract
+      - name: Home Assistant log on failure
+        if: failure()
+        run: docker logs ha 2>&1 | tail -200

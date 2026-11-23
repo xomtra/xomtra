@@ -1,0 +1,39 @@
+# Minimal Home Assistant configuration for the hacore contract tests.
+# Synthetic entities only; no real installation data.
+homeassistant:
+  name: HAmmond contract test
+  latitude: 50.0
+  longitude: 14.0
+  elevation: 200
+  unit_system: metric
+  time_zone: UTC
+  country: CZ
+  currency: EUR
+
+http:
+api:
+config:
+history:
+recorder:
+  commit_interval: 0
+
+input_number:
+  hammond_test_setpoint:
+    name: Test setpoint
+    min: -20
+    max: 40
+    step: 0.1
+    unit_of_measurement: "°C"
+
+input_boolean:
+  hammond_test_switch:
+    name: Test switch
+
+template:
+  - sensor:
+      - name: Test temperature
+        unique_id: hammond_test_temperature
+        state: "{{ states('input_number.hammond_test_setpoint') }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement

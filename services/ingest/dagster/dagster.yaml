@@ -1,0 +1,46 @@
+# Dagster instance of HAmmond ingest. DAGSTER_HOME points to this (read-only) directory;
+# run data, logs and artifacts go to the /data volume, run/event storage to Postgres.
+storage:
+  postgres:
+    postgres_db:
+      hostname: { env: HAMMOND_OPS_PG_HOST }
+      username: { env: HAMMOND_OPS_PG_USER }
+      password: { env: HAMMOND_OPS_PG_PASSWORD }
+      db_name: { env: HAMMOND_DAGSTER_PG_DB }
+      port: 5432
+
+# One run at a time: ingest, transformations and retention never compete for DuckLake
+# commits. The live stream is a separate service and retries on conflicts.
+run_coordinator:
+  module: dagster._core.run_coordinator
+  class: QueuedRunCoordinator
+  config:
+    max_concurrent_runs: 1
+
+run_launcher:
+  module: dagster._core.launcher
+  class: DefaultRunLauncher
+
+local_artifact_storage:
+  module: dagster._core.storage.root
+  class: LocalArtifactStorage
+  config:
+    base_dir: /data/dagster
+
+compute_logs:
+  module: dagster._core.storage.local_compute_log_manager
+  class: LocalComputeLogManager
+  config:
+    base_dir: /data/dagster/compute_logs
+
+retention:
+  schedule:
+    purge_after_days: 30
+  sensor:
+    purge_after_days: { skipped: 7, failure: 30, success: 7 }
+
+telemetry:
+  enabled: false
+
+nux:
+  enabled: false

@@ -25,6 +25,15 @@
     },
     {
       "customType": "regex",
+      "description": "Home Assistant images of the contract tests",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "HA_IMAGE_(?:CURRENT|PREVIOUS): (?<depName>[^:\\s]+):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
       "description": "uv version used in CI",
       "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
       "matchStrings": ["UV_VERSION: \"(?<currentValue>[^\"]+)\""],
@@ -44,8 +53,14 @@
       "groupName": "uv"
     },
     {
+      "description": "HA_IMAGE_PREVIOUS trails the current release: bump it by hand when HA_IMAGE_CURRENT moves to a new monthly release",
+      "matchPackageNames": ["homeassistant/home-assistant"],
+      "matchUpdateTypes": ["major", "minor"],
+      "dependencyDashboardApproval": true
+    },
+    {
       "description": "Major updates of the data stack need a manual look (DuckLake catalog format)",
-      "matchPackageNames": ["duckdb", "chrislusf/seaweedfs", "postgres"],
+      "matchPackageNames": ["duckdb", "sqlmesh", "dagster", "chrislusf/seaweedfs", "postgres"],
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true
     }

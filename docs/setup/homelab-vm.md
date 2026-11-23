@@ -100,6 +100,6 @@ Before the first deployment verify the signatures of both images (README,
 `cosign verify`) and pin `HAMMOND_MCP_IMAGE` / `HAMMOND_CADDY_IMAGE` in `.env` to the
 verified digests. Automatic pull + verification comes in a later iteration.
 
-Home Assistant (optional in 1a.1): create a dedicated **non-admin** HA user, a
-long-lived access token for it, and set `HAMMOND_HA_URL=http://<ha-ip>:8123` and
-`HAMMOND_HA_TOKEN` in `.env`.
+Home Assistant: create a dedicated **non-admin** HA user, a long-lived access token
+for it, and set `HAMMOND_HA_URL=http://<ha-ip>:8123` and `HAMMOND_HA_TOKEN` in `.env`.
+The ingest (phase 1a.2) needs it; see [Data ingest](ingest.md).
