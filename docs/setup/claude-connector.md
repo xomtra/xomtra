@@ -24,6 +24,7 @@ What Caddy lets through:
 | --- | --- | --- |
 | `/authorize`, `/consent`, `/auth/callback` | anywhere | sign-in steps in **your browser** |
 | everything else (`/mcp`, `/token`, `/register`, `/.well-known/*`) | `CLAUDE_IP_RANGES` only | called by Claude's servers |
+| `/admin`, `/admin/*` | `ADMIN_CIDR` only, then Entra role `HAmmond.Admin` | [admin GUI and Dagster UI](admin-gui.md) |
 | `/healthz` | nobody (404) | internal health check only |
 
 The browser paths only start or finish an Entra sign-in; without a successful sign-in of

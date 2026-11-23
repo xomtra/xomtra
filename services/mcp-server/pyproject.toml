@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 hammond-mcp = "hammond_mcp.__main__:main"
+hammond-admin = "hammond_mcp.admin.__main__:main"
 
 [build-system]
 requires = ["hatchling>=1.27"]
