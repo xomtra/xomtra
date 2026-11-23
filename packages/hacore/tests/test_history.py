@@ -104,3 +104,11 @@ async def test_iter_statistics(fake_ha: tuple[FakeHA, str]) -> None:
         ]
     assert {r.statistic_id for r in rows} == {"sensor.a", "sensor.b"}
     assert fake.received[0]["period"] == "5minute"
+
+
+def test_to_us_rounds_like_datetime() -> None:
+    # A raw time.time() value half-way between two microseconds: HA's datetime (and so
+    # the live event) has ...723; round(x * 1e6) would give ...724 (seen in CI, ADR 030).
+    seconds = 1795406751.7887235
+    event = datetime.fromtimestamp(seconds, UTC).isoformat()
+    assert to_us(seconds) == iso_to_us(event) == 1795406751788723
