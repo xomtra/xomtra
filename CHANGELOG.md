@@ -11,6 +11,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-23
+
 ### Added
 
 - MCP server (FastMCP) for Claude with sign-in through Microsoft Entra ID (OAuth proxy),
@@ -30,9 +32,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Home Assistant labels `hammond_no_ingest` and `hammond_no_analysis` exclude entities
   or devices from ingest and analysis (#21).
 - Release management: SemVer tags, release workflow that promotes the tested images,
-  signs them and publishes a GitHub release with pinned digests.
+  signs them and publishes a GitHub release with pinned digests (#22).
 
 ### Changed
 
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
+
+[Unreleased]: https://github.com/zettabyte-cz/HAmmond/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/zettabyte-cz/HAmmond/releases/tag/v0.1.0
