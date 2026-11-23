@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 # Caddy with a DNS provider plugin: certificates are issued via ACME DNS-01, so no
 # port has to be opened for Let's Encrypt and issuance works before the port forward.
 #   docker build -t hammond-caddy deploy/caddy
