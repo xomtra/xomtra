@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 
@@ -236,3 +237,42 @@ def test_on_ducklake(lake: duckdb.DuckDBPyConnection) -> None:
     res = corr.run(lake, params(outside_temp="sensor.outside"), now=NOW)
     assert res.findings > 0
     assert ("sensor.a", "sensor.b") in {pair(f) for f in findings(lake)}
+
+
+def test_weather_entity_as_outside_temperature(plain: duckdb.DuckDBPyConnection) -> None:
+    series = seed(plain)
+    # The temperature of a weather entity lives in its attributes, two updates an hour.
+    hours = [END - timedelta(hours=HOURS - i) for i in range(HOURS)]
+    rows = []
+    for h, v in zip(hours, series["sensor.outside"], strict=True):
+        for minute in (5, 35):
+            attrs = json.dumps({"temperature": round(float(v), 2), "temperature_unit": "°C"})
+            rows.append(
+                ("weather.home", "weather", "cloudy", False, attrs, h + timedelta(minutes=minute))
+            )
+    insert(
+        plain,
+        "lake.silver.states",
+        ["entity_id", "domain", "state", "is_missing", "attributes", "last_updated"],
+        rows,
+    )
+    plain.execute("DELETE FROM lake.silver.statistics WHERE statistic_id = 'sensor.outside'")
+    res = corr.run(plain, params(outside_temp="weather.home"), now=NOW)
+    assert res.notes == []
+    found = {pair(f) for f in findings(plain)}
+    assert ("sensor.heating", "sensor.radiator") not in found
+    assert ("sensor.radiator", "sensor.heating") not in found
+    assert "weather.home" not in {e for p in found for e in p}
+
+
+def test_short_outside_temperature_is_not_used(plain: duckdb.DuckDBPyConnection) -> None:
+    seed(plain)
+    plain.execute(
+        "DELETE FROM lake.silver.statistics WHERE statistic_id = 'sensor.outside' "
+        "AND period_start < $cut",
+        {"cut": END - timedelta(days=10)},
+    )
+    res = corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
+    assert res.notes == [
+        "outside temperature sensor.outside covers only 17% of the window, not used"
+    ]

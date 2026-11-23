@@ -46,8 +46,10 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    forward; series with less than 70 % coverage or constant ones are left out. The grid
    starts at the first hour with data.
 2. Residuals after the hour of the day and the day of the week (in `HAMMOND_TIMEZONE`)
-   and, if `HAMMOND_CORRELATION_OUTSIDE_TEMP` names an entity with hourly statistics,
-   the outside temperature. Without it, everything that depends on the weather
+   and, if `HAMMOND_CORRELATION_OUTSIDE_TEMP` names an entity with hourly statistics or
+   a `weather.*` entity (its `temperature` attribute), the outside temperature. A
+   temperature covering less than 70 % of the window is not used (the run notes it).
+   Without it, everything that depends on the weather
    correlates with everything else.
 3. Correlation of every pair with a lag of 0–24 hours (the best lag wins), on hours
    both series have; significance corrected for autocorrelation, Bonferroni over lags

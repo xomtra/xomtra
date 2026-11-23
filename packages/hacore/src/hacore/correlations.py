@@ -46,7 +46,7 @@ import duckdb
 import numpy as np
 import numpy.typing as npt
 
-from hacore.lake import LAKE_ALIAS
+from hacore.lake import LAKE_ALIAS, sql_literal
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +190,20 @@ WHERE h >= $start AND v >= 0
 """
 
 
+def _weather_temp_sql(alias: str, entity_id: str) -> str:
+    """Hourly mean of the ``temperature`` attribute of a ``weather.*`` entity (it has no
+    statistics); used as the outside temperature driver."""
+    return f"""
+SELECT entity_id, 'mean' AS metric, NULL::VARCHAR AS state,
+       date_trunc('hour', last_updated) AS h,
+       avg(TRY_CAST(attributes ->> 'temperature' AS DOUBLE)) AS v
+FROM {alias}.silver.states
+WHERE entity_id = {sql_literal(entity_id)} AND NOT is_missing
+  AND last_updated >= $start AND last_updated < $end
+GROUP BY ALL
+"""
+
+
 def _targets_sql(alias: str, has_catalog: bool) -> str:
     """(entity_id, state) pairs to turn into share series."""
     if has_catalog:
@@ -281,6 +295,9 @@ def load_grid(
         )
         con.execute("DELETE FROM share_targets WHERE state IS NULL")
         parts.append(_shares_sql(alias))
+    temp = params.outside_temp
+    if temp and temp.startswith("weather.") and _exists(con, alias, "silver", "states"):
+        parts.append(_weather_temp_sql(alias, temp))
     if not parts:
         return None
     union = "\nUNION ALL\n".join(f"({p})" for p in parts)
@@ -662,13 +679,21 @@ def run(
         logger.info("Correlations (%d d): not enough data", params.window_days)
         return result
     result.series_total = len(grid.series)
+    temp_coverage = _coverage(grid, params.outside_temp)
     grid = clean(grid, params.min_coverage)
     resid, series = residuals(grid, params.outside_temp)
     used_temp = bool(params.outside_temp) and any(
         s.entity_id == params.outside_temp and s.metric == "mean" for s in grid.series
     )
     if params.outside_temp and not used_temp:
-        result.notes.append(f"outside temperature {params.outside_temp} not in the grid")
+        if temp_coverage:
+            # e.g. a weather entity whose history is shorter than the window
+            result.notes.append(
+                f"outside temperature {params.outside_temp} covers only "
+                f"{temp_coverage:.0%} of the window, not used"
+            )
+        else:
+            result.notes.append(f"outside temperature {params.outside_temp} not in the grid")
     result.series_used = len(series)
     result.hours = len(grid.hours)
     result.period_start = _to_dt(grid.hours[0])
@@ -691,6 +716,13 @@ def run(
     result.findings = len(findings)
     logger.info("Correlations: %s", result.as_dict())
     return result
+
+
+def _coverage(grid: Grid, entity_id: str | None) -> float:
+    for j, s in enumerate(grid.series):
+        if s.entity_id == entity_id and s.metric == "mean":
+            return float((~np.isnan(ffill(grid.values[:, [j]]))).mean())
+    return 0.0
 
 
 def _to_dt(value: Any) -> datetime:

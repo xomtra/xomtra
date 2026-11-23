@@ -30,7 +30,8 @@ class IngestSettings(BaseSettings):
 
     # Correlations between entities (phase 1b.1, ADR 042): one run per window, findings
     # in ``catalog.finding``. The outside temperature (an entity_id with hourly
-    # statistics) is regressed out as a common driver when set.
+    # statistics, or a weather.* entity and its temperature attribute) is regressed out
+    # as a common driver when set.
     correlation_windows_days: list[int] = Field(default_factory=lambda: [365, 30])
     correlation_outside_temp: str = ""
     correlation_max_lag_hours: int = Field(default=24, ge=0, le=168)
