@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import importlib.util
-import shutil
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -49,10 +49,21 @@ Intro with a [link](https://example.org) and `[Unreleased]` mentioned.
 
 @pytest.fixture
 def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    # The copies start at 0.1.0 whatever version the repository is at, so the tests do
+    # not depend on the last release.
+    current = re.search(
+        r'^version = "([^"]+)"',
+        (REPO / "services/mcp-server/pyproject.toml").read_text(encoding="utf-8"),
+        re.M,
+    )
+    assert current
     for path in (*release.PYPROJECTS, *release.IMAGE_REFERENCES):
         target = tmp_path / path
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(REPO / path, target)
+        text = (REPO / path).read_text(encoding="utf-8")
+        text = text.replace(f'version = "{current[1]}"', 'version = "0.1.0"')
+        text = re.sub(rf"(hammond-[a-z]+):{re.escape(current[1])}\b", r"\1:0.1.0", text)
+        target.write_text(text, encoding="utf-8")
     (tmp_path / "CHANGELOG.md").write_text(CHANGELOG, encoding="utf-8")
     monkeypatch.setattr(release, "ROOT", tmp_path)
     return tmp_path
