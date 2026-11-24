@@ -9,6 +9,7 @@ from urllib.parse import quote
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from hacore.exclusions import NO_ANALYSIS, NO_INGEST, ExclusionLabels
 from hacore.maintenance import Retention
 
 
@@ -24,6 +25,11 @@ class IngestSettings(BaseSettings):
     statistics_hour_retention_days: int = Field(default=5 * 365, ge=1)
     # DuckLake snapshots older than this are expired; their files are then deleted.
     snapshot_retention_days: int = Field(default=7, ge=1)
+
+    # Home Assistant label ids that leave entities out (on the entity or its device,
+    # ADR 044): not stored at all, or stored but left out of the analyses.
+    label_no_ingest: str = Field(default=NO_INGEST, min_length=1)
+    label_no_analysis: str = Field(default=NO_ANALYSIS, min_length=1)
 
     # Days of state history the daily catalog profile looks at (ADR 037).
     catalog_window_days: int = Field(default=30, ge=1, le=365)
@@ -91,6 +97,18 @@ class IngestSettings(BaseSettings):
         if not v or any(d < 7 or d > 5 * 365 for d in v):
             raise ValueError("correlation windows must be 7..1825 days")
         return sorted(set(v), reverse=True)
+
+    @field_validator("label_no_ingest", "label_no_analysis")
+    @classmethod
+    def _label(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("label id must not be empty")
+        return v
+
+    @property
+    def labels(self) -> ExclusionLabels:
+        return ExclusionLabels(no_ingest=self.label_no_ingest, no_analysis=self.label_no_analysis)
 
     @property
     def retention(self) -> Retention:

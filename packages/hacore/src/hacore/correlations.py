@@ -47,7 +47,7 @@ import numpy as np
 import numpy.typing as npt
 
 from hacore import weather
-from hacore.exclusions import load_no_analysis
+from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, load_no_analysis
 from hacore.lake import LAKE_ALIAS, sql_literal
 
 logger = logging.getLogger(__name__)
@@ -154,6 +154,7 @@ class CorrelationParams:
     outside_temp: str | None = None
     timezone: str = "UTC"
     include_states: bool = True
+    labels: ExclusionLabels = DEFAULT_LABELS
 
 
 @dataclass(frozen=True, slots=True)
@@ -936,7 +937,7 @@ def run(
         logger.info("Correlations (%d d): not enough data", params.window_days)
         return result
     grid, result.series_excluded = _drop_excluded(
-        grid, load_no_analysis(con, alias), params.outside_temp
+        grid, load_no_analysis(con, alias, params.labels), params.outside_temp
     )
     if params.outside_temp:
         result.temperature_archive_hours = fill_from_archive(

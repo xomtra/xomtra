@@ -11,6 +11,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- The label ids that leave entities out are settings: `HAMMOND_LABEL_NO_INGEST` and
+  `HAMMOND_LABEL_NO_ANALYSIS` (defaults `hammond_no_ingest`, `hammond_no_analysis`).
+
 ## [0.2.0] - 2026-11-24
 
 ### Added

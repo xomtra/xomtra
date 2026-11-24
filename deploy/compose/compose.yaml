@@ -33,6 +33,9 @@ x-ingest-env: &ingest-env
   HAMMOND_STATISTICS_HOUR_RETENTION_DAYS: ${HAMMOND_STATISTICS_HOUR_RETENTION_DAYS:-1825}
   HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
   HAMMOND_CATALOG_WINDOW_DAYS: ${HAMMOND_CATALOG_WINDOW_DAYS:-30}
+  # Home Assistant label ids that leave entities out (ADR 044).
+  HAMMOND_LABEL_NO_INGEST: ${HAMMOND_LABEL_NO_INGEST:-hammond_no_ingest}
+  HAMMOND_LABEL_NO_ANALYSIS: ${HAMMOND_LABEL_NO_ANALYSIS:-hammond_no_analysis}
   # Correlations (ADR 042): entity_id of the outside temperature (regressed out as a
   # common driver) and the analysed windows in days.
   HAMMOND_CORRELATION_OUTSIDE_TEMP: ${HAMMOND_CORRELATION_OUTSIDE_TEMP:-}
