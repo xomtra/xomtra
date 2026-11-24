@@ -79,9 +79,38 @@ FINDING_COLUMNS = """
     method VARCHAR,
     entity_group VARCHAR[],
     related_group VARCHAR[],
+    observed DOUBLE,
+    expected DOUBLE,
     first_detected_at TIMESTAMPTZ,
     detected_at TIMESTAMPTZ NOT NULL
 """
+
+ADDED_COLUMNS = (
+    ("entity_group", "VARCHAR[]"),
+    ("related_group", "VARCHAR[]"),
+    ("observed", "DOUBLE"),
+    ("expected", "DOUBLE"),
+)
+# Columns of one finding as produced by an analysis (the rest is set when writing).
+_ROW_DEFAULTS: dict[str, Any] = {
+    "metric": None,
+    "state": None,
+    "related_entity_id": None,
+    "related_metric": None,
+    "related_state": None,
+    "lag_hours": None,
+    "score": None,
+    "q_value": None,
+    "n_eff": None,
+    "flags": [],
+    "entity_group": [],
+    "related_group": [],
+    "observed": None,
+    "expected": None,
+}
+_ROW_KEYS = frozenset(
+    {*_ROW_DEFAULTS, "finding_id", "entity_id", "rank", "period_start", "period_end"}
+)
 
 # Forward-fill gaps up to this many hours (a sensor that did not change for a while).
 FFILL_LIMIT = 3
@@ -180,10 +209,10 @@ class CorrelationResult:
 def ensure_schema(con: duckdb.DuckDBPyConnection, alias: str = LAKE_ALIAS) -> None:
     con.execute(f"CREATE SCHEMA IF NOT EXISTS {alias}.{SCHEMA}")
     con.execute(f"CREATE TABLE IF NOT EXISTS {alias}.{SCHEMA}.{FINDING} ({FINDING_COLUMNS})")
-    # Columns added after the first release of the table (1b.1 follow-up).
-    for column in ("entity_group", "related_group"):
+    # Columns added after the first release of the table (1b.1 follow-up, 1b.2).
+    for column, type_ in ADDED_COLUMNS:
         con.execute(
-            f"ALTER TABLE {alias}.{SCHEMA}.{FINDING} ADD COLUMN IF NOT EXISTS {column} VARCHAR[]"
+            f"ALTER TABLE {alias}.{SCHEMA}.{FINDING} ADD COLUMN IF NOT EXISTS {column} {type_}"
         )
 
 
@@ -812,19 +841,24 @@ def write_findings(
     findings: list[dict[str, Any]],
     *,
     window_days: int,
-    period_start: datetime,
-    period_end: datetime,
+    period_start: datetime | None,
+    period_end: datetime | None,
     method: str,
     now: datetime,
+    finding_type: str = FINDING_TYPE,
     alias: str = LAKE_ALIAS,
 ) -> None:
-    """Replace the correlation findings of ``window_days`` in one transaction."""
+    """Replace the findings of ``finding_type`` and ``window_days`` in one transaction.
+
+    ``period_start``/``period_end`` of a finding default to the given ones (the data
+    window); an anomaly or a change point carries its own.
+    """
     ensure_schema(con, alias)
     t = f"{alias}.{SCHEMA}.{FINDING}"
     con.execute(
         "CREATE OR REPLACE TEMP TABLE new_finding AS "
-        f"SELECT * EXCLUDE (finding_type, window_days, period_start, period_end, method, "
-        f"first_detected_at, detected_at) FROM {t} WHERE FALSE"
+        f"SELECT * EXCLUDE (finding_type, window_days, method, first_detected_at, "
+        f"detected_at) FROM {t} WHERE FALSE"
     )
     try:
         if findings:
@@ -832,19 +866,32 @@ def write_findings(
                 "INSERT INTO new_finding BY NAME SELECT $finding_id AS finding_id, "
                 "$entity_id AS entity_id, $metric AS metric, $state AS state, "
                 "$related_entity_id AS related_entity_id, $related_metric AS related_metric, "
-                "$related_state AS related_state, $lag_hours AS lag_hours, $score AS score, "
-                "$q_value AS q_value, $n_eff AS n_eff, $rank AS rank, $flags AS flags, "
+                "$related_state AS related_state, $lag_hours::INTEGER AS lag_hours, "
+                "$score::DOUBLE AS score, $q_value::DOUBLE AS q_value, "
+                "$n_eff::INTEGER AS n_eff, $rank AS rank, $flags::VARCHAR[] AS flags, "
                 "$entity_group::VARCHAR[] AS entity_group, "
-                "$related_group::VARCHAR[] AS related_group",
-                [{"entity_group": [], "related_group": [], **f} for f in findings],
+                "$related_group::VARCHAR[] AS related_group, "
+                "$observed::DOUBLE AS observed, $expected::DOUBLE AS expected, "
+                "coalesce($period_start::TIMESTAMPTZ, $ps::TIMESTAMPTZ) AS period_start, "
+                "coalesce($period_end::TIMESTAMPTZ, $pe::TIMESTAMPTZ) AS period_end",
+                [
+                    {
+                        **_ROW_DEFAULTS,
+                        "period_start": None,
+                        "period_end": None,
+                        **{k: v for k, v in f.items() if k in _ROW_KEYS},
+                        "ps": period_start,
+                        "pe": period_end,
+                    }
+                    for f in findings
+                ],
             )
         con.execute("BEGIN TRANSACTION")
         try:
             con.execute(
                 f"""
 INSERT INTO {t} BY NAME
-SELECT n.*, $type AS finding_type, $window AS window_days, $ps AS period_start,
-       $pe AS period_end, $method AS method,
+SELECT n.*, $type AS finding_type, $window AS window_days, $method AS method,
        coalesce(o.first_detected_at, $now) AS first_detected_at, $now AS detected_at
 FROM new_finding AS n
 LEFT JOIN (
@@ -853,10 +900,8 @@ LEFT JOIN (
 ) AS o USING (finding_id)
 """,
                 {
-                    "type": FINDING_TYPE,
+                    "type": finding_type,
                     "window": window_days,
-                    "ps": period_start,
-                    "pe": period_end,
                     "method": method,
                     "now": now,
                 },
@@ -864,7 +909,7 @@ LEFT JOIN (
             con.execute(
                 f"DELETE FROM {t} WHERE finding_type = $type AND window_days = $window "
                 "AND detected_at <> $now",
-                {"type": FINDING_TYPE, "window": window_days, "now": now},
+                {"type": finding_type, "window": window_days, "now": now},
             )
             con.execute("COMMIT")
         except Exception:

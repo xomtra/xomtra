@@ -16,12 +16,14 @@ def test_definitions_load_with_schedules() -> None:
         "ingest_hourly",
         "retention_daily",
         "catalog_daily",
+        "findings_weekly",
         "history_backfill",
         "silver_restate",
     } <= jobs
     schedules = {s.job_name: s for s in defs.schedules or []}  # type: ignore[union-attr]
     assert schedules["ingest_hourly"].execution_timezone == "Europe/Prague"
     assert schedules["catalog_daily"].cron_schedule == "15 4 * * *"
+    assert schedules["findings_weekly"].cron_schedule == "0 7 * * 1"
 
 
 def test_restate_sensor(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -73,8 +75,10 @@ def test_catalog_daily_runs_correlations_after_profile() -> None:
         "profile_catalog",
         "sync_outside_temperature",
         "find_correlations",
+        "find_anomalies",
     }
     assert any("find_correlations" in str(k) for k in deps)
+    assert any("find_anomalies" in str(k) for k in deps)
 
 
 def test_correlation_settings(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -104,3 +108,20 @@ def test_outside_temperature_off_by_default() -> None:
     }
     with pytest.raises(ValueError, match="https"):
         IngestSettings(open_meteo_url="http://example.org")
+
+
+def test_cli_anomalies_and_weekly(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(tasks, "find_anomalies", lambda settings: {"anomalies": 3})
+    monkeypatch.setattr(tasks, "snapshot_findings", lambda settings: {"findings": 5})
+    assert main(["anomalies"]) == 0
+    assert '"anomalies": 3' in capsys.readouterr().out
+    assert main(["findings-weekly"]) == 0
+    assert '"findings": 5' in capsys.readouterr().out
+
+
+def test_anomalies_can_be_switched_off() -> None:
+    assert tasks.find_anomalies(IngestSettings(anomalies_enabled=False)) == {
+        "skipped": "HAMMOND_ANOMALIES_ENABLED is off"
+    }

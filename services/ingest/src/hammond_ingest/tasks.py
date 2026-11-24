@@ -12,7 +12,17 @@ from typing import Any
 
 import duckdb
 
-from hacore import bronze, catalog, correlations, ingest, lake, maintenance, weather
+from hacore import (
+    anomalies,
+    bronze,
+    catalog,
+    correlations,
+    findings,
+    ingest,
+    lake,
+    maintenance,
+    weather,
+)
 from hacore.client import HAClient
 from hammond_ingest import transform
 from hammond_ingest.settings import IngestSettings
@@ -144,6 +154,36 @@ def find_correlations(settings: IngestSettings | None = None) -> list[dict[str, 
             )
             out.append(correlations.run(con, params).as_dict())
     return out
+
+
+def find_anomalies(settings: IngestSettings | None = None) -> dict[str, Any]:
+    """Anomalies and change points of single entities (ADR 046) into catalog.finding."""
+    s = settings or IngestSettings()
+    if not s.anomalies_enabled:
+        return {"skipped": "HAMMOND_ANOMALIES_ENABLED is off"}
+    params = anomalies.AnomalyParams(
+        baseline_days=s.anomaly_baseline_days,
+        recent_days=s.anomaly_recent_days,
+        z_threshold=s.anomaly_z,
+        changepoint_days=s.changepoint_window_days,
+        changepoint_recent_days=min(s.changepoint_recent_days, s.changepoint_window_days),
+        changepoint_min_shift=s.changepoint_min_shift,
+        min_coverage=s.correlation_min_coverage,
+        top=s.anomaly_top,
+        outside_temp=s.correlation_outside_temp or None,
+        timezone=s.timezone,
+    )
+    with open_lake() as con:
+        return anomalies.run(con, params).as_dict()
+
+
+def snapshot_findings(settings: IngestSettings | None = None) -> dict[str, Any]:
+    """Weekly snapshot of the current findings (ADR 048)."""
+    s = settings or IngestSettings()
+    with open_lake() as con:
+        return findings.snapshot_week(
+            con, timezone=s.timezone, keep_weeks=s.findings_weekly_keep_weeks
+        ).as_dict()
 
 
 def parse_time(value: str) -> datetime:

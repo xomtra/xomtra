@@ -5,7 +5,7 @@ A label on an entity or on its device decides:
 ``hammond_no_ingest``    the entity is not stored at all (live stream, catch-up, history
                          backfill, statistics); data stored before stays.
 ``hammond_no_analysis``  the entity is stored and can be queried, but derived analyses
-                         (correlations, later anomalies) leave it out.
+                         (correlations, anomalies, change points) leave it out.
 
 ``no_ingest`` implies ``no_analysis``. The labels live in Home Assistant, where the
 entities are managed, so HAmmond needs no write path of its own; a label on a device

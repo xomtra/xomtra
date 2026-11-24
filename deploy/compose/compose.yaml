@@ -40,6 +40,9 @@ x-ingest-env: &ingest-env
   # Outside temperature history from the Open-Meteo archive (ADR 043); sends the HA
   # home coordinates rounded to ~1 km to archive-api.open-meteo.com.
   HAMMOND_OPEN_METEO_ENABLED: ${HAMMOND_OPEN_METEO_ENABLED:-false}
+  # Anomalies and change points of single entities (ADR 046), daily after correlations.
+  HAMMOND_ANOMALIES_ENABLED: ${HAMMOND_ANOMALIES_ENABLED:-true}
+  HAMMOND_ANOMALY_Z: ${HAMMOND_ANOMALY_Z:-4.0}
   # DuckDB budget per process; queries spill to HAMMOND_DUCKDB_TEMP_DIR beyond it.
   HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_DUCKDB_MEMORY_LIMIT:-2GB}
   HAMMOND_DUCKDB_THREADS: ${HAMMOND_DUCKDB_THREADS:-2}

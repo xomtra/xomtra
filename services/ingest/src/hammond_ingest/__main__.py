@@ -9,6 +9,8 @@ hammond-ingest retention | maintenance
 hammond-ingest catalog                      # entity profile and drift (catalog.*)
 hammond-ingest outside-temperature          # Open-Meteo archive of the outside temperature
 hammond-ingest correlations                 # correlations into catalog.finding
+hammond-ingest anomalies                    # anomalies and change points into catalog.finding
+hammond-ingest findings-weekly              # snapshot of the findings of the last week
 """
 
 from __future__ import annotations
@@ -59,7 +61,7 @@ def _print(value: object) -> None:
     print(json.dumps(value, default=str, indent=2))
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:  # noqa: PLR0912, PLR0915 - one branch per command
     parser = argparse.ArgumentParser(prog="hammond-ingest")
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -78,6 +80,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("catalog", help="profile entities and record drift (catalog.*)")
     sub.add_parser("outside-temperature", help="Open-Meteo archive of the outside temperature")
     sub.add_parser("correlations", help="correlations between entities (catalog.finding)")
+    sub.add_parser("anomalies", help="anomalies and change points (catalog.finding)")
+    sub.add_parser("findings-weekly", help="snapshot of the findings of the last week")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -114,6 +118,10 @@ def main(argv: list[str] | None = None) -> int:
             _print(tasks.sync_outside_temperature(settings))
         case "correlations":
             _print(tasks.find_correlations(settings))
+        case "anomalies":
+            _print(tasks.find_anomalies(settings))
+        case "findings-weekly":
+            _print(tasks.snapshot_findings(settings))
     return 0
 
 

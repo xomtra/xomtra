@@ -1,4 +1,4 @@
-# Catalog and MCP data tools (phase 1a.3)
+# Catalog, findings and MCP data tools (phases 1a.3, 1b)
 
 The MCP server answers questions about the history of Home Assistant from the lake.
 Every call passes a policy layer by Entra app role and is audited.
@@ -13,10 +13,12 @@ Every call passes a policy layer by Entra app role and is audited.
 | `list_views` | SQL views available to the caller, with columns |
 | `get_timeseries` | values over time: raw state changes, or 5-minute/hourly/daily buckets (HA statistics when available) |
 | `query_sql` | one read-only DuckDB `SELECT` over the views |
+| `get_findings` | findings of the daily analysis with entity names; trivial ones hidden unless `include_flagged` |
+| `get_weekly_summary` | one week: anomalies, change points, correlations new or gone since the week before |
 | `server_info`, `ha_overview` | server version, live registry counts (Admin) |
 
 Views: `entities`, `states`, `statistics`, `statistics_meta`, `catalog_entity`,
-`catalog_finding`, `catalog_drift` (Admin only by default). Times are UTC; daily buckets of
+`catalog_finding`, `catalog_finding_weekly`, `catalog_drift` (Admin only by default). Times are UTC; daily buckets of
 `get_timeseries` use `HAMMOND_TIMEZONE`.
 
 ## Catalog
@@ -96,8 +98,60 @@ run without it. Open-Meteo is free for non-commercial use; check its terms other
 sudo docker compose exec dagster-daemon hammond-ingest outside-temperature
 ```
 
-Example question for Claude: *"Which findings in catalog_finding for the 365-day
-window are not flagged, and what could explain the top five?"*
+Example question for Claude: *"Use get_findings for the 365-day correlations and
+explain the top five."*
+
+## Anomalies and change points (phase 1b.2)
+
+After the correlations, `catalog_daily` looks at every series of the same hourly grid
+(same exclusions) one by one and writes to `catalog.finding`:
+
+- `finding_type = 'anomaly'` (`window_days` = `HAMMOND_ANOMALY_RECENT_DAYS`, 7): hours
+  of the last 7 days that are unusual for their hour of the week. The usual value is
+  the median of the same local hour of the week over the 56 days before
+  (`HAMMOND_ANOMALY_BASELINE_DAYS`; an hour of the week with fewer than 3 values uses
+  the hour of the day). The deviation is scaled by the robust standard deviation
+  (1.4826 × MAD) of that hour, shrunk towards the series' overall one. Hours with
+  `|z| >= 4` (`HAMMOND_ANOMALY_Z`) of the same sign form an episode (one normal hour in
+  between is bridged); one finding per episode, at most 3 per series: `score` = peak z,
+  `n_eff` = anomalous hours, `observed`/`expected` = mean value and usual value of
+  those hours, `period_start`/`period_end` = the episode. A series needs 14 days of
+  baseline, so binary and enum entities (from the state history) take part only once
+  HAmmond has collected that much.
+- `finding_type = 'change_point'` (`window_days` = `HAMMOND_CHANGEPOINT_WINDOW_DAYS`,
+  90): a lasting shift of the daily mean (local days). For every split in the last 30
+  days (`HAMMOND_CHANGEPOINT_RECENT_DAYS`) with at least 14 days before and 7 after, the
+  difference of the medians is scaled by the robust deviation of the days; the
+  strongest split is reported when it reaches 3 (`HAMMOND_CHANGEPOINT_MIN_SHIFT`) and
+  80 % of the days after lie beyond the median before. `period_start` = first day of
+  the new level, `observed`/`expected` = median after/before, `n_eff` = days after.
+
+Flags (the finding is kept but ranked last and hidden by `get_findings` by default):
+`short` (an anomaly of one hour), `weather` (the outside temperature, when configured,
+was itself unusual: mean `|z| >= 3` over the episode, or a shift of 3 at the same day),
+`level_shift` (an anomaly after a change point of the same series: the level changed,
+the hours are not unusual for the new one).
+
+```sh
+sudo docker compose exec dagster-daemon hammond-ingest anomalies
+```
+
+## Weekly summary
+
+The Dagster job `findings_weekly` (Monday 07:00 in `HAMMOND_TIMEZONE`) copies the
+current findings to `catalog.finding_weekly` under the Monday of the week just ended
+(`week_start`), keeping 104 weeks (`HAMMOND_FINDINGS_WEEKLY_KEEP_WEEKS`). The MCP tool
+`get_weekly_summary` compares a snapshot with the one before: anomalies and change
+points of that week, correlations that are new or gone, and counts per type. It is
+rendered when read, under the caller's policy, so a role never sees entities it may
+not see. Create the first snapshot by hand after deploying:
+
+```sh
+sudo docker compose exec dagster-daemon hammond-ingest findings-weekly
+```
+
+Example questions: *"What did HAmmond find last week?"*, *"Are there anomalies on the
+heat pump in the last days?"* (`get_findings` with `entity_id`).
 
 ## Roles and policy
 
@@ -106,11 +160,12 @@ The built-in policy (`services/mcp-server/src/hammond_mcp/policy.yaml`):
 | Role | Tools | Views | Hidden entities | Hidden columns | Rows per call |
 | --- | --- | --- | --- | --- | --- |
 | `HAmmond.Admin` | all | all | none | none | 10 000 |
-| `HAmmond.Reader` | catalog and data tools | all but `catalog_drift` | `person.*`, `device_tracker.*`, `zone.*`, `camera.*`, `image.*`, `lock.*`, `alarm_control_panel.*`, `*_location` | `states.attributes` | 1 000 |
+| `HAmmond.Reader` | catalog, data and findings tools | all but `catalog_drift` | `person.*`, `device_tracker.*`, `zone.*`, `camera.*`, `image.*`, `lock.*`, `alarm_control_panel.*`, `*_location` | `states.attributes` | 1 000 |
 | no role | `whoami` only | – | – | – | – |
 
 Hidden entities and columns are filtered inside the database (the views a caller can
-query already exclude them; a finding is hidden when either of its entities is); asking
+query already exclude them; a finding is hidden when either of its entities is, and
+hidden entities are removed from its group lists); asking
 for a hidden entity directly is refused and audited as `denied`. State attributes are
 hidden from Reader because they carry free text (media titles, addresses, coordinates,
 e-mails) also outside the hidden domains. To change

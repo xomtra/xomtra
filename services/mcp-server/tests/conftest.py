@@ -2,13 +2,16 @@ import os
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from hacore import catalog, correlations
+from hacore import findings as findings_mod
 from hacore.lake import connect_local, install_extensions
 from hammond_mcp.data import DataAccess
 
+TZ = "Europe/Prague"
 EXT = os.environ.get("HAMMOND_DUCKDB_EXTENSION_DIR") or None
 NOW = datetime.now(UTC).replace(microsecond=0)
 
@@ -109,15 +112,81 @@ def _seed(catalog_path: str, data_path: str) -> None:
                 "flags": [],
             },
         ]
+        # A week earlier: f1 and f9, snapshot of that week.
+        earlier = NOW - timedelta(days=7)
+        gone = {**findings[0], "finding_id": "f9", "related_entity_id": "sensor.energy"}
         correlations.write_findings(
             con,
-            findings,
+            [findings[0], gone],
+            window_days=30,
+            period_start=earlier - timedelta(days=30),
+            period_end=earlier,
+            method="test",
+            now=earlier,
+        )
+        findings_mod.snapshot_week(con, timezone=TZ, now=earlier)
+        findings[0]["entity_group"] = ["sensor.temp_copy", "person.jana"]
+        trivial = {
+            **base,
+            "finding_id": "f3",
+            "entity_id": "sensor.temp",
+            "related_entity_id": "sensor.energy",
+            "related_metric": "delta",
+            "score": 0.9,
+            "rank": 3,
+            "flags": ["same_device"],
+        }
+        correlations.write_findings(
+            con,
+            [*findings, trivial],
             window_days=30,
             period_start=NOW - timedelta(days=30),
             period_end=NOW,
             method="test",
             now=NOW,
         )
+        week = datetime.combine(
+            findings_mod.last_week_start(NOW, TZ), datetime.min.time(), ZoneInfo(TZ)
+        )
+        anomaly = {
+            "entity_id": "sensor.energy",
+            "metric": "delta",
+            "score": 6.5,
+            "n_eff": 3,
+            "observed": 5.0,
+            "expected": 1.0,
+            "period_start": week + timedelta(days=2),
+            "period_end": week + timedelta(days=2, hours=3),
+        }
+        correlations.write_findings(
+            con,
+            [
+                {**anomaly, "finding_id": "a1", "rank": 1, "flags": []},
+                {
+                    **anomaly,
+                    "finding_id": "a2",
+                    "rank": 2,
+                    "score": -4.2,
+                    "n_eff": 1,
+                    "flags": ["short"],
+                },
+                {
+                    **anomaly,
+                    "finding_id": "a3",
+                    "rank": 3,
+                    "entity_id": "person.jana",
+                    "metric": "share",
+                    "state": "home",
+                },
+            ],
+            window_days=7,
+            period_start=None,
+            period_end=None,
+            method="anomaly test",
+            now=NOW,
+            finding_type="anomaly",
+        )
+        findings_mod.snapshot_week(con, timezone=TZ, now=NOW)
     finally:
         con.close()
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
@@ -32,7 +33,9 @@ HAmmond exposes the history and catalog of a Home Assistant installation.
 
 Start with `search_catalog` to find entities (by words, area, domain or kind), then
 `describe_entity` for details and data quality, and `get_timeseries` for values over
-time. `list_views` shows the SQL views you may query with `query_sql` (DuckDB SQL, one
+time. `get_findings` lists what the daily analysis found (correlations between
+entities, anomalies, lasting level changes); `get_weekly_summary` what changed in a
+week. `list_views` shows the SQL views you may query with `query_sql` (DuckDB SQL, one
 SELECT, view names without schema). All times are UTC unless stated otherwise. What you
 can see depends on your role; entities outside it are not returned.
 """
@@ -212,6 +215,70 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
         result: dict[str, Any] = await run(
             data.get_timeseries, entity_id, start=start_ts, end=end_ts, resolution=resolution
         )
+        return result
+
+    @mcp.tool(annotations=READ_ONLY)
+    async def get_findings(  # noqa: PLR0917 - MCP tool arguments
+        finding_type: Annotated[
+            Literal["correlation", "anomaly", "change_point"] | None,
+            Field(
+                description="correlation = two entities move together beyond the daily/"
+                "weekly cycle and the weather; anomaly = unusual hours of one entity "
+                "against the same hour of the week; change_point = lasting level shift. "
+                "Default: all."
+            ),
+        ] = None,
+        entity_id: Annotated[
+            str | None, Field(description="Only findings involving this entity")
+        ] = None,
+        window_days: Annotated[
+            int | None, Field(description="Only this analysis window (e.g. 365 or 30)")
+        ] = None,
+        include_flagged: Annotated[
+            bool,
+            Field(
+                description="Also findings flagged as trivial or explained: "
+                "duplicate_suspect, same_device, short (one hour), weather, level_shift"
+            ),
+        ] = False,
+        new_since: Annotated[
+            str | None,
+            Field(description="Only findings first detected since (ISO 8601 or e.g. 7d)"),
+        ] = None,
+        limit: Annotated[int, Field(ge=1, le=200)] = 20,
+    ) -> dict[str, Any]:
+        """Findings of the daily analysis with entity names, strongest first within each
+        type and window. Trivial or explained findings are hidden unless include_flagged;
+        counts show how many exist. score: correlation r, or robust z (anomaly), or shift
+        in robust deviations (change_point); observed/expected in the entity's unit."""
+        since = parse_time(new_since) if new_since else None
+        result: dict[str, Any] = await run(
+            data.get_findings,
+            finding_type=finding_type,
+            entity_id=entity_id,
+            window_days=window_days,
+            include_flagged=include_flagged,
+            new_since=since,
+            limit=limit,
+        )
+        return result
+
+    @mcp.tool(annotations=READ_ONLY)
+    async def get_weekly_summary(
+        week: Annotated[
+            str | None,
+            Field(description="Any date (YYYY-MM-DD) in the week; default the last week"),
+        ] = None,
+        top: Annotated[int, Field(ge=1, le=50)] = 10,
+    ) -> dict[str, Any]:
+        """What the analysis found in one week (Monday to Sunday, local time): anomalies
+        and change points of the week, correlations new or gone since the week before,
+        and counts. Built from weekly snapshots of the findings."""
+        try:
+            day = date.fromisoformat(week) if week else None
+        except ValueError as err:
+            raise ValueError(f"Invalid week {week!r}: use YYYY-MM-DD") from err
+        result: dict[str, Any] = await run(data.get_weekly_summary, week=day, top=top)
         return result
 
     @mcp.tool(annotations=READ_ONLY)

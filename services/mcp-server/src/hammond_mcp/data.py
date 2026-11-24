@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 import duckdb
 
@@ -39,6 +40,8 @@ class View:
     source: str  # relative to the lake alias
     entity_columns: tuple[str, ...]  # a row is hidden if any of them is a denied entity
     description: str
+    # Lists of entity ids: denied entities are removed from them (the row stays).
+    entity_lists: tuple[str, ...] = ()
 
 
 VIEWS: dict[str, View] = {
@@ -90,11 +93,25 @@ VIEWS: dict[str, View] = {
             "catalog_finding",
             "catalog.finding",
             ("entity_id", "related_entity_id"),
-            "Findings of the daily analysis. finding_type 'correlation': entity_id "
-            "(metric mean/delta/share of state) leads related_entity_id by lag_hours; "
-            "score = correlation of hourly residuals after the daily/weekly cycle and the "
-            "outside temperature; q_value = FDR; flags duplicate_suspect, same_device; "
-            "window_days, period_start/end, first_detected_at, detected_at; rank 1 = strongest.",
+            "Findings of the daily analysis (prefer the get_findings tool). finding_type "
+            "'correlation': entity_id (metric mean/delta/share of state) leads "
+            "related_entity_id by lag_hours; score = correlation of hourly residuals after "
+            "the daily/weekly cycle and the outside temperature; q_value = FDR. "
+            "'anomaly': unusual hours period_start..period_end of one entity; score = peak "
+            "robust z against the same hour of the week, observed/expected = mean value, "
+            "n_eff = anomalous hours. 'change_point': lasting level shift from period_start; "
+            "score = shift in robust deviations, observed/expected = level after/before. "
+            "flags (trivial or explained findings): duplicate_suspect, same_device, short, "
+            "weather, level_shift; rank 1 = strongest within type and window.",
+            ("entity_group", "related_group"),
+        ),
+        View(
+            "catalog_finding_weekly",
+            "catalog.finding_weekly",
+            ("entity_id", "related_entity_id"),
+            "Weekly snapshots of catalog_finding (prefer get_weekly_summary): week_start = "
+            "local Monday of the summarised week, snapshot_at, then the finding columns.",
+            ("entity_group", "related_group"),
         ),
     )
 }
@@ -227,9 +244,21 @@ class DataAccess:
                 where = f" WHERE NOT ({hidden_rows})" if deny else ""
                 hidden = access.columns_hidden_in(view.name)
                 exclude = f" EXCLUDE ({', '.join(hidden)})" if hidden else ""
+                lists = [c for c in view.entity_lists if c not in hidden]
+                replace = (
+                    " REPLACE ("
+                    + ", ".join(
+                        f"list_filter({c}, lambda x: NOT coalesce({deny.format(col='x')}, "
+                        f"FALSE)) AS {c}"
+                        for c in lists
+                    )
+                    + ")"
+                    if deny and lists
+                    else ""
+                )
                 cur.execute(
                     f"CREATE TEMP VIEW {view.name} AS "
-                    f"SELECT *{exclude} FROM {LAKE_ALIAS}.{view.source}{where}"
+                    f"SELECT *{exclude}{replace} FROM {LAKE_ALIAS}.{view.source}{where}"
                 )
             yield cur
         finally:
@@ -468,6 +497,207 @@ class DataAccess:
             "views": sorted(guarded.views),
             "elapsed_ms": round((time.monotonic() - started) * 1000),
         }
+
+    # ---- findings (ADR 047, 048) ---------------------------------------------------
+
+    def _finding_select(self, access: Access, source: str, extra: str = "") -> str:
+        """Finding columns with entity names when the role may read the catalog."""
+        cols = extra + (
+            "f.finding_type, f.window_days, f.rank, f.entity_id, f.metric, f.state, "
+            "f.related_entity_id, f.related_metric, f.related_state, f.lag_hours, f.score, "
+            "f.q_value, f.n_eff, f.observed, f.expected, f.flags, f.entity_group, "
+            "f.related_group, f.period_start, f.period_end, f.first_detected_at, "
+            "f.detected_at, f.finding_id"
+        )
+        if not access.can_view("catalog_entity"):
+            return f"SELECT {cols} FROM {source} AS f"
+        return (
+            f"SELECT {cols}, e.name AS entity_name, e.area_name AS entity_area, "
+            "e.unit_of_measurement AS unit, r.name AS related_name, "
+            "r.area_name AS related_area, r.unit_of_measurement AS related_unit "
+            f"FROM {source} AS f "
+            "LEFT JOIN catalog_entity AS e ON e.entity_id = f.entity_id "
+            "LEFT JOIN catalog_entity AS r ON r.entity_id = f.related_entity_id"
+        )
+
+    @staticmethod
+    def _compact(row: Row) -> Row:
+        """Drop empty values: a finding of one type leaves the other types' columns
+        empty, and the caller reads fewer tokens."""
+        return {k: v for k, v in row.items() if v not in (None, [])}
+
+    def get_findings(
+        self,
+        access: Access,
+        *,
+        finding_type: str | None = None,
+        entity_id: str | None = None,
+        window_days: int | None = None,
+        include_flagged: bool = False,
+        new_since: datetime | None = None,
+        limit: int = 20,
+    ) -> Row:
+        access.require_view("catalog_finding")
+        if entity_id:
+            access.require_entity(entity_id)
+        limit = max(1, min(limit, access.max_rows, 200))
+        where = ["TRUE"]
+        params: list[Any] = []
+        if finding_type:
+            where.append("f.finding_type = ?")
+            params.append(finding_type)
+        if entity_id:
+            where.append(
+                "(f.entity_id = ? OR f.related_entity_id = ? "
+                "OR list_contains(f.entity_group, ?) OR list_contains(f.related_group, ?))"
+            )
+            params += [entity_id] * 4
+        if window_days:
+            where.append("f.window_days = ?")
+            params.append(window_days)
+        if new_since:
+            where.append("f.first_detected_at >= ?")
+            params.append(new_since)
+        flagged = "len(coalesce(f.flags, [])) > 0"
+        base = f"FROM catalog_finding AS f WHERE {' AND '.join(where)}"
+        order = (
+            "ORDER BY CASE finding_type WHEN 'anomaly' THEN 0 WHEN 'change_point' THEN 1 "
+            "ELSE 2 END, window_days, rank"
+        )
+        show = "TRUE" if include_flagged else f"NOT ({flagged})"
+        sql = (
+            f"SELECT * FROM ({self._finding_select(access, 'catalog_finding')}) AS f "
+            f"WHERE {' AND '.join(where)} AND {show} {order} LIMIT {limit + 1}"
+        )
+        with self._cursor(access) as cur:
+
+            def run() -> Row:
+                counts = cur.execute(
+                    f"SELECT f.finding_type, count(*) AS total, "
+                    f"count(*) FILTER (WHERE {flagged}) AS flagged {base} GROUP BY ALL "
+                    "ORDER BY 1",
+                    params,
+                ).fetchall()
+                methods = cur.execute(
+                    f"SELECT DISTINCT f.finding_type, f.window_days, f.method {base} ORDER BY 1, 2",
+                    params,
+                ).fetchall()
+                rows = self._rows(cur.execute(sql, params))
+                return {
+                    "findings": [self._compact(r) for r in rows[:limit]],
+                    "row_count": min(len(rows), limit),
+                    "truncated": len(rows) > limit,
+                    "counts": {
+                        str(t): {"total": int(n), "flagged": int(fl)} for t, n, fl in counts
+                    },
+                    "flagged_hidden": not include_flagged,
+                    "methods": [
+                        {"finding_type": t, "window_days": w, "method": m} for t, w, m in methods
+                    ],
+                }
+
+            return self._timed(cur, run)
+
+    def get_weekly_summary(self, access: Access, *, week: date | None = None, top: int = 10) -> Row:
+        access.require_view("catalog_finding_weekly")
+        top = max(1, min(top, 50))
+        tz = ZoneInfo(self.timezone)
+        with self._cursor(access) as cur:
+
+            def run() -> Row:
+                try:
+                    weeks = [
+                        r[0]
+                        for r in cur.execute(
+                            "SELECT DISTINCT week_start FROM catalog_finding_weekly ORDER BY 1 DESC"
+                        ).fetchall()
+                    ]
+                except duckdb.CatalogException:
+                    weeks = []
+                if not weeks:
+                    return {"week_start": None, "note": "No weekly snapshot yet"}
+                chosen = (
+                    weeks[0]
+                    if week is None
+                    else next((w for w in weeks if w <= week < w + timedelta(days=7)), None)
+                )
+                if chosen is None:
+                    raise QueryFailed(
+                        f"No snapshot for the week of {week}; available weeks: "
+                        + ", ".join(w.isoformat() for w in weeks[:12])
+                    )
+                previous = next((w for w in weeks if w < chosen), None)
+                select = self._finding_select(
+                    access, "catalog_finding_weekly", extra="f.week_start, "
+                )
+                cur.execute(
+                    f"SELECT * FROM ({select}) WHERE week_start IN (?, ?)", [chosen, previous]
+                )
+                rows = self._rows(cur)
+                return _summarise(rows, chosen, previous, tz, top)
+
+            return self._timed(cur, run)
+
+
+def _is_trivial(row: Row) -> bool:
+    return bool(row.get("flags"))
+
+
+def _summarise(rows: list[Row], week: date, previous: date | None, tz: ZoneInfo, top: int) -> Row:
+    """Sections of a weekly summary from the rows of two snapshots."""
+    current = [r for r in rows if r["week_start"] == week.isoformat()]
+    before = [r for r in rows if previous and r["week_start"] == previous.isoformat()]
+    start = datetime.combine(week, datetime.min.time(), tz).astimezone(UTC)
+    end = start + timedelta(days=7)
+
+    def in_week(r: Row) -> bool:
+        ps = r.get("period_start")
+        return ps is not None and start <= datetime.fromisoformat(ps) < end
+
+    def strongest(items: list[Row]) -> list[Row]:
+        ranked = sorted(items, key=lambda r: -abs(float(r.get("score") or 0)))
+        return [
+            {k: v for k, v in r.items() if v not in (None, []) and k != "week_start"}
+            for r in ranked[:top]
+        ]
+
+    corr_now = {r["finding_id"]: r for r in current if r["finding_type"] == "correlation"}
+    corr_before = {r["finding_id"]: r for r in before if r["finding_type"] == "correlation"}
+    counts: dict[str, dict[str, int]] = {}
+    for r in current:
+        c = counts.setdefault(r["finding_type"], {"total": 0, "flagged": 0})
+        c["total"] += 1
+        c["flagged"] += int(_is_trivial(r))
+    return {
+        "week_start": week.isoformat(),
+        "week_end": (week + timedelta(days=6)).isoformat(),
+        "compared_with": previous.isoformat() if previous else None,
+        "counts": counts,
+        "anomalies": strongest(
+            [
+                r
+                for r in current
+                if r["finding_type"] == "anomaly" and in_week(r) and not _is_trivial(r)
+            ]
+        ),
+        "change_points": strongest(
+            [
+                r
+                for r in current
+                if r["finding_type"] == "change_point" and in_week(r) and not _is_trivial(r)
+            ]
+        ),
+        "new_correlations": strongest(
+            [r for i, r in corr_now.items() if i not in corr_before and not _is_trivial(r)]
+            if previous
+            else []
+        ),
+        "gone_correlations": strongest(
+            [r for i, r in corr_before.items() if i not in corr_now and not _is_trivial(r)]
+        ),
+        "note": "Flagged (trivial or explained) findings are counted but not listed; "
+        "use get_findings with include_flagged for them.",
+    }
 
 
 def lockdown(con: duckdb.DuckDBPyConnection, allowed_paths: list[str]) -> None:

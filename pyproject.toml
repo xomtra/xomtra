@@ -52,7 +52,7 @@ known-first-party = ["hacore", "hammond_ingest", "hammond_mcp"]
 "**/tests/**" = ["S101", "S104", "S105", "S106", "S608", "PLR2004", "PLC0415", "ASYNC109", "ASYNC110"]
 # SQL built from internal identifiers (schema/table constants) and values quoted with
 # hacore.lake.sql_literal; DuckDB cannot bind identifiers or ATTACH/read_json options.
-"packages/hacore/src/hacore/{bronze,maintenance,catalog,correlations,weather}.py" = ["S608"]
+"packages/hacore/src/hacore/{bronze,maintenance,catalog,correlations,weather,findings}.py" = ["S608"]
 # Internal view/column names only; values are bound or quoted, user SQL passes the guard.
 "services/mcp-server/src/hammond_mcp/{data.py,admin/status.py}" = ["S608"]
 
