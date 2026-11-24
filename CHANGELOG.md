@@ -11,6 +11,30 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Anomalies (unusual hours against the same hour of the week) and change points
+  (lasting level shifts of daily means) of single entities in `catalog.finding`, run
+  daily after the correlations (`HAMMOND_ANOMALIES_ENABLED`, `HAMMOND_ANOMALY_*`,
+  `HAMMOND_CHANGEPOINT_*`).
+- MCP tools `get_findings` (findings with entity names, trivial ones hidden by default)
+  and `get_weekly_summary` (anomalies and change points of a week, correlations new or
+  gone), both also for `HAmmond.Reader`.
+- Dagster job `findings_weekly` (Monday 07:00) keeping weekly snapshots of the findings
+  in `catalog.finding_weekly` (view `catalog_finding_weekly`, 104 weeks).
+
+### Fixed
+
+- Caddy answers refused requests with a short `text/plain` body (404 for unknown paths
+  such as `/`, 403 for Claude-only endpoints and `/admin` from elsewhere); the empty
+  response without a Content-Type made Safari offer it as a file download.
+
+### Security
+
+- Entities hidden from a role are also removed from the group lists (`entity_group`,
+  `related_group`) of the findings it can see; before, a hidden entity could appear
+  there as a near-duplicate of a visible one.
+
 ## [0.1.0] - 2026-11-23
 
 ### Added

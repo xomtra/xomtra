@@ -45,6 +45,19 @@ class IngestSettings(BaseSettings):
     open_meteo_enabled: bool = False
     open_meteo_url: str = "https://archive-api.open-meteo.com/v1/archive"
 
+    # Anomalies and change points of single entities (phase 1b.2, ADR 046), run daily
+    # after the correlations; they use the same outside temperature.
+    anomalies_enabled: bool = True
+    anomaly_baseline_days: int = Field(default=56, ge=14, le=365)
+    anomaly_recent_days: int = Field(default=7, ge=1, le=30)
+    anomaly_z: float = Field(default=4.0, ge=2.0, le=20.0)
+    anomaly_top: int = Field(default=100, ge=1, le=1000)
+    changepoint_window_days: int = Field(default=90, ge=28, le=730)
+    changepoint_recent_days: int = Field(default=30, ge=7, le=365)
+    changepoint_min_shift: float = Field(default=3.0, ge=1.0, le=20.0)
+    # Weekly snapshots of the findings (ADR 048) kept this many weeks.
+    findings_weekly_keep_weeks: int = Field(default=104, ge=1, le=520)
+
     stream_flush_seconds: float = Field(default=30.0, gt=0)
     stream_max_buffer: int = Field(default=5_000, gt=0)
     stream_max_catchup_days: int = Field(default=10, ge=0)

@@ -106,7 +106,7 @@ them on an entity or on a device (a device label also covers its future entities
 | Label | Effect |
 |-------|--------|
 | `hammond_no_ingest` | Not stored at all: live stream, catch-up, history backfill, statistics. Data stored before stays. |
-| `hammond_no_analysis` | Stored and queryable, but left out of correlations (and later anomalies). |
+| `hammond_no_analysis` | Stored and queryable, but left out of correlations, anomalies and change points. |
 
 `hammond_no_ingest` implies `hammond_no_analysis`. The stream re-reads the labels every
 5 minutes; the correlations on every run (from `silver.entities`, i.e. after the next

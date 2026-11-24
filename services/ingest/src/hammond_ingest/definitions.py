@@ -4,8 +4,11 @@ Jobs
     ``ingest_hourly``     registries -> statistics -> SQLMesh run (scheduled hourly)
     ``retention_daily``   retention -> DuckLake maintenance (scheduled daily)
     ``catalog_daily``     entity profile and drift into ``catalog.*``, the Open-Meteo
-                          outside temperature archive (if enabled), then correlations
-                          between entities into ``catalog.finding`` (scheduled daily)
+                          outside temperature archive (if enabled), correlations
+                          between entities, then anomalies and change points of single
+                          entities into ``catalog.finding`` (scheduled daily)
+    ``findings_weekly``   snapshot of the findings of the week just ended into
+                          ``catalog.finding_weekly`` (scheduled on Monday morning)
     ``history_backfill``  state history of a range from the HA recorder (manual)
     ``silver_restate``    recompute silver for a range (manual, or the sensor
                           ``restate_after_catchup`` after a long stream outage)
@@ -122,10 +125,25 @@ def find_correlations(context: OpExecutionContext) -> None:
         context.log.info(f"Correlations: {window}")
 
 
+@op(ins={"after": In(Nothing)})
+def find_anomalies(context: OpExecutionContext) -> None:
+    context.log.info(f"Anomalies: {tasks.find_anomalies()}")
+
+
 @job
 def catalog_daily() -> None:
-    # Correlations pick binary/enum states from the fresh profile.
-    find_correlations(after=sync_outside_temperature(after=profile_catalog()))
+    # Correlations and anomalies pick binary/enum states from the fresh profile.
+    find_anomalies(after=find_correlations(after=sync_outside_temperature(after=profile_catalog())))
+
+
+@op
+def snapshot_findings(context: OpExecutionContext) -> None:
+    context.log.info(f"Weekly findings: {tasks.snapshot_findings()}")
+
+
+@job
+def findings_weekly() -> None:
+    snapshot_findings()
 
 
 @job
@@ -167,7 +185,14 @@ def restate_after_catchup(context: SensorEvaluationContext) -> SensorResult | Sk
 def build_definitions(settings: IngestSettings | None = None) -> Definitions:
     tz = (settings or IngestSettings()).timezone
     return Definitions(
-        jobs=[ingest_hourly, retention_daily, catalog_daily, history_backfill, silver_restate],
+        jobs=[
+            ingest_hourly,
+            retention_daily,
+            catalog_daily,
+            findings_weekly,
+            history_backfill,
+            silver_restate,
+        ],
         sensors=[restate_after_catchup],
         schedules=[
             ScheduleDefinition(
@@ -186,6 +211,13 @@ def build_definitions(settings: IngestSettings | None = None) -> Definitions:
             ScheduleDefinition(
                 job=catalog_daily,
                 cron_schedule="15 4 * * *",
+                execution_timezone=tz,
+                default_status=DefaultScheduleStatus.RUNNING,
+            ),
+            # Monday morning, after the daily findings of Monday.
+            ScheduleDefinition(
+                job=findings_weekly,
+                cron_schedule="0 7 * * 1",
                 execution_timezone=tz,
                 default_status=DefaultScheduleStatus.RUNNING,
             ),

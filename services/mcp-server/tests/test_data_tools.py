@@ -120,11 +120,63 @@ async def test_query_sql_row_level_policy(data: DataAccess) -> None:
 
 
 async def test_findings_hide_pairs_with_a_denied_entity(data: DataAccess) -> None:
-    sql = "SELECT finding_id, related_entity_id FROM catalog_finding ORDER BY rank"
+    sql = (
+        "SELECT finding_id, entity_group FROM catalog_finding "
+        "WHERE finding_type = 'correlation' ORDER BY rank"
+    )
     admin = await call(server(data, ADMIN), "query_sql", sql=sql)
     reader = await call(server(data, READER), "query_sql", sql=sql)
-    assert [r["finding_id"] for r in admin["rows"]] == ["f1", "f2"]
-    assert [r["finding_id"] for r in reader["rows"]] == ["f1"]
+    assert [r["finding_id"] for r in admin["rows"]] == ["f1", "f2", "f3"]
+    assert [r["finding_id"] for r in reader["rows"]] == ["f1", "f3"]
+    # a denied entity is also removed from the group lists
+    assert admin["rows"][0]["entity_group"] == ["sensor.temp_copy", "person.jana"]
+    assert reader["rows"][0]["entity_group"] == ["sensor.temp_copy"]
+
+
+async def test_get_findings(data: DataAccess) -> None:
+    reader = await call(server(data, READER), "get_findings")
+    ids = [f["finding_id"] for f in reader["findings"]]
+    # anomalies first, flagged ones (f3, a2) hidden, denied entities (f2, a3) never shown
+    assert ids == ["a1", "f1"]
+    assert reader["counts"] == {
+        "anomaly": {"total": 2, "flagged": 1},
+        "correlation": {"total": 2, "flagged": 1},
+    }
+    a1 = reader["findings"][0]
+    assert a1["entity_name"] == "Energie"
+    assert a1["unit"] == "kWh"
+    assert a1["observed"] == 5.0
+    assert "related_entity_id" not in a1  # empty columns are left out
+    f1 = reader["findings"][1]
+    assert f1["related_name"] == "Vstupní dveře"
+    assert f1["entity_group"] == ["sensor.temp_copy"]
+    everything = await call(server(data, ADMIN), "get_findings", include_flagged=True)
+    assert [f["finding_id"] for f in everything["findings"]] == ["a1", "a2", "a3", "f1", "f2", "f3"]
+    only = await call(
+        server(data, READER), "get_findings", entity_id="sensor.energy", include_flagged=True
+    )
+    assert {f["finding_id"] for f in only["findings"]} == {"a1", "a2", "f3"}
+    corr = await call(server(data, READER), "get_findings", finding_type="correlation")
+    assert [f["finding_id"] for f in corr["findings"]] == ["f1"]
+    assert corr["methods"] == [{"finding_type": "correlation", "window_days": 30, "method": "test"}]
+    with pytest.raises(ToolError, match="denied"):
+        await call(server(data, READER), "get_findings", entity_id="person.jana")
+
+
+async def test_get_weekly_summary(data: DataAccess) -> None:
+    summary = await call(server(data, READER), "get_weekly_summary")
+    assert summary["compared_with"] is not None
+    assert [a["finding_id"] for a in summary["anomalies"]] == ["a1"]
+    # f2 is new but hidden (person), f3 is new but trivial; f9 is gone
+    assert summary["new_correlations"] == []
+    assert [c["finding_id"] for c in summary["gone_correlations"]] == ["f9"]
+    assert summary["counts"]["anomaly"] == {"total": 2, "flagged": 1}
+    admin = await call(server(data, ADMIN), "get_weekly_summary")
+    assert [c["finding_id"] for c in admin["new_correlations"]] == ["f2"]
+    earlier = await call(server(data, ADMIN), "get_weekly_summary", week=summary["compared_with"])
+    assert earlier["compared_with"] is None
+    with pytest.raises(ToolError, match="No snapshot"):
+        await call(server(data, ADMIN), "get_weekly_summary", week="2020-01-01")
 
 
 async def test_query_sql_rejections_are_audited(data: DataAccess) -> None:
@@ -155,6 +207,7 @@ async def test_list_views(data: DataAccess) -> None:
     assert names == [
         "catalog_entity",
         "catalog_finding",
+        "catalog_finding_weekly",
         "entities",
         "states",
         "statistics",
