@@ -23,6 +23,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Dagster job `findings_weekly` (Monday 07:00) keeping weekly snapshots of the findings
   in `catalog.finding_weekly` (view `catalog_finding_weekly`, 104 weeks).
 
+### Fixed
+
+- Caddy answers refused requests with a short `text/plain` body (404 for unknown paths
+  such as `/`, 403 for Claude-only endpoints and `/admin` from elsewhere); the empty
+  response without a Content-Type made Safari offer it as a file download.
+
 ### Security
 
 - Entities hidden from a role are also removed from the group lists (`entity_group`,

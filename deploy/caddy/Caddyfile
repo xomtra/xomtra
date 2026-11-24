@@ -16,12 +16,20 @@
 #   - /admin (admin GUI and Dagster UI) only from ADMIN_CIDR; the admin app then requires
 #     an Entra sign-in with the role HAmmond.Admin and guards the Dagster UI through
 #     forward_auth (ADR 041).
+#   - Every refusal has a short text/plain body: an empty response without a
+#     Content-Type (with nosniff) makes some browsers offer it as a download.
 {
 	admin off
 	email {$ACME_EMAIL}
 	http_port 8080
 	https_port 8443
 	auto_https disable_redirects
+}
+
+(refuse) {
+	header Content-Type "text/plain; charset=utf-8"
+	header Cache-Control "no-store"
+	respond "{args[1]}" {args[0]}
 }
 
 {$HAMMOND_PUBLIC_HOST} {
@@ -59,7 +67,7 @@
 			}
 		}
 		handle {
-			respond 403
+			import refuse 403 Forbidden
 		}
 	}
 
@@ -70,7 +78,7 @@
 
 	@internal path /healthz
 	handle @internal {
-		respond 404
+		import refuse 404 "Not found"
 	}
 
 	@claude remote_ip {$CLAUDE_IP_RANGES}
@@ -81,7 +89,13 @@
 		}
 	}
 
+	# Endpoints Claude's servers call, refused from anywhere else.
+	@claude_only path /mcp /mcp/* /token /register /revoke /.well-known/*
+	handle @claude_only {
+		import refuse 403 Forbidden
+	}
+
 	handle {
-		respond 403
+		import refuse 404 "Not found"
 	}
 }
