@@ -13,6 +13,8 @@ from typing import Annotated, Literal, Self
 from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from hammond_mcp.ha_auth import DEFAULT_ROLE_MAP, RoleMap
+
 # Redirect URIs used by Claude (claude.ai / Claude Desktop) for remote MCP connectors.
 CLAUDE_REDIRECT_URIS = [
     "https://claude.ai/api/mcp/auth_callback",
@@ -29,7 +31,12 @@ def _split_csv(value: object) -> object:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HAMMOND_", extra="ignore")
 
-    auth_mode: Literal["entra", "none"] = "entra"
+    # Who signs in (admin GUI; MCP in public access): Entra ID, a Home Assistant account
+    # (ADR 053) or nobody (local development on loopback only).
+    auth_mode: Literal["entra", "ha", "none"] = "entra"
+    # public = OAuth for Claude through Caddy on a public host (ADR 026/028);
+    # local = MCP only in the LAN with personal tokens from the admin GUI (ADR 056/059).
+    access_mode: Literal["public", "local"] = "public"
     host: str = "127.0.0.1"
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: str = "INFO"
@@ -50,6 +57,12 @@ class Settings(BaseSettings):
     # Optional Home Assistant connection (read-only use in the PoC).
     ha_url: str | None = None
     ha_token: SecretStr | None = None
+    # HA URL as the user's browser reaches it (sign-in page); default HAMMOND_HA_URL.
+    ha_auth_url: str | None = None
+    # Optional allow-list of HA users (id or name); empty = every HA user with a role.
+    ha_allowed_users: Annotated[list[str], NoDecode] = []
+    # HAmmond role of HA administrators and of other HA users (empty value = refused).
+    ha_role_map: str = DEFAULT_ROLE_MAP
 
     # Access policy (ADR 038); default: the packaged policy.yaml.
     policy_file: Path | None = None
@@ -73,7 +86,12 @@ class Settings(BaseSettings):
     @classmethod
     def _csv_lists(cls, data: object) -> object:
         if isinstance(data, dict):
-            for key in ("entra_required_scopes", "allowed_client_redirect_uris", "dev_roles"):
+            for key in (
+                "entra_required_scopes",
+                "allowed_client_redirect_uris",
+                "dev_roles",
+                "ha_allowed_users",
+            ):
                 if key in data:
                     data[key] = _split_csv(data[key])
             if data.get("policy_file") == "":
@@ -89,9 +107,15 @@ class Settings(BaseSettings):
                     "(local development)."
                 )
             return self
-        missing = [
-            name
-            for name in (
+        RoleMap.parse(self.ha_role_map)  # fail early on a malformed map
+        if self.access_mode == "local":
+            # Personal tokens live in the audit database (ADR 059); no OAuth here.
+            required: tuple[str, ...] = ("audit_pg_host", "audit_pg_password")
+        elif self.auth_mode == "ha":
+            required = ("base_url", "ha_url", "jwt_signing_key", "audit_pg_host")
+            required += ("audit_pg_password",)
+        else:
+            required = (
                 "base_url",
                 "entra_tenant_id",
                 "entra_client_id",
@@ -100,17 +124,29 @@ class Settings(BaseSettings):
                 "audit_pg_host",
                 "audit_pg_password",
             )
-            if getattr(self, name) is None
-        ]
+        missing = [name for name in required if getattr(self, name) is None]
         if missing:
             env = ", ".join(f"HAMMOND_{m.upper()}" for m in missing)
-            raise ValueError(f"Entra auth requires: {env}")
+            what = (
+                "Local access"
+                if self.access_mode == "local"
+                else {"entra": "Entra auth", "ha": "Home Assistant auth"}[self.auth_mode]
+            )
+            raise ValueError(f"{what} requires: {env}")
         key = self.jwt_signing_key
         if key is not None and len(key.get_secret_value()) < 32:
             raise ValueError("HAMMOND_JWT_SIGNING_KEY must have at least 32 characters")
         if self.entra_tenant_id in {"common", "organizations", "consumers"}:
             raise ValueError("Use a specific tenant ID, multi-tenant sign-in is not allowed")
         return self
+
+    @property
+    def role_map(self) -> RoleMap:
+        return RoleMap.parse(self.ha_role_map)
+
+    @property
+    def browser_ha_url(self) -> str | None:
+        return self.ha_auth_url or self.ha_url
 
     @property
     def ha_configured(self) -> bool:

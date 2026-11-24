@@ -1,8 +1,11 @@
 """Admin GUI web app (Starlette), mounted by Caddy under ``/admin`` (ADR 041).
 
 Access: Caddy lets ``/admin`` through only from ``ADMIN_CIDR``; the app then requires
-an Entra sign-in with the role ``HAmmond.Admin``. ``/admin/auth/check`` answers Caddy's
-``forward_auth`` for the Dagster UI under ``/admin/dagster/``. Every page view, sign-in
+a sign-in (Entra ID, or a Home Assistant account with ``HAMMOND_AUTH_MODE=ha``, ADR 053)
+with the role ``HAmmond.Admin``. In the local access mode it also issues and revokes the
+personal tokens of MCP clients and offers the Claude Desktop extension (ADR 056/059).
+``/admin/auth/check`` answers Caddy's ``forward_auth`` for the Dagster UI under
+``/admin/dagster/``. Every page view, sign-in
 and refused sign-in is written to the audit table.
 """
 
@@ -14,7 +17,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -28,6 +31,11 @@ from hammond_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
 from hammond_mcp.admin.session import Signer
 from hammond_mcp.audit import AuditError, AuditRecord, AuditSink, LogAuditSink
 from hammond_mcp.data import DataAccess
+from hammond_mcp.desktop import FILENAME as MCPB_FILENAME
+from hammond_mcp.desktop import build_mcpb
+from hammond_mcp.ha_auth import HomeAssistantLogin, RoleMap, roles_for
+from hammond_mcp.ha_auth import LoginError as HALoginError
+from hammond_mcp.tokens import PostgresTokenStore, TokenStore, TokenStoreError, expiry
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +48,8 @@ HEADERS = {
     "Cache-Control": "no-store",
     "X-Frame-Options": "DENY",
 }
+TOKEN_ROLES = ("HAmmond.Reader", "HAmmond.Admin")
+TOKEN_DAYS = (30, 90, 365, 0)
 
 type Handler = Callable[[Request, dict[str, Any]], Awaitable[Response]]
 
@@ -52,6 +62,8 @@ class AdminApp:
         data: DataAccess | None,
         audit: AuditSink | None = None,
         oidc: EntraOIDC | None = None,
+        ha_login: HomeAssistantLogin | None = None,
+        tokens: TokenStore | None = None,
     ) -> None:
         self.settings = settings
         self.data = data
@@ -70,6 +82,25 @@ class AdminApp:
                 redirect_uri=settings.redirect_uri,
             )
         self.oidc = oidc
+        if ha_login is None and settings.auth_mode == "ha":
+            ha_login = HomeAssistantLogin(
+                ha_url=settings.ha_url or "",
+                ha_auth_url=settings.ha_auth_url or settings.ha_url or "",
+                client_id=settings.client_id,
+                redirect_uri=settings.redirect_uri,
+            )
+        self.ha_login = ha_login
+        dsn = settings.audit_dsn
+        if tokens is None and settings.access_mode == "local" and dsn:
+            tokens = PostgresTokenStore(dsn)
+        self.tokens = tokens
+        self.headers = dict(HEADERS)
+        if ha_login is not None:
+            origin = urlparse(ha_login.ha_auth_url)
+            self.headers["Content-Security-Policy"] = (
+                "default-src 'self'; frame-ancestors 'none'; form-action 'self' "
+                f"{origin.scheme}://{origin.netloc}"
+            )
 
     # ---- session -------------------------------------------------------------------
 
@@ -111,28 +142,48 @@ class AdminApp:
             username=(user or {}).get("username"),
             roles=list((user or {}).get("roles", [])),
             client_id="admin-gui",
+            idp=(user or {}).get("idp"),
             error=error,
         )
         await self.audit.write(record)
 
-    def protected(self, name: str, handler: Handler) -> Callable[[Request], Awaitable[Response]]:
+    def protected(
+        self, name: str, handler: Handler, *, audit: bool = True
+    ) -> Callable[[Request], Awaitable[Response]]:
+        """Signed-in admins only; ``audit=False`` for handlers that audit themselves."""
+
         async def endpoint(request: Request) -> Response:
             user = self.user(request)
             if user is None:
                 return RedirectResponse(f"{PREFIX}/login", status_code=303)
-            try:
-                await self._audit(name, user, arguments=dict(request.query_params))
-            except AuditError:
-                return HTMLResponse("Audit is unavailable.", status_code=503, headers=HEADERS)
+            if request.method == "POST" and not self._same_origin(request):
+                return Response("Cross-site request refused", status_code=403)
+            if audit:
+                try:
+                    await self._audit(name, user, arguments=dict(request.query_params))
+                except AuditError:
+                    return HTMLResponse(
+                        "Audit is unavailable.", status_code=503, headers=self.headers
+                    )
             resp = await handler(request, user)
-            resp.headers.update(HEADERS)
+            resp.headers.update(self.headers)
             return resp
 
         return endpoint
 
+    def _same_origin(self, request: Request) -> bool:
+        origin = request.headers.get("origin")
+        expected = urlparse(str(self.settings.base_url or request.base_url))
+        return not origin or urlparse(origin).netloc == expected.netloc
+
     # ---- auth routes ---------------------------------------------------------------
 
     async def login(self, request: Request) -> Response:
+        if self.ha_login is not None:
+            tx = LoginTransaction.new()
+            resp = RedirectResponse(self.ha_login.authorize_url(tx.state), status_code=303)
+            self._cookie(resp, TX_COOKIE, self.transactions.dumps({"state": tx.state}, 600), 600)
+            return resp
         if self.oidc is None:
             return RedirectResponse(f"{PREFIX}/", status_code=303)
         tx = LoginTransaction.new()
@@ -144,12 +195,14 @@ class AdminApp:
         return resp
 
     async def callback(self, request: Request) -> Response:
-        if self.oidc is None:
+        if self.oidc is None and self.ha_login is None:
             return RedirectResponse(f"{PREFIX}/", status_code=303)
         tx_data = self.transactions.loads(request.cookies.get(TX_COOKIE))
         state, code = request.query_params.get("state"), request.query_params.get("code")
         if tx_data is None or not state or state != tx_data.get("state") or not code:
             return self._login_failed("The sign-in expired or was not started here.")
+        if self.ha_login is not None or self.oidc is None:
+            return await self._ha_callback(code)
         tx = LoginTransaction(tx_data["state"], tx_data["nonce"], tx_data["verifier"])
         try:
             claims = await self.oidc.exchange(code, tx)
@@ -161,6 +214,7 @@ class AdminApp:
             "name": claims.get("name"),
             "username": claims.get("preferred_username") or claims.get("email"),
             "roles": roles,
+            "idp": "entra",
         }
         if self.settings.admin_role not in roles:
             await self._audit(
@@ -169,6 +223,35 @@ class AdminApp:
             return self._login_failed(
                 f"Your account does not have the role {self.settings.admin_role}.", status_code=403
             )
+        return await self._start_session(user)
+
+    async def _ha_callback(self, code: str) -> Response:
+        if self.ha_login is None:
+            return self._login_failed("Sign-in is not configured.")
+        try:
+            ha_user = await self.ha_login.exchange(code)
+        except HALoginError as err:
+            return self._login_failed(str(err))
+        s = self.settings
+        roles = roles_for(ha_user, RoleMap.parse(s.ha_role_map), s.ha_allowed_users)
+        user: dict[str, Any] = {
+            "sub": ha_user.id,
+            "name": ha_user.name,
+            "username": ha_user.name,
+            "roles": roles,
+            "idp": "ha",
+        }
+        if s.admin_role not in roles:
+            await self._audit(
+                "login", user, decision="denied", outcome="denied", error="missing admin role"
+            )
+            return self._login_failed(
+                "Only Home Assistant administrators may open the HAmmond admin GUI.",
+                status_code=403,
+            )
+        return await self._start_session(user)
+
+    async def _start_session(self, user: dict[str, Any]) -> Response:
         await self._audit("login", user)
         hours = self.settings.admin_session_hours
         resp = RedirectResponse(f"{PREFIX}/", status_code=303)
@@ -178,12 +261,10 @@ class AdminApp:
 
     def _login_failed(self, message: str, status_code: int = 400) -> Response:
         body = f"<p class=bad>{e(message)}</p><p><a href='{PREFIX}/login'>Sign in again</a></p>"
-        return HTMLResponse(page("Sign-in failed", body, None), status_code, headers=HEADERS)
+        return HTMLResponse(page("Sign-in failed", body, None), status_code, headers=self.headers)
 
     async def logout(self, request: Request) -> Response:
-        origin = request.headers.get("origin")
-        expected = urlparse(str(self.settings.base_url or request.base_url))
-        if origin and urlparse(origin).netloc != expected.netloc:
+        if not self._same_origin(request):
             return Response("Cross-site request refused", status_code=403)
         resp = RedirectResponse(f"{PREFIX}/login", status_code=303)
         resp.delete_cookie(SESSION_COOKIE, path=PREFIX)
@@ -329,6 +410,7 @@ class AdminApp:
         cols = [
             "ts",
             "username",
+            "idp",
             "tool",
             "decision",
             "outcome",
@@ -341,7 +423,7 @@ class AdminApp:
         if rows is None:
             body += "<p class=warn>The audit database is not configured for the admin GUI.</p>"
         else:
-            body += table(cols, [[r.get(c) for c in cols] for r in rows], {5, 6})
+            body += table(cols, [[r.get(c) for c in cols] for r in rows], {6, 7})
         return HTMLResponse(page("Audit", body, user.get("username")))
 
     async def recent_audit(self) -> list[dict[str, Any]] | None:
@@ -354,7 +436,7 @@ class AdminApp:
 
             with psycopg2.connect(dsn, connect_timeout=5) as conn, conn.cursor() as cur:
                 cur.execute(
-                    "SELECT ts, username, tool, decision, outcome, row_count, duration_ms, "
+                    "SELECT ts, username, idp, tool, decision, outcome, row_count, duration_ms, "
                     "arguments, error FROM audit.tool_call ORDER BY id DESC LIMIT 200"
                 )
                 cols = [d[0] for d in cur.description or []]
@@ -366,6 +448,216 @@ class AdminApp:
                 return out
 
         return await asyncio.to_thread(query)
+
+    # ---- personal tokens and client setup (local access, ADR 056/059) ---------------
+
+    def _local_only(self, user: dict[str, Any], title: str) -> Response | None:
+        if self.settings.access_mode == "local" and self.tokens is not None:
+            return None
+        body = (
+            "<p class=warn>Personal tokens are used only in the local access mode "
+            "(<code>HAMMOND_ACCESS_MODE=local</code>, see docs/setup/local-access.md). "
+            "In the public mode, Claude connects with OAuth (docs/setup/claude-connector.md)."
+            "</p>"
+        )
+        return HTMLResponse(page(title, body, user.get("username")))
+
+    async def tokens_page(self, request: Request, user: dict[str, Any]) -> Response:
+        refused = self._local_only(user, "Tokens")
+        if refused is not None or self.tokens is None:
+            return refused or Response(status_code=404)
+        try:
+            items = await asyncio.to_thread(self.tokens.list)
+        except TokenStoreError:
+            return HTMLResponse(
+                page("Tokens", "<p class=bad>The token store is unavailable.</p>", None), 503
+            )
+        roles = "".join(f"<option>{e(r)}</option>" for r in TOKEN_ROLES)
+        days = "".join(
+            f"<option value={d}{' selected' if d == 365 else ''}>"
+            f"{f'{d} days' if d else 'never'}</option>"
+            for d in TOKEN_DAYS
+        )
+        form = (
+            f"<form class=filters method=post action='{PREFIX}/tokens/issue'>"
+            f"<input name=owner required maxlength=100 value='{e(user.get('username') or '')}'"
+            " placeholder='for whom'>"
+            "<input name=description required maxlength=200 placeholder='device or app, "
+            "e.g. Jana laptop, Claude Desktop'>"
+            f"<select name=role>{roles}</select>"
+            f"<label>expires <select name=days>{days}</select></label>"
+            "<button>Issue token</button></form>"
+        )
+        rows = []
+        for t in items:
+            action = (
+                f"<form method=post action='{PREFIX}/tokens/revoke'>"
+                f"<input type=hidden name=id value='{e(t.id)}'><button>Revoke</button></form>"
+                if t.active()
+                else ("revoked" if t.revoked_at else "expired")
+            )
+            rows.append(
+                [
+                    t.id,
+                    t.owner,
+                    t.description,
+                    t.role,
+                    t.created_at,
+                    t.expires_at,
+                    t.last_used_at,
+                    action,
+                ]
+            )
+        body = (
+            "<p class=muted>Each person or device gets its own token. A token is shown once; "
+            "only its hash is stored. Revoked tokens stop working within 30 seconds.</p>"
+            + form
+            + table(
+                ["id", "for", "description", "role", "created", "expires", "last used", ""],
+                rows,
+                trusted_html={7},
+            )
+            + f"<p><a href='{PREFIX}/connect'>How to connect Claude and other MCP clients</a></p>"
+        )
+        return HTMLResponse(page("Tokens", body, user.get("username")))
+
+    async def _form(self, request: Request) -> dict[str, str]:
+        raw = (await request.body())[:10_000].decode(errors="replace")
+        return {k: v[0].strip() for k, v in parse_qs(raw).items() if v}
+
+    async def token_issue(self, request: Request, user: dict[str, Any]) -> Response:
+        refused = self._local_only(user, "Tokens")
+        if refused is not None or self.tokens is None:
+            return refused or Response(status_code=404)
+        form = await self._form(request)
+        owner, description = form.get("owner", "")[:100], form.get("description", "")[:200]
+        role = form.get("role", "")
+        try:
+            days = int(form.get("days", "365"))
+        except ValueError:
+            days = -1
+        if not owner or not description or role not in TOKEN_ROLES or days not in TOKEN_DAYS:
+            return HTMLResponse(
+                page("Tokens", "<p class=bad>Fill in all fields.</p>", user.get("username")),
+                400,
+            )
+        try:
+            info, token = await asyncio.to_thread(
+                self.tokens.issue,
+                owner=owner,
+                description=description,
+                role=role,
+                created_by=user.get("username"),
+                expires_at=expiry(days),
+            )
+            await self._audit(
+                "token_issue",
+                user,
+                arguments={
+                    "id": info.id,
+                    "owner": owner,
+                    "description": description,
+                    "role": role,
+                    "days": days,
+                },
+            )
+        except (TokenStoreError, AuditError):
+            return HTMLResponse(
+                page(
+                    "Tokens",
+                    "<p class=bad>Not issued: the token store or audit is unavailable.</p>",
+                    user.get("username"),
+                ),
+                503,
+            )
+        body = (
+            f"<p>Token <code>{e(info.id)}</code> for {e(owner)} ({e(description)}, {e(role)}). "
+            "<strong>Copy it now, it is not shown again.</strong></p>"
+            f"<p><input class=token readonly size=80 value='{e(token)}'></p>"
+            + self._connect_help(token)
+            + f"<p><a href='{PREFIX}/tokens'>Back to tokens</a></p>"
+        )
+        return HTMLResponse(page("New token", body, user.get("username")))
+
+    async def token_revoke(self, request: Request, user: dict[str, Any]) -> Response:
+        refused = self._local_only(user, "Tokens")
+        if refused is not None or self.tokens is None:
+            return refused or Response(status_code=404)
+        token_id = (await self._form(request)).get("id", "")[:40]
+        try:
+            done = await asyncio.to_thread(self.tokens.revoke, token_id, user.get("username"))
+            await self._audit(
+                "token_revoke",
+                user,
+                arguments={"id": token_id},
+                outcome="ok" if done else "error",
+                error=None if done else "not found or already revoked",
+            )
+        except (TokenStoreError, AuditError):
+            return HTMLResponse(
+                page(
+                    "Tokens",
+                    "<p class=bad>The token store or audit is unavailable.</p>",
+                    user.get("username"),
+                ),
+                503,
+            )
+        return RedirectResponse(f"{PREFIX}/tokens", status_code=303)
+
+    def _connect_help(self, token: str | None = None) -> str:
+        url = self.settings.endpoint
+        tok = token or "hmd_..."
+        origin = urlparse(url)
+        ca = f"{origin.scheme}://{origin.netloc}/hammond-ca.crt"
+        server = json.dumps(
+            {
+                "mcpServers": {
+                    "hammond": {
+                        "type": "http",
+                        "url": url,
+                        "headers": {"Authorization": f"Bearer {tok}"},
+                    }
+                }
+            },
+            indent=2,
+        )
+        return (
+            "<h2>Claude Desktop</h2><ol>"
+            f"<li>Download <a href='{PREFIX}/connect/{MCPB_FILENAME}'>{MCPB_FILENAME}</a> "
+            f"(address <code>{e(url)}</code> is filled in) and open it: Claude Desktop "
+            "shows the extension and asks for the token.</li>"
+            "<li>Paste the token. If your browser warned about the certificate of this "
+            f"server, also download <a href='{e(ca)}'>hammond-ca.crt</a> and select it as "
+            "<em>Certificate of the server</em>.</li></ol>"
+            "<h2>Claude Code</h2>"
+            f"<pre>claude mcp add --transport http hammond {e(url)} \\\n"
+            f'  --header "Authorization: Bearer {e(tok)}"</pre>'
+            "<p class=muted>With the server's own certificate, start Claude Code with "
+            "<code>NODE_EXTRA_CA_CERTS=/path/to/hammond-ca.crt</code>.</p>"
+            "<h2>Other MCP clients</h2>"
+            "<p>Streamable HTTP endpoint with a bearer token, e.g.:</p>"
+            f"<pre>{e(server)}</pre>"
+            "<p class=muted>claude.ai on the web and on phones connects through Anthropic's "
+            "servers and needs the public access mode (docs/setup/claude-connector.md).</p>"
+        )
+
+    async def connect_page(self, request: Request, user: dict[str, Any]) -> Response:
+        refused = self._local_only(user, "Connect clients")
+        if refused is not None:
+            return refused
+        body = (
+            f"<p>Issue a personal token on <a href='{PREFIX}/tokens'>Tokens</a> first, one "
+            "per person and device.</p>" + self._connect_help()
+        )
+        return HTMLResponse(page("Connect clients", body, user.get("username")))
+
+    async def mcpb(self, request: Request, user: dict[str, Any]) -> Response:
+        data = build_mcpb(self.settings.endpoint)
+        return Response(
+            data,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(MCPB_FILENAME)}"},
+        )
 
     # ---- app -----------------------------------------------------------------------
 
@@ -388,6 +680,19 @@ class AdminApp:
             Route(f"{PREFIX}/drift", p("drift", self.drift)),
             Route(f"{PREFIX}/retention", p("retention", self.retention)),
             Route(f"{PREFIX}/audit", p("audit", self.audit_page)),
+            Route(f"{PREFIX}/tokens", p("tokens", self.tokens_page)),
+            Route(
+                f"{PREFIX}/tokens/issue",
+                p("token_issue", self.token_issue, audit=False),
+                methods=["POST"],
+            ),
+            Route(
+                f"{PREFIX}/tokens/revoke",
+                p("token_revoke", self.token_revoke, audit=False),
+                methods=["POST"],
+            ),
+            Route(f"{PREFIX}/connect", p("connect", self.connect_page)),
+            Route(f"{PREFIX}/connect/{MCPB_FILENAME}", p("download_mcpb", self.mcpb)),
             Route(f"{PREFIX}/static.css", css),
             Route(f"{PREFIX}/login", self.login),
             Route(f"{PREFIX}/auth/callback", self.callback),

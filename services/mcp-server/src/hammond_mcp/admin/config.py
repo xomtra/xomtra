@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from hammond_mcp.ha_auth import DEFAULT_ROLE_MAP, RoleMap
 
 PREFIX = "/admin"
 
@@ -13,7 +15,8 @@ PREFIX = "/admin"
 class AdminSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HAMMOND_", extra="ignore")
 
-    auth_mode: Literal["entra", "none"] = "entra"
+    auth_mode: Literal["entra", "ha", "none"] = "entra"
+    access_mode: Literal["public", "local"] = "public"
     host: str = "0.0.0.0"  # noqa: S104 - container port, only reachable through Caddy
     admin_port: int = Field(default=8100, ge=1, le=65535)
     log_level: str = "INFO"
@@ -29,6 +32,13 @@ class AdminSettings(BaseSettings):
 
     ha_url: str | None = None
     ha_token: SecretStr | None = None
+    # Sign-in with a Home Assistant account (ADR 053), see hammond_mcp.config.
+    ha_auth_url: str | None = None
+    ha_allowed_users: Annotated[list[str], NoDecode] = []
+    ha_role_map: str = DEFAULT_ROLE_MAP
+    # MCP endpoint for clients in the LAN (local access), shown with new tokens and put
+    # into the Claude Desktop extension; default <base_url>/mcp.
+    mcp_url: AnyHttpUrl | None = None
     timezone: str = "UTC"
 
     # Read access to the audit table (role with SELECT + INSERT, ADR 040/041).
@@ -44,21 +54,24 @@ class AdminSettings(BaseSettings):
     statistics_hour_retention_days: int = 1825
     catalog_window_days: int = 30
 
+    @field_validator("ha_allowed_users", mode="before")
+    @classmethod
+    def _csv(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
     @model_validator(mode="after")
     def _check(self) -> Self:
         if self.auth_mode == "none":
             return self
-        missing = [
-            n
-            for n in (
-                "base_url",
-                "entra_tenant_id",
-                "entra_client_id",
-                "entra_client_secret",
-                "admin_session_key",
-            )
-            if getattr(self, n) is None
-        ]
+        required: tuple[str, ...] = ("base_url", "admin_session_key")
+        if self.auth_mode == "entra":
+            required += ("entra_tenant_id", "entra_client_id", "entra_client_secret")
+        else:
+            required += ("ha_url",)
+            RoleMap.parse(self.ha_role_map)
+        missing = [n for n in required if getattr(self, n) is None]
         if missing:
             raise ValueError(
                 "Admin GUI requires: " + ", ".join(f"HAMMOND_{m.upper()}" for m in missing)
@@ -67,6 +80,18 @@ class AdminSettings(BaseSettings):
         if key is not None and len(key.get_secret_value()) < 32:
             raise ValueError("HAMMOND_ADMIN_SESSION_KEY must have at least 32 characters")
         return self
+
+    @property
+    def endpoint(self) -> str:
+        """MCP endpoint URL for clients (local access)."""
+        if self.mcp_url is not None:
+            return str(self.mcp_url).rstrip("/")
+        return f"{str(self.base_url or 'https://localhost').rstrip('/')}/mcp"
+
+    @property
+    def client_id(self) -> str:
+        """OAuth client id of the admin GUI towards Home Assistant (IndieAuth URL)."""
+        return f"{str(self.base_url).rstrip('/')}/"
 
     @property
     def redirect_uri(self) -> str:

@@ -16,11 +16,13 @@ class Identity:
     username: str | None = None
     roles: tuple[str, ...] = ()
     scopes: tuple[str, ...] = field(default_factory=tuple)
+    # Who vouched for the identity: entra | ha | token (ADR 040/053/059); dev without auth.
+    idp: str | None = None
 
 
 def identity_from_claims(claims: dict[str, Any], scopes: list[str]) -> Identity:
-    # Upstream Entra claims may be nested under "upstream_claims" (FastMCP-issued JWT)
-    # or be the Entra token payload itself.
+    # Upstream claims may be nested under "upstream_claims" (FastMCP-issued JWT) or be
+    # the token payload itself. Home Assistant users and personal tokens carry "idp".
     upstream = claims.get("upstream_claims")
     source: dict[str, Any] = upstream if isinstance(upstream, dict) else claims
     roles = source.get("roles") or []
@@ -31,6 +33,7 @@ def identity_from_claims(claims: dict[str, Any], scopes: list[str]) -> Identity:
         username=source.get("preferred_username") or source.get("upn") or source.get("email"),
         roles=tuple(str(r) for r in roles) if isinstance(roles, list) else (),
         scopes=tuple(scopes),
+        idp=str(source.get("idp") or claims.get("idp") or "entra"),
     )
 
 

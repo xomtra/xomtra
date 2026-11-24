@@ -1,4 +1,7 @@
-"""FastMCP application: catalog and data tools behind the Entra OAuth proxy.
+"""FastMCP application: catalog and data tools behind authentication.
+
+Public access: OAuth proxy to Entra ID (ADR 026) or Home Assistant (ADR 053). Local
+access: personal tokens from the admin GUI (ADR 056/059).
 
 Every request passes the policy middleware (roles -> tools, views, entities) and is
 audited (ADR 038-040). Data tools are registered when a lake connection is configured.
@@ -12,6 +15,7 @@ from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
+from fastmcp.server.auth import AuthProvider
 from fastmcp.server.auth.providers.azure import AzureProvider
 from pydantic import Field
 from starlette.requests import Request
@@ -23,8 +27,10 @@ from hammond_mcp.audit import AuditSink, LogAuditSink, PostgresAuditSink
 from hammond_mcp.config import Settings
 from hammond_mcp.data import DataAccess, parse_time
 from hammond_mcp.guard import PolicyMiddleware
+from hammond_mcp.ha_auth import HomeAssistantProvider
 from hammond_mcp.identity import Identity, current_identity
 from hammond_mcp.policy import Policy, current_access
+from hammond_mcp.tokens import PersonalTokenVerifier, PostgresTokenStore, TokenStore
 
 logger = logging.getLogger(__name__)
 
@@ -43,19 +49,39 @@ can see depends on your role; entities outside it are not returned.
 READ_ONLY = {"readOnlyHint": True, "openWorldHint": False}
 
 
-def build_auth(settings: Settings) -> AzureProvider | None:
+def build_auth(settings: Settings, tokens: TokenStore | None = None) -> AuthProvider | None:
     if settings.auth_mode == "none":
         logger.warning("Authentication is DISABLED (local development only)")
         return None
+    if settings.access_mode == "local":
+        dsn = settings.audit_dsn
+        if tokens is None and dsn is None:
+            raise RuntimeError("Local access needs the audit database")  # guarded by Settings
+        logger.info("Local access: personal tokens only, no OAuth")
+        return PersonalTokenVerifier(tokens or PostgresTokenStore(str(dsn)))
+    signing_key, base_url = settings.jwt_signing_key, settings.base_url
+    if settings.auth_mode == "ha":
+        ha_url, auth_url = settings.ha_url, settings.browser_ha_url
+        if not (ha_url and auth_url and signing_key and base_url):
+            raise RuntimeError("Home Assistant auth configuration is incomplete")
+        return HomeAssistantProvider(
+            base_url=str(base_url),
+            ha_url=ha_url,
+            ha_auth_url=auth_url,
+            jwt_signing_key=signing_key.get_secret_value(),
+            role_map=settings.role_map,
+            allowed_users=settings.ha_allowed_users,
+            allowed_client_redirect_uris=settings.allowed_client_redirect_uris,
+        )
     client_id, tenant_id = settings.entra_client_id, settings.entra_tenant_id
-    secret, signing_key = settings.entra_client_secret, settings.jwt_signing_key
-    if not (client_id and tenant_id and secret and signing_key and settings.base_url):
+    secret = settings.entra_client_secret
+    if not (client_id and tenant_id and secret and signing_key and base_url):
         raise RuntimeError("Entra configuration is incomplete")  # guarded by Settings
     return AzureProvider(
         client_id=client_id,
         client_secret=secret.get_secret_value(),
         tenant_id=tenant_id,
-        base_url=str(settings.base_url).rstrip("/"),
+        base_url=str(base_url).rstrip("/"),
         required_scopes=settings.entra_required_scopes,
         jwt_signing_key=signing_key.get_secret_value(),
         allowed_client_redirect_uris=settings.allowed_client_redirect_uris,
@@ -80,11 +106,12 @@ def create_server(
     data: DataAccess | None = None,
     audit: AuditSink | None = None,
     policy: Policy | None = None,
+    tokens: TokenStore | None = None,
 ) -> FastMCP:
     mcp = FastMCP(
         name="HAmmond",
         instructions=INSTRUCTIONS,
-        auth=build_auth(settings),
+        auth=build_auth(settings, tokens),
         mask_error_details=True,
     )
     mcp.add_middleware(
@@ -109,6 +136,7 @@ def create_server(
             "username": ident.username,
             "roles": list(ident.roles),
             "scopes": list(ident.scopes),
+            "identity_provider": ident.idp,
         }
 
     @mcp.tool(annotations=READ_ONLY)
@@ -118,6 +146,7 @@ def create_server(
             "name": "HAmmond",
             "version": __version__,
             "auth_mode": settings.auth_mode,
+            "access_mode": settings.access_mode,
             "home_assistant_configured": settings.ha_configured,
         }
 

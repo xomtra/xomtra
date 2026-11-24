@@ -73,6 +73,7 @@ class PolicyMiddleware(Middleware):
             username=ident.username,
             roles=list(ident.roles),
             client_id=_client_id(),
+            idp=ident.idp,
         )
         started = time.monotonic()
 

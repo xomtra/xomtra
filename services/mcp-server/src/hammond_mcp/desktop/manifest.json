@@ -1,0 +1,66 @@
+{
+  "manifest_version": "0.2",
+  "name": "hammond",
+  "display_name": "HAmmond",
+  "version": "0.0.0",
+  "description": "History, catalog and findings of your Home Assistant, from your HAmmond server in the LAN.",
+  "long_description": "Connects Claude Desktop to a HAmmond server on your local network. Issue a personal token in the HAmmond admin GUI (Tokens) and enter it here. Read-only: HAmmond never changes anything in Home Assistant.",
+  "author": {
+    "name": "HAmmond contributors",
+    "url": "https://github.com/zettabyte-cz/hammond"
+  },
+  "homepage": "https://github.com/zettabyte-cz/hammond",
+  "documentation": "https://github.com/zettabyte-cz/hammond/blob/main/docs/setup/local-access.md",
+  "license": "Apache-2.0",
+  "keywords": ["home assistant", "smart home", "history", "energy"],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "HAMMOND_URL": "${user_config.url}",
+        "HAMMOND_TOKEN": "${user_config.token}",
+        "HAMMOND_CA_FILE": "${user_config.ca_file}",
+        "HAMMOND_ALLOW_HTTP": "${user_config.allow_http}"
+      }
+    }
+  },
+  "user_config": {
+    "url": {
+      "type": "string",
+      "title": "HAmmond address",
+      "description": "MCP endpoint of your HAmmond server, e.g. https://hammond.lan/mcp",
+      "required": true,
+      "default": ""
+    },
+    "token": {
+      "type": "string",
+      "title": "Personal token",
+      "description": "Token from the HAmmond admin GUI (Tokens), starts with hmd_",
+      "sensitive": true,
+      "required": true
+    },
+    "ca_file": {
+      "type": "file",
+      "title": "Certificate of the server (optional)",
+      "description": "hammond-ca.crt from https://<server>/hammond-ca.crt when the server uses its own local certificate",
+      "required": false,
+      "default": ""
+    },
+    "allow_http": {
+      "type": "boolean",
+      "title": "Allow unencrypted http://",
+      "description": "Only for a server on a trusted network without HTTPS",
+      "required": false,
+      "default": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}
