@@ -63,6 +63,8 @@ CREATE TABLE IF NOT EXISTS audit.tool_call (
   duration_ms integer
 );
 CREATE INDEX IF NOT EXISTS tool_call_ts ON audit.tool_call (ts);
+-- Identity provider of the caller: entra | ha | token (ADR 053, 059); NULL before 1c.1.
+ALTER TABLE audit.tool_call ADD COLUMN IF NOT EXISTS idp text;
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'db', :'usr') \gexec
 SELECT format('GRANT USAGE ON SCHEMA audit TO %I', :'usr') \gexec
 SELECT format('GRANT INSERT ON audit.tool_call TO %I', :'usr') \gexec
@@ -83,5 +85,43 @@ LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $b$
 $b$$f$, :'days'::integer) \gexec
 REVOKE ALL ON FUNCTION audit.purge_expired() FROM PUBLIC;
 SELECT format('GRANT EXECUTE ON FUNCTION audit.purge_expired() TO %I, %I', :'usr', :'adm') \gexec
+
+-- Personal access tokens of the local access mode (ADR 056, 059). Only SHA-256 hashes
+-- are stored. The admin GUI lists, issues and revokes (no DELETE: history stays); the
+-- MCP server may only call access.verify_token(), which returns a valid token's row and
+-- records its last use, so it can neither list nor change tokens.
+CREATE SCHEMA IF NOT EXISTS access AUTHORIZATION postgres;
+CREATE TABLE IF NOT EXISTS access.token (
+  id           text PRIMARY KEY,
+  token_hash   bytea NOT NULL UNIQUE,
+  owner        text NOT NULL,
+  description  text NOT NULL,
+  role         text NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  created_by   text,
+  expires_at   timestamptz,
+  revoked_at   timestamptz,
+  revoked_by   text,
+  last_used_at timestamptz
+);
+CREATE OR REPLACE FUNCTION access.verify_token(digest bytea)
+RETURNS TABLE (id text, owner text, description text, role text, created_at timestamptz,
+  created_by text, expires_at timestamptz, revoked_at timestamptz, revoked_by text,
+  last_used_at timestamptz)
+LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $f$
+  UPDATE access.token t
+  SET last_used_at = CASE
+    WHEN t.last_used_at IS NULL OR t.last_used_at < now() - interval '5 minutes' THEN now()
+    ELSE t.last_used_at END
+  WHERE t.token_hash = digest AND t.revoked_at IS NULL
+    AND (t.expires_at IS NULL OR t.expires_at > now())
+  RETURNING t.id, t.owner, t.description, t.role, t.created_at, t.created_by,
+    t.expires_at, t.revoked_at, t.revoked_by, t.last_used_at
+$f$;
+REVOKE ALL ON FUNCTION access.verify_token(bytea) FROM PUBLIC;
+SELECT format('GRANT USAGE ON SCHEMA access TO %I, %I', :'usr', :'adm') \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION access.verify_token(bytea) TO %I', :'usr') \gexec
+SELECT format('GRANT SELECT, INSERT ON access.token TO %I', :'adm') \gexec
+SELECT format('GRANT UPDATE (revoked_at, revoked_by) ON access.token TO %I', :'adm') \gexec
 SQL
 echo "Postgres roles and databases are in place."

@@ -15,6 +15,30 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 - The label ids that leave entities out are settings: `HAMMOND_LABEL_NO_INGEST` and
   `HAMMOND_LABEL_NO_ANALYSIS` (defaults `hammond_no_ingest`, `hammond_no_analysis`).
+- Sign-in with a Home Assistant account (`HAMMOND_AUTH_MODE=ha`, ADR 053) for the
+  Claude connector and the admin GUI: HA administrators get `HAmmond.Admin`, other users
+  `HAmmond.Reader` (`HAMMOND_HA_ROLE_MAP`, optional `HAMMOND_HA_ALLOWED_USERS`,
+  `HAMMOND_HA_AUTH_URL`). See docs/setup/ha-login.md.
+- Local access mode (`HAMMOND_ACCESS_MODE=local`, ADR 056/059): MCP and admin GUI only in
+  the LAN behind Caddy's local CA (`HAMMOND_LOCAL_HOST`, `LAN_CIDR`), personal tokens
+  issued and revoked on the new admin page **Tokens**, connect instructions for Claude
+  Desktop, Claude Code and other MCP clients. See docs/setup/local-access.md.
+- Claude Desktop extension `hammond.mcpb` (dependency-free stdio bridge): downloadable
+  from the admin GUI with the server address filled in, and attached to releases.
+- `deploy/compose/init-env.sh` creates `.env` with every internal password and key
+  generated (ADR 061); `--fill` completes an existing `.env` after an update.
+- Audit records carry the identity provider (`idp`: `entra`, `ha`, `token`); `whoami`
+  shows it, `server_info` shows the access mode.
+
+### Changed
+
+- The Caddy image starts through `hammond-caddy`, which picks the configuration of
+  `HAMMOND_ACCESS_MODE` and checks the values it needs. In compose, `ACME_EMAIL`,
+  `CLOUDFLARE_API_TOKEN`, `CLAUDE_IP_RANGES` and `HAMMOND_PUBLIC_HOST` are no longer
+  required by compose itself; Caddy refuses to start without them in the public mode.
+  Upgrade: nothing to do, existing `.env` files keep the public mode.
+- `postgres-init` adds the column `audit.tool_call.idp` and the schema `access` (personal
+  tokens) to existing installations.
 
 ## [0.2.0] - 2026-11-24
 

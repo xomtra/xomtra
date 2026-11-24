@@ -43,6 +43,9 @@ input, select, button { font:inherit; padding:5px 8px; border:1px solid var(--li
   border-radius:6px; background:var(--card); color:var(--fg); }
 button { cursor:pointer; }
 form.filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+pre { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px;
+  overflow-x:auto; font-size:12px; }
+input.token { font-family:ui-monospace, monospace; max-width:100%; }
 """
 
 NAV = (
@@ -51,6 +54,7 @@ NAV = (
     ("/drift", "Drift"),
     ("/retention", "Retention"),
     ("/audit", "Audit"),
+    ("/tokens", "Tokens"),
     ("/dagster/", "Dagster"),
 )
 
@@ -84,19 +88,22 @@ def page(title: str, body: str, user: str | None) -> str:
 
 
 def table(
-    columns: Sequence[str], rows: Iterable[Sequence[Any]], numeric: set[int] | None = None
+    columns: Sequence[str],
+    rows: Iterable[Sequence[Any]],
+    numeric: set[int] | None = None,
+    *,
+    trusted_html: set[int] | None = None,
 ) -> str:
-    numeric = numeric or set()
+    """``trusted_html``: columns holding markup built by the app itself (not escaped)."""
+    numeric, trusted = numeric or set(), trusted_html or set()
+
+    def cell(i: int, v: Any) -> str:
+        if i in trusted:
+            return f"<td>{v}</td>"
+        return f'<td class="num">{e(v)}</td>' if i in numeric else f"<td>{e(v)}</td>"
+
     head = "".join(f"<th>{escape(c)}</th>" for c in columns)
-    body = "".join(
-        "<tr>"
-        + "".join(
-            f'<td class="num">{e(v)}</td>' if i in numeric else f"<td>{e(v)}</td>"
-            for i, v in enumerate(r)
-        )
-        + "</tr>"
-        for r in rows
-    )
+    body = "".join("<tr>" + "".join(cell(i, v) for i, v in enumerate(r)) + "</tr>" for r in rows)
     return f'<div class="scroll"><table><tr>{head}</tr>{body}</table></div>'
 
 

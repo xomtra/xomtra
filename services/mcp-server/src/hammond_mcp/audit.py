@@ -1,8 +1,9 @@
 """Audit of every MCP tool call (ADR 040).
 
-Each call, allowed or denied, becomes one record: who (Entra object id, username,
-roles, OAuth client), what (tool and arguments), the policy decision, the outcome, the
-number of rows returned and the duration. Records go to
+Each call, allowed or denied, becomes one record: who (subject: Entra object id, Home
+Assistant user id or personal token id; username, roles, identity provider, OAuth
+client), what (tool and arguments), the policy decision, the outcome, the number of rows
+returned and the duration. Records go to
 
 * the log as one JSON line (``hammond.audit`` logger, collected with ``docker logs``;
   exported to Wazuh in phase 2), and
@@ -42,6 +43,7 @@ class AuditRecord:
     username: str | None = None
     roles: list[str] = field(default_factory=list)
     client_id: str | None = None
+    idp: str | None = None
     error: str | None = None
     row_count: int | None = None
     duration_ms: int | None = None
@@ -92,9 +94,9 @@ class MemoryAuditSink(LogAuditSink):
 
 INSERT_SQL = """
 INSERT INTO audit.tool_call
-  (ts, subject, username, roles, client_id, tool, arguments, decision, outcome, error,
+  (ts, subject, username, roles, client_id, idp, tool, arguments, decision, outcome, error,
    row_count, duration_ms)
-VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
 """
 
 
@@ -150,6 +152,7 @@ class PostgresAuditSink(LogAuditSink):
                                 record.username,
                                 record.roles,
                                 record.client_id,
+                                record.idp,
                                 record.tool,
                                 json.dumps(record.arguments, default=str),
                                 record.decision,

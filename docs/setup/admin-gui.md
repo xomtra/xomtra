@@ -1,6 +1,8 @@
 # Admin GUI and Dagster UI (phase 1a.3)
 
-`https://<public-host>/admin/` shows the state of the installation:
+`https://<public-host>/admin/` (or `https://<local-host>/admin/` in [local access](local-access.md))
+shows the state of the installation. Sign-in with Entra ID or, with
+`HAMMOND_AUTH_MODE=ha`, with a [Home Assistant administrator account](ha-login.md).
 
 | Page | Content |
 | --- | --- |
@@ -8,7 +10,8 @@
 | Catalog | searchable entity profile (kind, change rate, value range, stale, range shift) |
 | Drift | changes between daily profiles, last 30 days |
 | Retention | configured retention periods with their cut-off dates, size of every lake table |
-| Audit | last 200 calls of MCP tools and of this GUI |
+| Audit | last 200 calls of MCP tools and of this GUI, with the identity provider (`entra`, `ha`, `token`) |
+| Tokens | local access only: issue and revoke personal tokens, connect instructions and the Claude Desktop extension ([local access](local-access.md)) |
 | Dagster | the Dagster UI (`/admin/dagster/`): runs, schedules, launching jobs |
 
 Retention values are set in `.env` (`HAMMOND_*_RETENTION_DAYS`) and applied by the
