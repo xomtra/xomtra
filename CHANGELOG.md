@@ -11,6 +11,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-24
+
 ### Added
 
 - Editions (ADR 050): `HAMMOND_EDITION=full|lite` selects default retention and DuckDB
@@ -42,6 +44,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   Upgrade: nothing to do, existing `.env` files keep the public mode.
 - `postgres-init` adds the column `audit.tool_call.idp` and the schema `access` (personal
   tokens) to existing installations.
+
+Upgrade from 0.2.0: take `compose.yaml`, `postgres/ensure-databases.sh` and the new
+`init-env.sh` from the tag and the image lines from `hammond-0.3.0-images.env`.
+Optionally run `./init-env.sh --fill` to add the new keys with their defaults (it never
+changes existing values). An `.env` without the new keys keeps working: public access
+with Entra ID as before.
 
 ## [0.2.0] - 2026-11-24
 
@@ -97,6 +105,7 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/zettabyte-cz/HAmmond/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/zettabyte-cz/HAmmond/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/zettabyte-cz/HAmmond/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/zettabyte-cz/HAmmond/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/zettabyte-cz/HAmmond/releases/tag/v0.1.0
