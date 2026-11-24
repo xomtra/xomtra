@@ -51,6 +51,21 @@ HAMMOND_DAGSTER_BIND=127.0.0.1           # Dagster UI on loopback only
 
 Verify the image signature like the others (README, `cosign verify`) and pin the digest.
 
+### Editions: full and lite (ADR 050)
+
+`HAMMOND_EDITION` selects the defaults of a resource profile; every value can still be
+set explicitly with its own variable.
+
+| | `full` (default, compose/VM) | `lite` (HA add-on, small machines) |
+|---|---|---|
+| Lake data files | object storage (`HAMMOND_S3_*`) | local directory `HAMMOND_LAKE_DATA_PATH` |
+| State / 5-minute / hourly retention | 365 / 365 / 1825 days | 90 / 90 / 1825 days |
+| DuckDB memory per process | 2 GB | 512 MB |
+
+`HAMMOND_LAKE_DATA_PATH` (an absolute path) puts the data files on the local file
+system; the `HAMMOND_S3_*` variables are then not needed and the DuckLake catalog stays
+in Postgres. Keep the directory on an SSD, not on an SD card or eMMC.
+
 ## 3. Deploy
 
 ```bash

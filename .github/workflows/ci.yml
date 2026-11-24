@@ -223,6 +223,19 @@ jobs:
               assert err.code == 401, err.code
           print(urllib.request.urlopen("http://127.0.0.1:8000/.well-known/oauth-protected-resource/mcp").read())
           PY
+      - name: Smoke test lite lake (Postgres catalog + local data files, ADR 050)
+        working-directory: deploy/compose
+        run: |
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres \
+            -c "CREATE DATABASE ducklake_lite OWNER ducklake"
+          # No object storage: the S3 values are blanked and must not be needed.
+          docker compose run --rm --no-deps --tmpfs /data:uid=10001,gid=10001 \
+            -e HAMMOND_EDITION=lite -e HAMMOND_LAKE_PG_DB=ducklake_lite \
+            -e HAMMOND_LAKE_DATA_PATH=/data/lake \
+            -e HAMMOND_S3_ENDPOINT= -e HAMMOND_S3_ACCESS_KEY= -e HAMMOND_S3_SECRET_KEY= \
+            -e HAMMOND_S3_BUCKET= \
+            ducklake-init 2>&1 | tee /tmp/lite-lake.log
+          grep -q "data files in local data path" /tmp/lite-lake.log
       - name: Smoke test ingest (HA -> stream/backfill -> bronze -> SQLMesh silver)
         working-directory: deploy/compose
         run: |

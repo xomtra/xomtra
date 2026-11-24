@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from hacore.edition import PROFILES, Edition
 from hacore.exclusions import NO_ANALYSIS, NO_INGEST, ExclusionLabels
 from hacore.maintenance import Retention
 
@@ -19,7 +21,11 @@ class IngestSettings(BaseSettings):
     ha_url: str = ""
     ha_token: SecretStr = SecretStr("")
 
+    # Resource profile (ADR 050); only changes the defaults of the values below.
+    edition: Edition = Edition.FULL
+
     # Rows older than this are deleted from bronze and silver (daily retention job, ADR 034).
+    # Defaults by edition: full 365/365/1825 days, lite 90/90/1825 days.
     states_retention_days: int = Field(default=365, ge=1)
     statistics_5min_retention_days: int = Field(default=365, ge=1)
     statistics_hour_retention_days: int = Field(default=5 * 365, ge=1)
@@ -78,6 +84,22 @@ class IngestSettings(BaseSettings):
 
     # Schedules of the Dagster jobs (cron, in ``timezone``).
     timezone: str = "UTC"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _edition_defaults(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        edition = Edition(str(data.get("edition") or Edition.FULL).strip().lower())
+        defaults = PROFILES[edition]
+        for name in (
+            "states_retention_days",
+            "statistics_5min_retention_days",
+            "statistics_hour_retention_days",
+        ):
+            if data.get(name) in (None, ""):
+                data[name] = getattr(defaults, name)
+        return data
 
     @field_validator("ha_url")
     @classmethod

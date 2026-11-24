@@ -13,6 +13,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Added
 
+- Editions (ADR 050): `HAMMOND_EDITION=full|lite` selects default retention and DuckDB
+  memory; `HAMMOND_LAKE_DATA_PATH` keeps the lake data files in a local directory
+  instead of object storage (no SeaweedFS needed). Existing installations are unchanged.
 - The label ids that leave entities out are settings: `HAMMOND_LABEL_NO_INGEST` and
   `HAMMOND_LABEL_NO_ANALYSIS` (defaults `hammond_no_ingest`, `hammond_no_analysis`).
 - Sign-in with a Home Assistant account (`HAMMOND_AUTH_MODE=ha`, ADR 053) for the
