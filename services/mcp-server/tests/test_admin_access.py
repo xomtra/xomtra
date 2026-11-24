@@ -237,3 +237,23 @@ def test_admin_settings_for_ha() -> None:
     assert s.endpoint == f"{BASE}/mcp"
     assert s.client_id == f"{BASE}/"
     assert s.ha_allowed_users == ["a", "b"]
+
+
+def test_admin_settings_empty_optional_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    # compose passes unset variables as empty strings (homelab .env without new keys)
+    for key, value in {
+        "HAMMOND_BASE_URL": BASE,
+        "HAMMOND_ADMIN_SESSION_KEY": "s" * 40,
+        "HAMMOND_ENTRA_TENANT_ID": "t",
+        "HAMMOND_ENTRA_CLIENT_ID": "c",
+        "HAMMOND_ENTRA_CLIENT_SECRET": "x",
+        "HAMMOND_MCP_URL": "",
+        "HAMMOND_HA_AUTH_URL": "",
+        "HAMMOND_HA_ALLOWED_USERS": "",
+        "HAMMOND_ACCESS_MODE": "public",
+    }.items():
+        monkeypatch.setenv(key, value)
+    s = AdminSettings()
+    assert s.mcp_url is None
+    assert s.ha_auth_url is None
+    assert s.ha_allowed_users == []

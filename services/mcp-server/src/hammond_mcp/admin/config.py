@@ -54,6 +54,12 @@ class AdminSettings(BaseSettings):
     statistics_hour_retention_days: int = 1825
     catalog_window_days: int = 30
 
+    @field_validator("mcp_url", "ha_auth_url", mode="before")
+    @classmethod
+    def _empty_is_unset(cls, value: object) -> object:
+        # compose passes unset optional variables as empty strings
+        return None if value == "" else value
+
     @field_validator("ha_allowed_users", mode="before")
     @classmethod
     def _csv(cls, value: object) -> object:
