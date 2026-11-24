@@ -65,13 +65,18 @@ def sync_statistics(settings: IngestSettings | None = None) -> dict[str, int]:
         period: min(ingest.DEFAULT_LOOKBACK[period], s.retention.statistics[period])
         for period in ingest.DEFAULT_LOOKBACK
     }
-    fetch = functools.partial(ingest.sync_statistics, lookback=lookback)
+    fetch = functools.partial(ingest.sync_statistics, lookback=lookback, labels=s.labels)
     return _with_ha(fetch, s).written
 
 
-def backfill_history(start: datetime, end: datetime | None = None) -> dict[str, int]:
+def backfill_history(
+    start: datetime, end: datetime | None = None, settings: IngestSettings | None = None
+) -> dict[str, int]:
+    s = settings or IngestSettings()
     stop = end or datetime.now(UTC)
-    return _with_ha(lambda ha, con: ingest.backfill_history(ha, con, start, stop)).written
+    return _with_ha(
+        lambda ha, con: ingest.backfill_history(ha, con, start, stop, labels=s.labels), s
+    ).written
 
 
 def pending_gaps(after_us: int | None) -> list[tuple[datetime, datetime, int]]:
@@ -151,6 +156,7 @@ def find_correlations(settings: IngestSettings | None = None) -> list[dict[str, 
                 top=s.correlation_top,
                 outside_temp=s.correlation_outside_temp or None,
                 timezone=s.timezone,
+                labels=s.labels,
             )
             out.append(correlations.run(con, params).as_dict())
     return out
@@ -172,6 +178,7 @@ def find_anomalies(settings: IngestSettings | None = None) -> dict[str, Any]:
         top=s.anomaly_top,
         outside_temp=s.correlation_outside_temp or None,
         timezone=s.timezone,
+        labels=s.labels,
     )
     with open_lake() as con:
         return anomalies.run(con, params).as_dict()

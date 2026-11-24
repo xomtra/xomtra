@@ -45,7 +45,7 @@ import numpy as np
 import numpy.typing as npt
 
 from hacore import correlations as corr
-from hacore.exclusions import load_no_analysis
+from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, load_no_analysis
 from hacore.lake import LAKE_ALIAS
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,7 @@ class AnomalyParams:
     top: int = 100
     outside_temp: str | None = None
     timezone: str = "UTC"
+    labels: ExclusionLabels = DEFAULT_LABELS
 
     @property
     def window_days(self) -> int:
@@ -487,7 +488,7 @@ def run(
         result.notes.append("not enough data in the window")
     else:
         grid, result.series_excluded = corr._drop_excluded(
-            grid, load_no_analysis(con, alias), params.outside_temp
+            grid, load_no_analysis(con, alias, params.labels), params.outside_temp
         )
         if params.outside_temp:
             corr.fill_from_archive(con, grid, params.outside_temp, alias=alias)

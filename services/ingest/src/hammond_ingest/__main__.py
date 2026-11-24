@@ -43,6 +43,7 @@ def _stream(settings: IngestSettings) -> int:
             max_buffer=settings.stream_max_buffer,
             max_catchup=timedelta(days=settings.stream_max_catchup_days),
             heartbeat_file=settings.heartbeat_file,
+            labels=settings.labels,
         ),
     )
 

@@ -32,7 +32,7 @@ import duckdb
 from hacore import bronze
 from hacore.client import HAClient
 from hacore.errors import HAAuthError, HAError
-from hacore.exclusions import fetch_no_ingest
+from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, fetch_no_ingest
 from hacore.history import StateRow, us_to_datetime
 from hacore.ingest import backfill_history
 from hacore.lake import LAKE_ALIAS
@@ -55,8 +55,9 @@ class StreamSettings:
     reconnect_min: float = 2.0
     reconnect_max: float = 300.0
     heartbeat_file: Path | None = None
-    # How often the hammond_no_ingest labels are re-read from the registries.
+    # How often the no-ingest labels are re-read from the registries.
     exclusions_refresh: float = 300.0
+    labels: ExclusionLabels = DEFAULT_LABELS
 
 
 class StateStream:
@@ -138,9 +139,9 @@ class StateStream:
             logger.warning("Ignoring malformed state_changed event")
 
     async def _refresh_exclusions(self, ha: HAClient) -> None:
-        exclude = await fetch_no_ingest(ha)
+        exclude = await fetch_no_ingest(ha, self._settings.labels)
         if exclude != self._exclude:
-            logger.info("Entities labelled hammond_no_ingest: %d", len(exclude))
+            logger.info("Entities labelled %s: %d", self._settings.labels.no_ingest, len(exclude))
         self._exclude = exclude
         # Drop buffered states of entities that were just labelled.
         self._buffer = [r for r in self._buffer if r.entity_id not in exclude]

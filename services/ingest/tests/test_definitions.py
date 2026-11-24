@@ -125,3 +125,14 @@ def test_anomalies_can_be_switched_off() -> None:
     assert tasks.find_anomalies(IngestSettings(anomalies_enabled=False)) == {
         "skipped": "HAMMOND_ANOMALIES_ENABLED is off"
     }
+
+
+def test_label_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert IngestSettings().labels.analysis == ["hammond_no_analysis", "hammond_no_ingest"]
+    monkeypatch.setenv("HAMMOND_LABEL_NO_INGEST", " private ")
+    monkeypatch.setenv("HAMMOND_LABEL_NO_ANALYSIS", "skip_analysis")
+    labels = IngestSettings().labels
+    assert (labels.no_ingest, labels.no_analysis) == ("private", "skip_analysis")
+    monkeypatch.setenv("HAMMOND_LABEL_NO_ANALYSIS", "  ")
+    with pytest.raises(ValueError, match="label"):
+        IngestSettings()

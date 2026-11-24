@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from hacore import anomalies as an
+from hacore.exclusions import ExclusionLabels
 
 NOW = datetime(2026, 6, 1, 12, 30, tzinfo=UTC)
 END = NOW.replace(minute=0)
@@ -144,6 +145,20 @@ def test_labelled_entities_left_out(plain: duckdb.DuckDBPyConnection) -> None:
     res = an.run(plain, params(), now=NOW)
     assert res.series_excluded == 1
     assert not [f for f in rows(plain, "anomaly") if f["entity_id"] == "sensor.power"]
+
+
+def test_custom_label(plain: duckdb.DuckDBPyConnection) -> None:
+    seed(plain)
+    plain.execute(
+        "INSERT INTO lake.silver.entities VALUES ('sensor.power', NULL, ['private']), "
+        "('sensor.level', NULL, ['hammond_no_analysis'])"
+    )
+    labels = ExclusionLabels(no_analysis="private")
+    res = an.run(plain, params(labels=labels), now=NOW)
+    assert res.series_excluded == 1
+    found = {f["entity_id"] for f in rows(plain, "anomaly") + rows(plain, "change_point")}
+    assert "sensor.power" not in found
+    assert "sensor.level" in found
 
 
 def test_weather_flag(plain: duckdb.DuckDBPyConnection) -> None:

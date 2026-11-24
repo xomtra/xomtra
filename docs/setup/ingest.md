@@ -108,6 +108,12 @@ them on an entity or on a device (a device label also covers its future entities
 | `hammond_no_ingest` | Not stored at all: live stream, catch-up, history backfill, statistics. Data stored before stays. |
 | `hammond_no_analysis` | Stored and queryable, but left out of correlations, anomalies and change points. |
 
+The label ids are settings: `HAMMOND_LABEL_NO_INGEST` and `HAMMOND_LABEL_NO_ANALYSIS`
+(defaults above) take the id of any label you already use. Home Assistant derives a
+label's id from its name when the label is created (lower case, spaces become `_`) and
+keeps it when the label is renamed later; after changing a setting restart the
+`ingest-stream` and `dagster-daemon` containers.
+
 `hammond_no_ingest` implies `hammond_no_analysis`. The stream re-reads the labels every
 5 minutes; the correlations on every run (from `silver.entities`, i.e. after the next
 hourly ingest). Removing `hammond_no_ingest` later backfills only what the HA recorder

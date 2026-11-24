@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from hacore import bronze
-from hacore.exclusions import fetch_no_ingest
+from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, fetch_no_ingest
 from hacore.history import (
     DEFAULT_HISTORY_WINDOW,
     PERIODS,
@@ -108,15 +108,16 @@ async def sync_statistics(
     end: datetime | None = None,
     lookback: dict[Period, timedelta] | None = None,
     exclude: Collection[str] | None = None,
+    labels: ExclusionLabels = DEFAULT_LABELS,
     alias: str = LAKE_ALIAS,
 ) -> SyncResult:
     """Fetch statistics newer than what is stored (or ``start``..``end`` if given).
 
     Statistics of entities in ``exclude`` (by default those labelled
-    ``hammond_no_ingest``) are skipped."""
+    ``labels.no_ingest``) are skipped."""
     result = SyncResult()
     now = end or datetime.now(UTC)
-    skip = await fetch_no_ingest(client) if exclude is None else exclude
+    skip = await fetch_no_ingest(client, labels) if exclude is None else exclude
     ids = [
         m["statistic_id"] for m in await list_statistic_ids(client) if m["statistic_id"] not in skip
     ]
@@ -161,12 +162,13 @@ async def backfill_history(
     entity_ids: list[str] | None = None,
     window: timedelta = DEFAULT_HISTORY_WINDOW,
     exclude: Collection[str] | None = None,
+    labels: ExclusionLabels = DEFAULT_LABELS,
     alias: str = LAKE_ALIAS,
 ) -> SyncResult:
     """Copy the recorded state history of ``start``..``end`` into bronze, without the
-    entities in ``exclude`` (by default those labelled ``hammond_no_ingest``)."""
+    entities in ``exclude`` (by default those labelled ``labels.no_ingest``)."""
     result = SyncResult()
-    skip = await fetch_no_ingest(client) if exclude is None else exclude
+    skip = await fetch_no_ingest(client, labels) if exclude is None else exclude
     ids = entity_ids if entity_ids is not None else await known_entity_ids(client)
     ids = [i for i in ids if i not in skip]
     if not ids:
