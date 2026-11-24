@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # Caddy with a DNS provider plugin: certificates are issued via ACME DNS-01, so no
 # port has to be opened for Let's Encrypt and issuance works before the port forward.
+# In the local access mode (ADR 056) it uses its own local CA instead.
 #   docker build -t hammond-caddy deploy/caddy
 
 FROM caddy:2.11.9-builder@sha256:f9beaa5ddbe7df6f26ebbcf9cbf44e05a1917b9bba464f0c3229038d7e2e6e13 AS build
@@ -27,8 +28,10 @@ RUN apk upgrade --no-cache \
  && mkdir -p /data /config \
  && chown -R caddy:caddy /data /config
 COPY --from=build /usr/bin/caddy /usr/bin/caddy
-COPY Caddyfile /etc/caddy/Caddyfile
+COPY Caddyfile Caddyfile.local /etc/caddy/
+COPY --chmod=0755 start.sh /usr/local/bin/hammond-caddy
 USER 10002:10002
 # Unprivileged ports inside the container; compose maps 443 -> 8443.
 EXPOSE 8443
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+# Chooses Caddyfile (public) or Caddyfile.local by HAMMOND_ACCESS_MODE (ADR 056).
+CMD ["/usr/local/bin/hammond-caddy"]

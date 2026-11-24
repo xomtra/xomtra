@@ -1,4 +1,9 @@
-# Claude connector (PoC)
+# Claude connector (public access)
+
+Public access mode (`HAMMOND_ACCESS_MODE=public`, the default): claude.ai on the web,
+desktop and phone reach HAmmond through Anthropic's servers. Sign-in with Entra ID
+(below) or with a [Home Assistant account](ha-login.md). For a LAN-only setup without
+any of this, see [local access](local-access.md).
 
 ## 1. Publish the server over HTTPS
 

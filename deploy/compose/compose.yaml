@@ -1,6 +1,9 @@
 # HAmmond stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
 # + Postgres (DuckLake catalog, Dagster and SQLMesh state) + SeaweedFS (S3).
-# Usage: cp .env.example .env && edit && docker compose up -d
+# Usage: ./init-env.sh (generates .env with all internal secrets, ADR 061), check the
+# few values it asks about, then docker compose up -d
+# Access (ADR 056): HAMMOND_ACCESS_MODE=public (Claude connector on a public host,
+# OAuth) or local (LAN only, personal tokens, Caddy's local CA).
 # Only Caddy is published (HTTPS); the MCP server is reachable only through it and
 # audits every tool call into the Postgres DB "audit" (INSERT-only role). The
 # Dagster UI is published on loopback only (SSH tunnel, see docs/setup/ingest.md).
@@ -155,10 +158,15 @@ services:
     environment:
       <<: *lake-env
       HAMMOND_AUTH_MODE: ${HAMMOND_AUTH_MODE:-entra}
+      HAMMOND_ACCESS_MODE: ${HAMMOND_ACCESS_MODE:-public}
       HAMMOND_BASE_URL: ${HAMMOND_BASE_URL:-}
       HAMMOND_ENTRA_TENANT_ID: ${HAMMOND_ENTRA_TENANT_ID:-}
       HAMMOND_ENTRA_CLIENT_ID: ${HAMMOND_ENTRA_CLIENT_ID:-}
       HAMMOND_ENTRA_CLIENT_SECRET: ${HAMMOND_ENTRA_CLIENT_SECRET:-}
+      # Sign-in with a Home Assistant account (HAMMOND_AUTH_MODE=ha, ADR 053).
+      HAMMOND_HA_AUTH_URL: ${HAMMOND_HA_AUTH_URL:-}
+      HAMMOND_HA_ALLOWED_USERS: ${HAMMOND_HA_ALLOWED_USERS:-}
+      HAMMOND_HA_ROLE_MAP: ${HAMMOND_HA_ROLE_MAP:-admin=HAmmond.Admin,user=HAmmond.Reader}
       HAMMOND_ENTRA_REQUIRED_SCOPES: ${HAMMOND_ENTRA_REQUIRED_SCOPES:-mcp.access}
       HAMMOND_JWT_SIGNING_KEY: ${HAMMOND_JWT_SIGNING_KEY:-}
       HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
@@ -271,11 +279,18 @@ services:
     environment:
       <<: *lake-env
       HAMMOND_AUTH_MODE: ${HAMMOND_AUTH_MODE:-entra}
+      HAMMOND_ACCESS_MODE: ${HAMMOND_ACCESS_MODE:-public}
       HAMMOND_BASE_URL: ${HAMMOND_BASE_URL:-}
       HAMMOND_ENTRA_TENANT_ID: ${HAMMOND_ENTRA_TENANT_ID:-}
       HAMMOND_ENTRA_CLIENT_ID: ${HAMMOND_ENTRA_CLIENT_ID:-}
       HAMMOND_ENTRA_CLIENT_SECRET: ${HAMMOND_ENTRA_CLIENT_SECRET:-}
+      # Sign-in with a Home Assistant account (HAMMOND_AUTH_MODE=ha, ADR 053).
+      HAMMOND_HA_AUTH_URL: ${HAMMOND_HA_AUTH_URL:-}
+      HAMMOND_HA_ALLOWED_USERS: ${HAMMOND_HA_ALLOWED_USERS:-}
+      HAMMOND_HA_ROLE_MAP: ${HAMMOND_HA_ROLE_MAP:-admin=HAmmond.Admin,user=HAmmond.Reader}
       HAMMOND_ADMIN_SESSION_KEY: ${HAMMOND_ADMIN_SESSION_KEY:?set HAMMOND_ADMIN_SESSION_KEY in .env}
+      # MCP endpoint shown with new personal tokens (local access); default <base_url>/mcp.
+      HAMMOND_MCP_URL: ${HAMMOND_MCP_URL:-}
       HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
       HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
       HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
@@ -307,11 +322,15 @@ services:
   caddy:
     <<: *hardening
     image: ${HAMMOND_CADDY_IMAGE:-ghcr.io/zettabyte-cz/hammond-caddy:0.2.0}
+    # The image checks the values its access mode needs at start (deploy/caddy/start.sh).
     environment:
-      HAMMOND_PUBLIC_HOST: ${HAMMOND_PUBLIC_HOST:?set HAMMOND_PUBLIC_HOST in .env}
-      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN in .env}
-      CLAUDE_IP_RANGES: ${CLAUDE_IP_RANGES:?set CLAUDE_IP_RANGES in .env}
+      HAMMOND_ACCESS_MODE: ${HAMMOND_ACCESS_MODE:-public}
+      HAMMOND_PUBLIC_HOST: ${HAMMOND_PUBLIC_HOST:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      CLAUDE_IP_RANGES: ${CLAUDE_IP_RANGES:-}
+      HAMMOND_LOCAL_HOST: ${HAMMOND_LOCAL_HOST:-}
+      LAN_CIDR: ${LAN_CIDR:-10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7}
       ADMIN_CIDR: ${ADMIN_CIDR:?set ADMIN_CIDR in .env}
     ports:
       - "${HAMMOND_HTTPS_BIND:-0.0.0.0}:443:8443"

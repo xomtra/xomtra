@@ -126,6 +126,12 @@ jobs:
               echo "$var=$REGISTRY/$image:$VERSION@$digest"
             done < digests.txt
           } > "dist/hammond-$VERSION-images.env"
+          # Claude Desktop extension (ADR 056), built by the code of the released image.
+          mcp_digest=$(awk '$1 == "hammond-mcp" { print $2 }' digests.txt)
+          docker run --rm --network none --entrypoint python \
+            "$REGISTRY/hammond-mcp@$mcp_digest" -m hammond_mcp.desktop --version "$VERSION" \
+            > "dist/hammond-$VERSION.mcpb"
+          unzip -l "dist/hammond-$VERSION.mcpb" | grep -q server/index.js
           {
             python3 scripts/release.py notes "$TAG"
             echo
@@ -147,6 +153,9 @@ jobs:
             echo "  --certificate-identity https://github.com/$GH_REPO/.github/workflows/release.yml@refs/tags/$TAG \\"
             echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             echo '```'
+            echo
+            echo "Claude Desktop extension for the local access mode: \`hammond-$VERSION.mcpb\`"
+            echo "(also offered with the server address filled in by the admin GUI)."
             echo
             echo "Upgrade: see [docs/releasing.md](https://github.com/$GH_REPO/blob/$TAG/docs/releasing.md#upgrading-an-installation)."
           } > notes.md

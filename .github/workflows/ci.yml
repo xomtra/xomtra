@@ -85,7 +85,7 @@ jobs:
           cp -r packages/hacore/tests/contract/ha-config "$RUNNER_TEMP/ha-config"
           docker run -d --name ha -p 127.0.0.1:8123:8123 \
             -v "$RUNNER_TEMP/ha-config:/config" "$HA_IMAGE"
-      - name: Contract tests (onboarding, non-admin token, history, statistics, ingest)
+      - name: Contract tests (onboarding, non-admin token, history, statistics, ingest, HA login)
         env:
           HAMMOND_CONTRACT_HA_URL: http://127.0.0.1:8123
           HAMMOND_CONTRACT_HA_CONFIG: ${{ runner.temp }}/ha-config
@@ -198,6 +198,15 @@ jobs:
           docker run --rm --cap-drop ALL --security-opt no-new-privileges --read-only \
             -e HAMMOND_PUBLIC_HOST -e ACME_EMAIL -e CLAUDE_IP_RANGES -e ADMIN_CIDR \
             hammond-caddy:ci caddy adapt --config /etc/caddy/Caddyfile >/dev/null
+          # Local access mode (ADR 056): own CA, LAN only.
+          docker run --rm --cap-drop ALL --security-opt no-new-privileges --read-only \
+            -e HAMMOND_LOCAL_HOST=hammond.lan -e LAN_CIDR=192.168.0.0/16 -e ADMIN_CIDR \
+            hammond-caddy:ci caddy adapt --config /etc/caddy/Caddyfile.local >/dev/null
+          # The start script refuses incomplete settings with a clear message.
+          if out=$(docker run --rm -e HAMMOND_ACCESS_MODE=local hammond-caddy:ci 2>&1); then
+            echo "started without HAMMOND_LOCAL_HOST"; exit 1
+          fi
+          echo "$out" | grep -q "requires HAMMOND_LOCAL_HOST"
       - name: Smoke test compose stack (Postgres + SeaweedFS + DuckLake + MCP)
         working-directory: deploy/compose
         run: |
@@ -294,10 +303,34 @@ jobs:
               except Exception as err:
                   print("engine refused:", type(err).__name__)
           sink = PostgresAuditSink(Settings().audit_dsn)
-          asyncio.run(sink.write(AuditRecord(tool="ci", decision="allowed", outcome="ok")))
+          asyncio.run(sink.write(AuditRecord(tool="ci", decision="allowed", outcome="ok", idp="token")))
           PY
           docker compose exec -T postgres psql -U postgres -d audit -tAc \
-            "SELECT count(*) FROM audit.tool_call WHERE tool = 'ci'" | grep -qx 1
+            "SELECT count(*) FROM audit.tool_call WHERE tool = 'ci' AND idp = 'token'" | grep -qx 1
+      - name: Smoke test personal tokens (ADR 059 grants)
+        working-directory: deploy/compose
+        run: |
+          # sha256('hmd_ci_token') stored by the superuser; the MCP role may only verify.
+          docker compose exec -T postgres psql -U postgres -d audit -c \
+            "INSERT INTO access.token (id, token_hash, owner, description, role) VALUES ('ci', sha256('hmd_ci_token'), 'ci', 'ci', 'HAmmond.Reader')"
+          docker compose exec -T mcp python - <<'PY'
+          from hammond_mcp.config import Settings
+          from hammond_mcp.tokens import PostgresTokenStore, TokenStoreError, token_hash
+
+          store = PostgresTokenStore(Settings().audit_dsn)
+          info = store.verify(token_hash("hmd_ci_token"))
+          assert info is not None and info.role == "HAmmond.Reader", info
+          assert store.verify(token_hash("hmd_ci_wrong")) is None
+          for forbidden in (store.list, lambda: store.revoke("ci", "x")):
+              try:
+                  forbidden()
+                  raise SystemExit("MCP role may list or revoke tokens")
+              except TokenStoreError:
+                  pass
+          print("token grants ok")
+          PY
+          docker compose exec -T postgres psql -U postgres -d audit -tAc \
+            "SELECT last_used_at IS NOT NULL FROM access.token WHERE id = 'ci'" | grep -qx t
           docker compose exec -T postgres psql -U postgres -d audit -tAc \
             "SELECT count(*) FROM audit.tool_call WHERE tool = 'ci-old'" | grep -qx 0
       - name: Smoke test admin GUI (sign-in required, Dagster UI under /admin/dagster)

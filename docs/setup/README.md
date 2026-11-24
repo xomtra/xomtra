@@ -1,6 +1,10 @@
 # Setup guides
 
-Order for the proof of concept "Claude connector authenticated by Entra ID":
+Quick start (phase 1c.1): [local access](local-access.md) – LAN only, generated secrets,
+personal tokens for Claude Desktop, Claude Code and other MCP clients, sign-in to the
+admin GUI with a [Home Assistant account](ha-login.md).
+
+Order for the public setup "Claude connector authenticated by Entra ID" (homelab):
 
 1. [Host VM](homelab-vm.md) – Debian 13 VM on Proxmox in the DMZ VLAN, Docker.
 2. [Entra ID app registration](entra-app-registration.md) – app, API scope, secret, app roles.
@@ -13,5 +17,9 @@ Order for the proof of concept "Claude connector authenticated by Entra ID":
 7. [Admin GUI and Dagster UI](admin-gui.md) – from the admin network with Entra role
    `HAmmond.Admin` (phase 1a.3).
 
+Instead of Entra ID, the connector and the admin GUI can use
+[Home Assistant accounts](ha-login.md) (`HAMMOND_AUTH_MODE=ha`, ADR 053).
+
 Placeholders used in all guides: `<public-host>` (public DNS name of the MCP server),
+`<local-host>` (name or IP of the server in the LAN),
 `<public-ip>`, `<dmz-cidr>`, `<tenant-id>`, `<client-id>`. Keep real values in `.env` only, never in the repository.
