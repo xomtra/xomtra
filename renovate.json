@@ -63,6 +63,18 @@
       "matchPackageNames": ["duckdb", "sqlmesh", "dagster", "chrislusf/seaweedfs", "postgres"],
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Our own images (compose defaults): each deployment pins them in .env, not Renovate",
+      "matchPackageNames": ["ghcr.io/zettabyte-cz/**"],
+      "enabled": false
+    },
+    {
+      "description": "Python base image: a new major/minor (3.13 -> 3.15) needs the dependencies to support it first",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["python"],
+      "matchUpdateTypes": ["major", "minor"],
+      "dependencyDashboardApproval": true
     }
   ]
 }
