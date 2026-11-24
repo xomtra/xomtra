@@ -110,7 +110,9 @@ async def test_ha_admin_signs_in_and_ha_token_is_revoked(fake_ha: tuple[FakeHA, 
         assert SESSION_COOKIE in client.cookies
         page = await client.get("/admin/tokens")
         assert page.status_code == 200
-        assert "https://ha.example.org" in page.headers["content-security-policy"]
+        csp = page.headers["content-security-policy"]
+        form_action = next(d for d in csp.split(";") if d.strip().startswith("form-action"))
+        assert form_action.split()[1:] == ["'self'", "https://ha.example.org"]
     assert http.revoked == ["refresh-1"]
     assert http.client_ids == [f"{BASE}/"]
     login = audit.records[0]
