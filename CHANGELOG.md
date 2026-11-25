@@ -16,6 +16,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Home Assistant add-on: it did not start ("expected url" for `mcp_url`). The empty
   default of the optional option failed the Supervisor's check of `url?`; optional
   options now have no default, and a test keeps the defaults in line with the schema.
+- `migrate-from-hammond.sh` stopped at its first step: `docker compose -p hammond down`
+  read the new `compose.yaml` with the old `.env` and failed on the missing `XOMTRA_*`
+  variables. It now stops and removes the old containers and networks by their compose
+  labels.
 
 ## [0.5.0] - 2026-11-25
 

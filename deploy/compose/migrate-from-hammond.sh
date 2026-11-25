@@ -26,7 +26,14 @@ envval() { sed -n "s/^$1=//p" .env | tail -n 1; }
 old_bucket=$(envval S3_BUCKET); old_bucket=${old_bucket:-$OLD}
 
 echo "== stopping the old stack ($OLD)"
-docker compose -p "$OLD" down
+# By the compose labels: the new compose.yaml cannot be read with the old .env yet.
+ids=$(docker ps -aq --filter "label=com.docker.compose.project=$OLD")
+if [ -n "$ids" ]; then
+  docker stop $ids >/dev/null
+  docker rm $ids >/dev/null
+fi
+nets=$(docker network ls -q --filter "label=com.docker.compose.project=$OLD")
+[ -z "$nets" ] || docker network rm $nets >/dev/null
 
 echo "== rewriting .env (backup .env.bak-$OLD)"
 cp -p .env ".env.bak-$OLD"
