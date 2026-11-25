@@ -6,9 +6,9 @@ from fastmcp.server.auth.providers.azure import AzureProvider
 from pydantic import SecretStr
 
 from hacore.testing import VALID_TOKEN, FakeHA, running_fake_ha
-from hammond_mcp.config import Settings
-from hammond_mcp.identity import identity_from_claims
-from hammond_mcp.server import build_auth, create_server
+from xomtra_mcp.config import Settings
+from xomtra_mcp.identity import identity_from_claims
+from xomtra_mcp.server import build_auth, create_server
 
 
 @pytest.fixture
@@ -75,13 +75,13 @@ def test_identity_from_nested_claims() -> None:
                 "oid": "o1",
                 "name": "Jane",
                 "preferred_username": "jane@example.org",
-                "roles": ["HAmmond.Reader"],
+                "roles": ["Xomtra.Reader"],
             }
         },
         ["api://x/mcp.access"],
     )
     assert ident.subject == "o1"
-    assert ident.roles == ("HAmmond.Reader",)
+    assert ident.roles == ("Xomtra.Reader",)
     assert ident.username == "jane@example.org"
 
 

@@ -1,7 +1,7 @@
 """Automated onboarding of a fresh Home Assistant instance (contract tests, dev stack).
 
 Creates the owner account through the onboarding API, then a dedicated non-admin user
-the way production uses HAmmond, and returns a long-lived token for each. Only meant for
+the way production uses Xomtra, and returns a long-lived token for each. Only meant for
 throwaway instances in containers: credentials are generated, not configured.
 
 CLI::
@@ -25,7 +25,7 @@ from typing import Any
 
 from hacore.client import HAClient
 
-NON_ADMIN_USERNAME = "hammond"
+NON_ADMIN_USERNAME = "xomtra"
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +108,7 @@ async def _long_lived_token(base_url: str, access_token: str, name: str) -> str:
 async def _create_user(base_url: str, admin_token: str, username: str, password: str) -> None:
     async with HAClient(base_url, admin_token) as ha:
         user = await ha.send_command(
-            "config/auth/create", name="HAmmond", group_ids=["system-users"], local_only=False
+            "config/auth/create", name="Xomtra", group_ids=["system-users"], local_only=False
         )
         await ha.send_command(
             "config/auth_provider/homeassistant/create",
@@ -148,8 +148,8 @@ def onboard(base_url: str) -> OnboardedTokens:
     asyncio.run(_create_user(base_url, admin_access, NON_ADMIN_USERNAME, user_password))
     user_access = _login(base_url, client_id, NON_ADMIN_USERNAME, user_password)
     return OnboardedTokens(
-        admin_token=asyncio.run(_long_lived_token(base_url, admin_access, "hammond-admin")),
-        user_token=asyncio.run(_long_lived_token(base_url, user_access, "hammond")),
+        admin_token=asyncio.run(_long_lived_token(base_url, admin_access, "xomtra-admin")),
+        user_token=asyncio.run(_long_lived_token(base_url, user_access, "xomtra")),
     )
 
 

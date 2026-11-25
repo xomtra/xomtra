@@ -4,15 +4,15 @@ Status: **in development** (phase 1c.2, PR 9). The add-on image is built, scanne
 started in CI on every pull request and published with every release.
 
 The add-on needs Home Assistant OS or Supervised (installations with the Supervisor).
-Home Assistant Container and Core have no add-ons; there HAmmond runs next to Home
+Home Assistant Container and Core have no add-ons; there Xomtra runs next to Home
 Assistant with Docker Compose ([lite or full edition](README.md)).
 
 ## Installing
 
 In the add-on store of Home Assistant, add the repository
 `https://github.com/xomtra/xomtra` (three-dot menu → Repositories), then install
-**HAmmond**. The Supervisor pulls the signed image
-`ghcr.io/xomtra/hammond-addon-{amd64,aarch64}` of the version in `config.yaml`;
+**Xomtra**. The Supervisor pulls the signed image
+`ghcr.io/xomtra/xomtra-addon-{amd64,aarch64}` of the version in `config.yaml`;
 images exist for every release after 0.4.1 ([releasing](../releasing.md)).
 
 ## What runs inside
@@ -21,14 +21,14 @@ One container, supervised by [s6-overlay](https://github.com/just-containers/s6-
 
 | Service | What it does |
 | --- | --- |
-| `init-hammond` | first start: generates every internal password and key into `/data/secrets.env` (mode 600) and the Postgres cluster in `/data/postgres`; later starts only add keys introduced by newer versions |
+| `init-xomtra` | first start: generates every internal password and key into `/data/secrets.env` (mode 600) and the Postgres cluster in `/data/postgres`; later starts only add keys introduced by newer versions |
 | `postgres` | DuckLake catalog, audit, personal tokens, analysis settings (ADR 063); listens on 127.0.0.1 only |
 | `init-databases` | roles and databases (the same script as compose) and the DuckLake catalog |
 | `worker` | live stream from Home Assistant and the scheduled jobs (ADR 050) |
 | `mcp` | MCP server for the LAN on port 8000 with personal tokens (ADR 056, 059) |
 | `admin` | admin GUI in the Home Assistant sidebar (Ingress, port 8100 inside the hassio network only, ADR 070) |
 
-Postgres runs as user `postgres`, the HAmmond services as user `hammond`; s6 itself
+Postgres runs as user `postgres`, the Xomtra services as user `xomtra`; s6 itself
 starts as root, as in other add-ons.
 
 Home Assistant is reached through the Supervisor (`http://supervisor/core`) with the
@@ -36,11 +36,11 @@ add-on's own token (`homeassistant_api: true`), so no long-lived access token is
 
 ## Admin GUI (Ingress)
 
-The admin GUI opens as **HAmmond** in the Home Assistant sidebar, for Home Assistant
+The admin GUI opens as **Xomtra** in the Home Assistant sidebar, for Home Assistant
 administrators only (`panel_admin`). There is no separate sign-in: Home Assistant signs
 the user in and its Ingress proxy (the Supervisor, `172.30.32.2`) passes the user in the
 `X-Remote-User-*` headers. The GUI therefore accepts connections only from that address
-(`HAMMOND_AUTH_MODE=ingress`) and refuses everything else; when the Supervisor also sends
+(`XOMTRA_AUTH_MODE=ingress`) and refuses everything else; when the Supervisor also sends
 the user's groups, it checks the administrator group itself. Every page view is in the
 audit with the Home Assistant user. Port 8100 is not published outside the add-on.
 
@@ -65,7 +65,7 @@ virtual appliance.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `log_level` | `info` | log level of the HAmmond services |
+| `log_level` | `info` | log level of the Xomtra services |
 | `states_retention_days` | 90 | days of state history kept in the lake |
 | `statistics_5min_retention_days` | 90 | days of 5-minute statistics |
 | `statistics_hour_retention_days` | 1825 | days of hourly statistics |
@@ -76,8 +76,8 @@ The time zone is Home Assistant's (`TZ` from the Supervisor).
 ## Building and testing locally
 
 ```bash
-docker build -f addon/hammond/Dockerfile -t hammond-addon:dev .
-addon/hammond/smoke-test.sh hammond-addon:dev
+docker build -f addon/xomtra/Dockerfile -t xomtra-addon:dev .
+addon/xomtra/smoke-test.sh xomtra-addon:dev
 ```
 
 The smoke test starts the image like the Supervisor (a `/data` directory with

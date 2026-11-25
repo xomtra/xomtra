@@ -13,7 +13,7 @@ Development builds of `main` are not supported for production use.
 
 ## Scope notes
 
-- HAmmond handles Home Assistant history, which can reveal presence and habits of the
+- Xomtra handles Home Assistant history, which can reveal presence and habits of the
   people in a household. Treat any data exposure as a high severity issue.
 - Never attach real Home Assistant data, tokens, tenant/client IDs or hostnames to reports.
 

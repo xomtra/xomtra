@@ -1,11 +1,11 @@
-# hammond-ingest
+# xomtra-ingest
 
-Ingest of Home Assistant data into the HAmmond lake (full edition):
+Ingest of Home Assistant data into the Xomtra lake (full edition):
 
-* `hammond-ingest stream` – live `state_changed` stream with catch-up (service);
-* Dagster code location `hammond_ingest.definitions` – hourly ingest + SQLMesh, daily
+* `xomtra-ingest stream` – live `state_changed` stream with catch-up (service);
+* Dagster code location `xomtra_ingest.definitions` – hourly ingest + SQLMesh, daily
   retention, manual backfill / restate jobs;
-* SQLMesh project `hammond_ingest/sqlmesh_project` – silver models on DuckLake.
+* SQLMesh project `xomtra_ingest/sqlmesh_project` – silver models on DuckLake.
 
 The ingest logic itself (HA API, bronze writers, stream) lives in
 `hacore` so that the lite edition can reuse it. Deployment and operations:

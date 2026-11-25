@@ -1,6 +1,6 @@
 # Local access (LAN only, personal tokens)
 
-The quickest way to try HAmmond (ADR 056): the MCP endpoint and the admin GUI are
+The quickest way to try Xomtra (ADR 056): the MCP endpoint and the admin GUI are
 reachable only in your LAN. No public DNS name, certificate authority account, port
 forward or cloud identity is needed. Claude Desktop, Claude Code and other MCP clients
 on a computer in the LAN (or connected by your VPN) use a **personal token** that you
@@ -22,11 +22,11 @@ environment variables, see the script header):
 
 | Question | Example | Written to `.env` |
 | --- | --- | --- |
-| Access mode | `local` | `HAMMOND_ACCESS_MODE` |
-| Name or IP of this server | `hammond.lan` or `192.168.1.20` | `HAMMOND_LOCAL_HOST`, `HAMMOND_BASE_URL` |
-| Sign-in | `ha` | `HAMMOND_AUTH_MODE` ([Home Assistant account](ha-login.md)) |
+| Access mode | `local` | `XOMTRA_ACCESS_MODE` |
+| Name or IP of this server | `xomtra.lan` or `192.168.1.20` | `XOMTRA_LOCAL_HOST`, `XOMTRA_BASE_URL` |
+| Sign-in | `ha` | `XOMTRA_AUTH_MODE` ([Home Assistant account](ha-login.md)) |
 | Network of the admin GUI | `192.168.1.0/24` | `ADMIN_CIDR` |
-| Home Assistant URL and token | `http://homeassistant.local:8123` | `HAMMOND_HA_URL`, `HAMMOND_HA_TOKEN` ([ingest](ingest.md)) |
+| Home Assistant URL and token | `http://homeassistant.local:8123` | `XOMTRA_HA_URL`, `XOMTRA_HA_TOKEN` ([ingest](ingest.md)) |
 
 The Postgres, S3, OAuth and session secrets are generated, stored only in `.env`
 (mode 600) and never need to be typed or copied. After an update, `./init-env.sh --fill`
@@ -37,8 +37,8 @@ changes existing values.
 
 ## 2. Trust the server's certificate
 
-Caddy issues the certificate for `HAMMOND_LOCAL_HOST` from its own local CA. Download the
-CA certificate once from `https://<local-host>/hammond-ca.crt` (your browser warns the
+Caddy issues the certificate for `XOMTRA_LOCAL_HOST` from its own local CA. Download the
+CA certificate once from `https://<local-host>/xomtra-ca.crt` (your browser warns the
 first time, which is expected) and compare its fingerprint with the server:
 
 ```bash
@@ -52,8 +52,8 @@ server) or give it only to the clients that need it (below).
 ## 3. Issue a token
 
 Open `https://<local-host>/admin/`, sign in (Home Assistant administrator) and go to
-**Tokens**: who it is for, a description (device or app), role (`HAmmond.Reader` or
-`HAmmond.Admin`) and expiry. The token (`hmd_…`) is shown **once**, together with ready
+**Tokens**: who it is for, a description (device or app), role (`Xomtra.Reader` or
+`Xomtra.Admin`) and expiry. The token (`xmt_…`) is shown **once**, together with ready
 instructions for the clients. Only its SHA-256 hash is stored; revoking takes effect
 within 30 seconds. Issue one token per person and device, so that you can revoke one
 without the others and the audit shows who asked what.
@@ -62,25 +62,25 @@ without the others and the audit shows who asked what.
 
 ### Claude Desktop
 
-1. Admin GUI → **Tokens → How to connect** → download `hammond.mcpb`. The server's
+1. Admin GUI → **Tokens → How to connect** → download `xomtra.mcpb`. The server's
    address is already filled in.
 2. Open the file; Claude Desktop shows the extension and asks for the **personal
    token** (stored as a secret by Claude Desktop) and, if the CA is not in your system
-   trust store, for the **certificate of the server** (`hammond-ca.crt`).
+   trust store, for the **certificate of the server** (`xomtra-ca.crt`).
 
 The extension is a small bridge without dependencies (`server/index.js`) that forwards
-MCP from Claude Desktop to the HAmmond endpoint. It refuses plain `http://` to anything
+MCP from Claude Desktop to the Xomtra endpoint. It refuses plain `http://` to anything
 but the local machine unless you allow it explicitly.
 
 ### Claude Code
 
 ```bash
-claude mcp add --transport http hammond https://<local-host>/mcp \
-  --header "Authorization: Bearer hmd_..."
+claude mcp add --transport http xomtra https://<local-host>/mcp \
+  --header "Authorization: Bearer xmt_..."
 ```
 
 With the server's own CA not in the system trust store, start Claude Code with
-`NODE_EXTRA_CA_CERTS=/path/to/hammond-ca.crt`.
+`NODE_EXTRA_CA_CERTS=/path/to/xomtra-ca.crt`.
 
 ### Other MCP clients
 
@@ -89,25 +89,25 @@ Any client that speaks MCP over Streamable HTTP and can send a header:
 ```json
 {
   "mcpServers": {
-    "hammond": {
+    "xomtra": {
       "type": "http",
       "url": "https://<local-host>/mcp",
-      "headers": { "Authorization": "Bearer hmd_..." }
+      "headers": { "Authorization": "Bearer xmt_..." }
     }
   }
 }
 ```
 
 Clients that only speak stdio can use the same bridge as Claude Desktop:
-`HAMMOND_URL=https://<local-host>/mcp HAMMOND_TOKEN=hmd_... node server/index.js` (from
-the unpacked `hammond.mcpb`; `HAMMOND_CA_FILE` for the CA certificate).
+`XOMTRA_URL=https://<local-host>/mcp XOMTRA_TOKEN=xmt_... node server/index.js` (from
+the unpacked `xomtra.mcpb`; `XOMTRA_CA_FILE` for the CA certificate).
 
 ## What Caddy lets through (local mode)
 
 | Path | From | Why |
 | --- | --- | --- |
 | `/mcp` | `LAN_CIDR`, then a valid personal token | MCP clients |
-| `/hammond-ca.crt` | `LAN_CIDR` | root certificate of the local CA |
+| `/xomtra-ca.crt` | `LAN_CIDR` | root certificate of the local CA |
 | `/admin`, `/admin/*` | `ADMIN_CIDR`, then sign-in with the admin role | admin GUI, Dagster UI |
 | everything else | nobody (404) | |
 

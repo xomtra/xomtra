@@ -1,7 +1,7 @@
 """Hourly outside temperature from the Open-Meteo historical archive (ADR 043).
 
 The correlations (ADR 042) regress out the outside temperature. A ``weather.*`` entity
-of Home Assistant only has the history HAmmond collected itself, so the hours before
+of Home Assistant only has the history Xomtra collected itself, so the hours before
 that come from the Open-Meteo archive (ERA5 reanalysis, the source behind the HA
 Open-Meteo integration). The archive lags a few days behind; the live entity covers the
 recent hours.

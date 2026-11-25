@@ -2,8 +2,8 @@
 (SeaweedFS, full edition) or on the local file system (lite edition, ADR 050).
 
 Configuration comes from environment variables (see ``LakeSettings.from_env``) so that
-no installation specific values ever live in the repository. ``HAMMOND_LAKE_DATA_PATH``
-set to an absolute local path selects local data files; the ``HAMMOND_S3_*`` variables
+no installation specific values ever live in the repository. ``XOMTRA_LAKE_DATA_PATH``
+set to an absolute local path selects local data files; the ``XOMTRA_S3_*`` variables
 are then not needed.
 
 CLI (used by the compose ``ducklake-init`` service)::
@@ -79,9 +79,9 @@ class LakeSettings:
     def __post_init__(self) -> None:
         if self.local_data_path is not None:
             if not PurePosixPath(self.local_data_path).is_absolute():
-                raise ValueError("HAMMOND_LAKE_DATA_PATH must be an absolute path")
+                raise ValueError("XOMTRA_LAKE_DATA_PATH must be an absolute path")
         elif not all((self.s3_endpoint, self.s3_access_key, self.s3_secret_key, self.s3_bucket)):
-            raise ValueError("object storage needs HAMMOND_S3_* or HAMMOND_LAKE_DATA_PATH")
+            raise ValueError("object storage needs XOMTRA_S3_* or XOMTRA_LAKE_DATA_PATH")
 
     def __repr__(self) -> str:  # never leak secrets into logs
         return (
@@ -92,43 +92,43 @@ class LakeSettings:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> LakeSettings:
         e = os.environ if env is None else env
-        local = (e.get("HAMMOND_LAKE_DATA_PATH") or "").strip() or None
+        local = (e.get("XOMTRA_LAKE_DATA_PATH") or "").strip() or None
         required = [
-            "HAMMOND_LAKE_PG_HOST",
-            "HAMMOND_LAKE_PG_DB",
-            "HAMMOND_LAKE_PG_USER",
-            "HAMMOND_LAKE_PG_PASSWORD",
+            "XOMTRA_LAKE_PG_HOST",
+            "XOMTRA_LAKE_PG_DB",
+            "XOMTRA_LAKE_PG_USER",
+            "XOMTRA_LAKE_PG_PASSWORD",
         ]
         if local is None:
             required += [
-                "HAMMOND_S3_ENDPOINT",
-                "HAMMOND_S3_ACCESS_KEY",
-                "HAMMOND_S3_SECRET_KEY",
-                "HAMMOND_S3_BUCKET",
+                "XOMTRA_S3_ENDPOINT",
+                "XOMTRA_S3_ACCESS_KEY",
+                "XOMTRA_S3_SECRET_KEY",
+                "XOMTRA_S3_BUCKET",
             ]
         missing = [k for k in required if not e.get(k)]
         if missing:
             raise ValueError(f"Missing environment variables: {', '.join(missing)}")
         defaults = profile(env=e)
         return cls(
-            pg_host=e["HAMMOND_LAKE_PG_HOST"],
-            pg_port=int(e.get("HAMMOND_LAKE_PG_PORT", "5432")),
-            pg_db=e["HAMMOND_LAKE_PG_DB"],
-            pg_user=e["HAMMOND_LAKE_PG_USER"],
-            pg_password=e["HAMMOND_LAKE_PG_PASSWORD"],
-            s3_endpoint="" if local else e["HAMMOND_S3_ENDPOINT"],
-            s3_access_key="" if local else e["HAMMOND_S3_ACCESS_KEY"],
-            s3_secret_key="" if local else e["HAMMOND_S3_SECRET_KEY"],
-            s3_bucket="" if local else e["HAMMOND_S3_BUCKET"],
-            s3_region=e.get("HAMMOND_S3_REGION") or "us-east-1",
-            s3_use_ssl=_bool(e.get("HAMMOND_S3_USE_SSL"), default=False),
-            data_prefix=(e.get("HAMMOND_LAKE_DATA_PREFIX") or "lake/").strip("/") + "/",
+            pg_host=e["XOMTRA_LAKE_PG_HOST"],
+            pg_port=int(e.get("XOMTRA_LAKE_PG_PORT", "5432")),
+            pg_db=e["XOMTRA_LAKE_PG_DB"],
+            pg_user=e["XOMTRA_LAKE_PG_USER"],
+            pg_password=e["XOMTRA_LAKE_PG_PASSWORD"],
+            s3_endpoint="" if local else e["XOMTRA_S3_ENDPOINT"],
+            s3_access_key="" if local else e["XOMTRA_S3_ACCESS_KEY"],
+            s3_secret_key="" if local else e["XOMTRA_S3_SECRET_KEY"],
+            s3_bucket="" if local else e["XOMTRA_S3_BUCKET"],
+            s3_region=e.get("XOMTRA_S3_REGION") or "us-east-1",
+            s3_use_ssl=_bool(e.get("XOMTRA_S3_USE_SSL"), default=False),
+            data_prefix=(e.get("XOMTRA_LAKE_DATA_PREFIX") or "lake/").strip("/") + "/",
             local_data_path=local,
-            extension_dir=e.get("HAMMOND_DUCKDB_EXTENSION_DIR") or None,
-            memory_limit=e.get("HAMMOND_DUCKDB_MEMORY_LIMIT") or defaults.duckdb_memory_limit,
-            threads=int(e.get("HAMMOND_DUCKDB_THREADS") or defaults.duckdb_threads),
-            temp_directory=e.get("HAMMOND_DUCKDB_TEMP_DIR") or None,
-            max_temp_directory_size=e.get("HAMMOND_DUCKDB_MAX_TEMP_SIZE") or "8GB",
+            extension_dir=e.get("XOMTRA_DUCKDB_EXTENSION_DIR") or None,
+            memory_limit=e.get("XOMTRA_DUCKDB_MEMORY_LIMIT") or defaults.duckdb_memory_limit,
+            threads=int(e.get("XOMTRA_DUCKDB_THREADS") or defaults.duckdb_threads),
+            temp_directory=e.get("XOMTRA_DUCKDB_TEMP_DIR") or None,
+            max_temp_directory_size=e.get("XOMTRA_DUCKDB_MAX_TEMP_SIZE") or "8GB",
         )
 
     @property
@@ -178,7 +178,7 @@ class LakeSettings:
 
 def secret_sql(settings: LakeSettings) -> str:
     return (
-        "CREATE OR REPLACE TEMPORARY SECRET hammond_s3 ("
+        "CREATE OR REPLACE TEMPORARY SECRET xomtra_s3 ("
         "TYPE s3, "
         f"KEY_ID {sql_literal(settings.s3_access_key)}, "
         f"SECRET {sql_literal(settings.s3_secret_key)}, "
@@ -298,7 +298,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     if args.command == "install-extensions":
-        install_extensions(os.environ.get("HAMMOND_DUCKDB_EXTENSION_DIR"))
+        install_extensions(os.environ.get("XOMTRA_DUCKDB_EXTENSION_DIR"))
         return 0
     settings = LakeSettings.from_env()
     if args.command == "init":

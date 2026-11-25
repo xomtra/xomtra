@@ -1,6 +1,6 @@
 """Contract tests against a real Home Assistant in a container.
 
-Enabled by ``HAMMOND_CONTRACT_HA_URL`` (a fresh, not yet onboarded instance started with
+Enabled by ``XOMTRA_CONTRACT_HA_URL`` (a fresh, not yet onboarded instance started with
 the configuration in ``ha-config/``). See the ``contract`` job in
 .github/workflows/ci.yml for how CI runs them.
 """
@@ -13,9 +13,9 @@ import pytest
 
 from hacore.onboarding import OnboardedTokens, onboard
 
-HA_URL = os.environ.get("HAMMOND_CONTRACT_HA_URL", "").rstrip("/")
+HA_URL = os.environ.get("XOMTRA_CONTRACT_HA_URL", "").rstrip("/")
 # Onboarding works only once per instance; keep tokens for repeated local runs.
-TOKEN_CACHE = os.environ.get("HAMMOND_CONTRACT_TOKEN_CACHE")
+TOKEN_CACHE = os.environ.get("XOMTRA_CONTRACT_TOKEN_CACHE")
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -23,7 +23,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         if "contract" in item.nodeid:
             item.add_marker(pytest.mark.contract)
             if not HA_URL:
-                item.add_marker(pytest.mark.skip(reason="HAMMOND_CONTRACT_HA_URL not set"))
+                item.add_marker(pytest.mark.skip(reason="XOMTRA_CONTRACT_HA_URL not set"))
 
 
 @pytest.fixture(scope="session")

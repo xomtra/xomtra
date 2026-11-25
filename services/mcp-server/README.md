@@ -1,6 +1,6 @@
-# hammond-mcp
+# xomtra-mcp
 
-MCP server of HAmmond built on FastMCP, protected by an OAuth proxy to Microsoft Entra ID.
+MCP server of Xomtra built on FastMCP, protected by an OAuth proxy to Microsoft Entra ID.
 
 Tools, roles, SQL limits and audit: [docs/setup/mcp-tools.md](../../docs/setup/mcp-tools.md).
 

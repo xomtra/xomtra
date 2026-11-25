@@ -87,8 +87,8 @@ jobs:
             -v "$RUNNER_TEMP/ha-config:/config" "$HA_IMAGE"
       - name: Contract tests (onboarding, non-admin token, history, statistics, ingest, HA login)
         env:
-          HAMMOND_CONTRACT_HA_URL: http://127.0.0.1:8123
-          HAMMOND_CONTRACT_HA_CONFIG: ${{ runner.temp }}/ha-config
+          XOMTRA_CONTRACT_HA_URL: http://127.0.0.1:8123
+          XOMTRA_CONTRACT_HA_CONFIG: ${{ runner.temp }}/ha-config
         run: uv run pytest packages/hacore/tests/contract -m contract
       - name: Home Assistant log on failure
         if: failure()
@@ -128,26 +128,26 @@ jobs:
     permissions:
       contents: read
     env:
-      HAMMOND_MCP_IMAGE: hammond-mcp:ci
-      HAMMOND_INGEST_IMAGE: hammond-ingest:ci
+      XOMTRA_MCP_IMAGE: xomtra-mcp:ci
+      XOMTRA_INGEST_IMAGE: xomtra-ingest:ci
       POSTGRES_PASSWORD: ci-postgres
       DUCKLAKE_PG_PASSWORD: ci-ducklake
       OPS_PG_PASSWORD: ci-ops-'quote
       AUDIT_PG_PASSWORD: ci-audit-'quote
       AUDIT_ADMIN_PG_PASSWORD: ci-audit-admin
-      HAMMOND_ADMIN_SESSION_KEY: ci-dummy-admin-session-key-at-least-32-chars
+      XOMTRA_ADMIN_SESSION_KEY: ci-dummy-admin-session-key-at-least-32-chars
       ADMIN_CIDR: 192.0.2.0/24
-      HAMMOND_HA_URL: http://ha:8123
+      XOMTRA_HA_URL: http://ha:8123
       S3_ACCESS_KEY: ci-access
       S3_SECRET_KEY: ci-secret-key
       # Dummy Entra values: the server must start and serve OAuth metadata.
-      HAMMOND_BASE_URL: http://127.0.0.1:8000
-      HAMMOND_ENTRA_TENANT_ID: 00000000-0000-0000-0000-000000000001
-      HAMMOND_ENTRA_CLIENT_ID: 00000000-0000-0000-0000-000000000002
-      HAMMOND_ENTRA_CLIENT_SECRET: ci-dummy
-      HAMMOND_JWT_SIGNING_KEY: ci-dummy-signing-key-at-least-32-characters
+      XOMTRA_BASE_URL: http://127.0.0.1:8000
+      XOMTRA_ENTRA_TENANT_ID: 00000000-0000-0000-0000-000000000001
+      XOMTRA_ENTRA_CLIENT_ID: 00000000-0000-0000-0000-000000000002
+      XOMTRA_ENTRA_CLIENT_SECRET: ci-dummy
+      XOMTRA_JWT_SIGNING_KEY: ci-dummy-signing-key-at-least-32-characters
       # Caddy is not started in CI (needs a real DNS zone), but compose must render.
-      HAMMOND_PUBLIC_HOST: mcp.example.org
+      XOMTRA_PUBLIC_HOST: mcp.example.org
       ACME_EMAIL: ci@example.org
       CLOUDFLARE_API_TOKEN: ci-dummy
       CLAUDE_IP_RANGES: 192.0.2.0/24
@@ -163,9 +163,9 @@ jobs:
           file: services/mcp-server/Dockerfile
           load: true
           push: false
-          tags: hammond-mcp:ci
-          cache-from: type=gha,scope=hammond-mcp
-          cache-to: type=gha,mode=max,scope=hammond-mcp
+          tags: xomtra-mcp:ci
+          cache-from: type=gha,scope=xomtra-mcp
+          cache-to: type=gha,mode=max,scope=xomtra-mcp
       - name: Build ingest image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -173,21 +173,21 @@ jobs:
           file: services/ingest/Dockerfile
           load: true
           push: false
-          tags: hammond-ingest:ci
-          cache-from: type=gha,scope=hammond-ingest
-          cache-to: type=gha,mode=max,scope=hammond-ingest
+          tags: xomtra-ingest:ci
+          cache-from: type=gha,scope=xomtra-ingest
+          cache-to: type=gha,mode=max,scope=xomtra-ingest
       - name: Build Caddy image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: deploy/caddy
           load: true
           push: false
-          tags: hammond-caddy:ci
-          cache-from: type=gha,scope=hammond-caddy
-          cache-to: type=gha,mode=max,scope=hammond-caddy
+          tags: xomtra-caddy:ci
+          cache-from: type=gha,scope=xomtra-caddy
+          cache-to: type=gha,mode=max,scope=xomtra-caddy
       - name: Scan images
         run: |
-          for image in hammond-mcp:ci hammond-ingest:ci hammond-caddy:ci; do
+          for image in xomtra-mcp:ci xomtra-ingest:ci xomtra-caddy:ci; do
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" image \
               --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$image"
           done
@@ -196,17 +196,17 @@ jobs:
         # file capabilities, which the plain `docker run` default would hide.
         run: |
           docker run --rm --cap-drop ALL --security-opt no-new-privileges --read-only \
-            -e HAMMOND_PUBLIC_HOST -e ACME_EMAIL -e CLAUDE_IP_RANGES -e ADMIN_CIDR \
-            hammond-caddy:ci caddy adapt --config /etc/caddy/Caddyfile >/dev/null
+            -e XOMTRA_PUBLIC_HOST -e ACME_EMAIL -e CLAUDE_IP_RANGES -e ADMIN_CIDR \
+            xomtra-caddy:ci caddy adapt --config /etc/caddy/Caddyfile >/dev/null
           # Local access mode (ADR 056): own CA, LAN only.
           docker run --rm --cap-drop ALL --security-opt no-new-privileges --read-only \
-            -e HAMMOND_LOCAL_HOST=hammond.lan -e LAN_CIDR=192.168.0.0/16 -e ADMIN_CIDR \
-            hammond-caddy:ci caddy adapt --config /etc/caddy/Caddyfile.local >/dev/null
+            -e XOMTRA_LOCAL_HOST=xomtra.lan -e LAN_CIDR=192.168.0.0/16 -e ADMIN_CIDR \
+            xomtra-caddy:ci caddy adapt --config /etc/caddy/Caddyfile.local >/dev/null
           # The start script refuses incomplete settings with a clear message.
-          if out=$(docker run --rm -e HAMMOND_ACCESS_MODE=local hammond-caddy:ci 2>&1); then
-            echo "started without HAMMOND_LOCAL_HOST"; exit 1
+          if out=$(docker run --rm -e XOMTRA_ACCESS_MODE=local xomtra-caddy:ci 2>&1); then
+            echo "started without XOMTRA_LOCAL_HOST"; exit 1
           fi
-          echo "$out" | grep -q "requires HAMMOND_LOCAL_HOST"
+          echo "$out" | grep -q "requires XOMTRA_LOCAL_HOST"
       - name: Smoke test compose stack (Postgres + SeaweedFS + DuckLake + MCP)
         working-directory: deploy/compose
         run: |
@@ -228,16 +228,16 @@ jobs:
         run: |
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres \
             -c "CREATE DATABASE ducklake_lite OWNER ducklake"
-          # No object storage: no HAMMOND_S3_* values at all. `docker compose run` has
+          # No object storage: no XOMTRA_S3_* values at all. `docker compose run` has
           # no --tmpfs, so the image runs directly on the compose backend network.
           set -o pipefail
-          docker run --rm --network hammond_backend --read-only --cap-drop ALL \
+          docker run --rm --network xomtra_backend --read-only --cap-drop ALL \
             --tmpfs /data:uid=10001,gid=10001 \
-            -e HAMMOND_EDITION=lite -e HAMMOND_LAKE_PG_HOST=postgres \
-            -e HAMMOND_LAKE_PG_DB=ducklake_lite -e HAMMOND_LAKE_PG_USER=ducklake \
-            -e HAMMOND_LAKE_PG_PASSWORD="$DUCKLAKE_PG_PASSWORD" \
-            -e HAMMOND_LAKE_DATA_PATH=/data/lake \
-            --entrypoint python "$HAMMOND_MCP_IMAGE" -m hacore.lake init 2>&1 \
+            -e XOMTRA_EDITION=lite -e XOMTRA_LAKE_PG_HOST=postgres \
+            -e XOMTRA_LAKE_PG_DB=ducklake_lite -e XOMTRA_LAKE_PG_USER=ducklake \
+            -e XOMTRA_LAKE_PG_PASSWORD="$DUCKLAKE_PG_PASSWORD" \
+            -e XOMTRA_LAKE_DATA_PATH=/data/lake \
+            --entrypoint python "$XOMTRA_MCP_IMAGE" -m hacore.lake init 2>&1 \
             | tee /tmp/lite-lake.log
           grep -q "data files in local data path" /tmp/lite-lake.log
       - name: Smoke test ingest (HA -> stream/backfill -> bronze -> SQLMesh silver)
@@ -245,22 +245,22 @@ jobs:
         run: |
           # Creates the egress network (and the ingest containers, started below).
           docker compose up --no-start ingest-stream dagster-daemon dagster-webserver
-          docker run -d --name ha --network hammond_egress \
+          docker run -d --name ha --network xomtra_egress \
             -v "$GITHUB_WORKSPACE/packages/hacore/tests/contract/ha-config:/config" \
             "$HA_IMAGE_CURRENT"
-          HAMMOND_HA_TOKEN=$(docker compose run --rm --no-deps -T ingest-stream \
+          XOMTRA_HA_TOKEN=$(docker compose run --rm --no-deps -T ingest-stream \
             python -c "from hacore.onboarding import onboard; print(onboard('http://ha:8123').user_token)" \
             | tail -n 1)
-          export HAMMOND_HA_TOKEN
-          echo "::add-mask::$HAMMOND_HA_TOKEN"
+          export XOMTRA_HA_TOKEN
+          echo "::add-mask::$XOMTRA_HA_TOKEN"
           # Token of the throwaway CI Home Assistant, reused by the lite smoke test.
-          echo "HAMMOND_HA_TOKEN=$HAMMOND_HA_TOKEN" >> "$GITHUB_ENV"
+          echo "XOMTRA_HA_TOKEN=$XOMTRA_HA_TOKEN" >> "$GITHUB_ENV"
           docker compose up -d --wait --wait-timeout 240 ingest-stream dagster-daemon dagster-webserver
-          docker compose exec -T dagster-daemon hammond-ingest sync
-          docker compose exec -T dagster-daemon hammond-ingest backfill --start 1d
+          docker compose exec -T dagster-daemon xomtra-ingest sync
+          docker compose exec -T dagster-daemon xomtra-ingest backfill --start 1d
           # Through Dagster (Postgres run storage, read-only image): retention + maintenance.
           docker compose exec -T dagster-daemon dagster job execute \
-            -m hammond_ingest.definitions -a defs -j retention_daily
+            -m xomtra_ingest.definitions -a defs -j retention_daily
           docker compose exec -T dagster-daemon python - <<'PY'
           from hacore import lake
           con = lake.connect(lake.LakeSettings.from_env())
@@ -280,7 +280,7 @@ jobs:
       - name: Smoke test catalog and MCP data tools (policy, SQL guard, lockdown, audit)
         working-directory: deploy/compose
         run: |
-          docker compose exec -T dagster-daemon hammond-ingest catalog
+          docker compose exec -T dagster-daemon xomtra-ingest catalog
           # A record past the audit retention (default 90 days) must be purged on first write.
           docker compose exec -T postgres psql -U postgres -d audit -c \
             "INSERT INTO audit.tool_call (ts, tool, decision, outcome) VALUES (now() - interval '100 days', 'ci-old', 'allowed', 'ok')"
@@ -289,17 +289,17 @@ jobs:
           docker compose exec -T mcp python - <<'PY'
           import asyncio
           from hacore.lake import LakeSettings
-          from hammond_mcp.audit import AuditRecord, PostgresAuditSink
-          from hammond_mcp.config import Settings
-          from hammond_mcp.data import KNOWN_VIEWS, DataAccess
-          from hammond_mcp.identity import Identity
-          from hammond_mcp.policy import Policy
-          from hammond_mcp.sqlguard import SQLRejected
+          from xomtra_mcp.audit import AuditRecord, PostgresAuditSink
+          from xomtra_mcp.config import Settings
+          from xomtra_mcp.data import KNOWN_VIEWS, DataAccess
+          from xomtra_mcp.identity import Identity
+          from xomtra_mcp.policy import Policy
+          from xomtra_mcp.sqlguard import SQLRejected
 
           data = DataAccess.from_settings(LakeSettings.from_env())
           policy = Policy.load()
-          admin = policy.access_for(Identity(True, "ci", roles=("HAmmond.Admin",)), KNOWN_VIEWS)
-          reader = policy.access_for(Identity(True, "ci", roles=("HAmmond.Reader",)), KNOWN_VIEWS)
+          admin = policy.access_for(Identity(True, "ci", roles=("Xomtra.Admin",)), KNOWN_VIEWS)
+          reader = policy.access_for(Identity(True, "ci", roles=("Xomtra.Reader",)), KNOWN_VIEWS)
           found = data.search_catalog(admin)
           print("catalog entities", found["row_count"])
           assert found["row_count"] > 0
@@ -329,17 +329,17 @@ jobs:
       - name: Smoke test personal tokens (ADR 059 grants)
         working-directory: deploy/compose
         run: |
-          # sha256('hmd_ci_token') stored by the superuser; the MCP role may only verify.
+          # sha256('xmt_ci_token') stored by the superuser; the MCP role may only verify.
           docker compose exec -T postgres psql -U postgres -d audit -c \
-            "INSERT INTO access.token (id, token_hash, owner, description, role) VALUES ('ci', sha256('hmd_ci_token'), 'ci', 'ci', 'HAmmond.Reader')"
+            "INSERT INTO access.token (id, token_hash, owner, description, role) VALUES ('ci', sha256('xmt_ci_token'), 'ci', 'ci', 'Xomtra.Reader')"
           docker compose exec -T mcp python - <<'PY'
-          from hammond_mcp.config import Settings
-          from hammond_mcp.tokens import PostgresTokenStore, TokenStoreError, token_hash
+          from xomtra_mcp.config import Settings
+          from xomtra_mcp.tokens import PostgresTokenStore, TokenStoreError, token_hash
 
           store = PostgresTokenStore(Settings().audit_dsn)
-          info = store.verify(token_hash("hmd_ci_token"))
-          assert info is not None and info.role == "HAmmond.Reader", info
-          assert store.verify(token_hash("hmd_ci_wrong")) is None
+          info = store.verify(token_hash("xmt_ci_token"))
+          assert info is not None and info.role == "Xomtra.Reader", info
+          assert store.verify(token_hash("xmt_ci_wrong")) is None
           for forbidden in (store.list, lambda: store.revoke("ci", "x")):
               try:
                   forbidden()
@@ -380,7 +380,7 @@ jobs:
       - name: Smoke test lite edition (worker, local lake, no SeaweedFS/Dagster, ADR 050)
         working-directory: deploy/compose
         env:
-          COMPOSE_PROJECT_NAME: hammond-lite
+          COMPOSE_PROJECT_NAME: xomtra-lite
           COMPOSE_FILE: compose.yaml:compose.lite.yaml
         run: |
           services=$(docker compose config --services | sort | tr '\n' ' ')
@@ -388,11 +388,11 @@ jobs:
           [ "$services" = "admin caddy ducklake-init mcp postgres postgres-init worker " ]
           docker compose up -d --wait --wait-timeout 180 mcp
           docker compose up --no-start worker
-          docker network connect hammond-lite_egress ha
+          docker network connect xomtra-lite_egress ha
           # One job through the run store (ops DB), then the worker itself.
-          docker compose run --rm --no-deps -T worker hammond-ingest job ingest_hourly
+          docker compose run --rm --no-deps -T worker xomtra-ingest job ingest_hourly
           docker compose up -d --wait --wait-timeout 240 worker
-          docker compose exec -T worker hammond-ingest runs | tee /tmp/runs.json
+          docker compose exec -T worker xomtra-ingest runs | tee /tmp/runs.json
           grep -q '"status": "success"' /tmp/runs.json
           docker compose exec -T worker python - <<'PY'
           import os
@@ -413,7 +413,7 @@ jobs:
         working-directory: deploy/compose
         run: |
           docker compose logs --no-color || true
-          docker compose -p hammond-lite -f compose.yaml -f compose.lite.yaml logs --no-color || true
+          docker compose -p xomtra-lite -f compose.yaml -f compose.lite.yaml logs --no-color || true
 
   # Home Assistant add-on (lite edition in one container): build, scan and start it like
   # the Supervisor would. Publishing (amd64 + aarch64, signed) comes with the releases.
@@ -432,18 +432,18 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: addon/hammond/Dockerfile
+          file: addon/xomtra/Dockerfile
           load: true
           push: false
-          tags: hammond-addon:ci
-          cache-from: type=gha,scope=hammond-addon-amd64
-          cache-to: type=gha,mode=max,scope=hammond-addon-amd64
+          tags: xomtra-addon:ci
+          cache-from: type=gha,scope=xomtra-addon-amd64
+          cache-to: type=gha,mode=max,scope=xomtra-addon-amd64
       - name: Scan image
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" image \
-            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 hammond-addon:ci
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 xomtra-addon:ci
       - name: Start like the Supervisor
-        run: addon/hammond/smoke-test.sh hammond-addon:ci
+        run: addon/xomtra/smoke-test.sh xomtra-addon:ci
 
   # Every commit of main gets signed images tagged main and sha-<commit>. Releases do not
   # rebuild: release.yml promotes these images to the version tags (ADR 045).
@@ -455,31 +455,31 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: hammond-mcp
+          - image: xomtra-mcp
             context: .
             file: services/mcp-server/Dockerfile
             runner: ubuntu-26.04
             platform: linux/amd64
-          - image: hammond-ingest
+          - image: xomtra-ingest
             context: .
             file: services/ingest/Dockerfile
             runner: ubuntu-26.04
             platform: linux/amd64
-          - image: hammond-caddy
+          - image: xomtra-caddy
             context: deploy/caddy
             file: deploy/caddy/Dockerfile
             runner: ubuntu-26.04
             platform: linux/amd64
           # Home Assistant add-on, one image per architecture ({arch} in config.yaml),
           # each built natively on its own runner.
-          - image: hammond-addon-amd64
+          - image: xomtra-addon-amd64
             context: .
-            file: addon/hammond/Dockerfile
+            file: addon/xomtra/Dockerfile
             runner: ubuntu-26.04
             platform: linux/amd64
-          - image: hammond-addon-aarch64
+          - image: xomtra-addon-aarch64
             context: .
-            file: addon/hammond/Dockerfile
+            file: addon/xomtra/Dockerfile
             runner: ubuntu-26.04-arm
             platform: linux/arm64
     permissions:

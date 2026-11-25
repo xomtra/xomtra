@@ -13,13 +13,13 @@ import pytest
 from pydantic import SecretStr
 
 from hacore.testing import VALID_TOKEN, FakeHA, running_fake_ha
-from hammond_mcp.admin.app import SESSION_COOKIE, AdminApp
-from hammond_mcp.admin.config import AdminSettings
-from hammond_mcp.audit import MemoryAuditSink
-from hammond_mcp.ha_auth import HomeAssistantLogin
-from hammond_mcp.tokens import MemoryTokenStore, token_hash
+from xomtra_mcp.admin.app import SESSION_COOKIE, AdminApp
+from xomtra_mcp.admin.config import AdminSettings
+from xomtra_mcp.audit import MemoryAuditSink
+from xomtra_mcp.ha_auth import HomeAssistantLogin
+from xomtra_mcp.tokens import MemoryTokenStore, token_hash
 
-BASE = "https://hammond.lan"
+BASE = "https://xomtra.lan"
 
 
 class FakeHAHttp:
@@ -144,7 +144,7 @@ async def test_ha_code_rejected(fake_ha: tuple[FakeHA, str]) -> None:
 async def test_tokens_issue_list_revoke_and_mcpb(fake_ha: tuple[FakeHA, str]) -> None:
     fake, url = fake_ha
     fake.results["auth/current_user"] = {"id": "u1", "name": "Jana", "is_owner": True}
-    app, audit, store = make_app(url, FakeHAHttp(), mcp_url="https://hammond.lan/mcp")
+    app, audit, store = make_app(url, FakeHAHttp(), mcp_url="https://xomtra.lan/mcp")
     async with client_for(app) as client:
         await sign_in(client)
         origin = {"origin": BASE}
@@ -153,20 +153,20 @@ async def test_tokens_issue_list_revoke_and_mcpb(fake_ha: tuple[FakeHA, str]) ->
             data={
                 "owner": "Petr",
                 "description": "Claude Desktop <laptop>",
-                "role": "HAmmond.Reader",
+                "role": "Xomtra.Reader",
                 "days": "90",
             },
             headers=origin,
         )
         assert issued.status_code == 200
         token = issued.text.split("value='", 1)[1].split("'", 1)[0]
-        assert token.startswith("hmd_")
-        assert "claude mcp add --transport http hammond https://hammond.lan/mcp" in issued.text
+        assert token.startswith("xmt_")
+        assert "claude mcp add --transport http xomtra https://xomtra.lan/mcp" in issued.text
         assert "&lt;laptop&gt;" in issued.text
         assert issued.headers["cache-control"] == "no-store"
         info = store.verify(token_hash(token))
         assert info is not None
-        assert (info.owner, info.role, info.created_by) == ("Petr", "HAmmond.Reader", "Jana")
+        assert (info.owner, info.role, info.created_by) == ("Petr", "Xomtra.Reader", "Jana")
 
         listing = await client.get("/admin/tokens")
         assert info.id in listing.text
@@ -189,11 +189,11 @@ async def test_tokens_issue_list_revoke_and_mcpb(fake_ha: tuple[FakeHA, str]) ->
         assert revoked.status_code == 303
         assert store.verify(token_hash(token)) is None
 
-        mcpb = await client.get("/admin/connect/hammond.mcpb")
+        mcpb = await client.get("/admin/connect/xomtra.mcpb")
         assert mcpb.status_code == 200
         with zipfile.ZipFile(io.BytesIO(mcpb.content)) as archive:
             manifest = json.loads(archive.read("manifest.json"))
-        assert manifest["user_config"]["url"]["default"] == "https://hammond.lan/mcp"
+        assert manifest["user_config"]["url"]["default"] == "https://xomtra.lan/mcp"
         assert (await client.get("/admin/connect")).status_code == 200
     tools = [r.tool for r in audit.records]
     assert "admin:token_issue" in tools
@@ -213,7 +213,7 @@ async def test_tokens_only_in_local_mode(fake_ha: tuple[FakeHA, str]) -> None:
         assert "only in the local access mode" in page.text
         resp = await client.post(
             "/admin/tokens/issue",
-            data={"owner": "x", "description": "y", "role": "HAmmond.Reader", "days": "30"},
+            data={"owner": "x", "description": "y", "role": "Xomtra.Reader", "days": "30"},
             headers={"origin": BASE},
         )
         assert "only in the local access mode" in resp.text
@@ -221,7 +221,7 @@ async def test_tokens_only_in_local_mode(fake_ha: tuple[FakeHA, str]) -> None:
 
 
 def test_admin_settings_for_ha() -> None:
-    with pytest.raises(ValueError, match="HAMMOND_HA_URL"):
+    with pytest.raises(ValueError, match="XOMTRA_HA_URL"):
         AdminSettings(
             auth_mode="ha",
             base_url=BASE,  # type: ignore[arg-type]
@@ -242,15 +242,15 @@ def test_admin_settings_for_ha() -> None:
 def test_admin_settings_empty_optional_values(monkeypatch: pytest.MonkeyPatch) -> None:
     # compose passes unset variables as empty strings (homelab .env without new keys)
     for key, value in {
-        "HAMMOND_BASE_URL": BASE,
-        "HAMMOND_ADMIN_SESSION_KEY": "s" * 40,
-        "HAMMOND_ENTRA_TENANT_ID": "t",
-        "HAMMOND_ENTRA_CLIENT_ID": "c",
-        "HAMMOND_ENTRA_CLIENT_SECRET": "x",
-        "HAMMOND_MCP_URL": "",
-        "HAMMOND_HA_AUTH_URL": "",
-        "HAMMOND_HA_ALLOWED_USERS": "",
-        "HAMMOND_ACCESS_MODE": "public",
+        "XOMTRA_BASE_URL": BASE,
+        "XOMTRA_ADMIN_SESSION_KEY": "s" * 40,
+        "XOMTRA_ENTRA_TENANT_ID": "t",
+        "XOMTRA_ENTRA_CLIENT_ID": "c",
+        "XOMTRA_ENTRA_CLIENT_SECRET": "x",
+        "XOMTRA_MCP_URL": "",
+        "XOMTRA_HA_AUTH_URL": "",
+        "XOMTRA_HA_ALLOWED_USERS": "",
+        "XOMTRA_ACCESS_MODE": "public",
     }.items():
         monkeypatch.setenv(key, value)
     s = AdminSettings()

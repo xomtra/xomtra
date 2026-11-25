@@ -3,13 +3,13 @@ from typing import Any
 import httpx2
 import pytest
 
-from hammond_mcp.admin.analysis import MemorySettingsStore, preview
-from hammond_mcp.admin.app import AdminApp
-from hammond_mcp.admin.config import AdminSettings
-from hammond_mcp.audit import MemoryAuditSink
-from hammond_mcp.data import DataAccess
+from xomtra_mcp.admin.analysis import MemorySettingsStore, preview
+from xomtra_mcp.admin.app import AdminApp
+from xomtra_mcp.admin.config import AdminSettings
+from xomtra_mcp.audit import MemoryAuditSink
+from xomtra_mcp.data import DataAccess
 
-BASE = "https://hammond.lan"
+BASE = "https://xomtra.lan"
 
 
 def settings() -> AdminSettings:
@@ -29,8 +29,8 @@ async def test_analysis_settings_save_validate_reset() -> None:
     async with client_for(dev_app(None, store, audit)) as client:
         page = await client.get("/admin/analysis")
         assert page.status_code == 200
-        assert "HAMMOND_CORRELATION_MAX_Q" in page.text
-        assert "HAMMOND_ANOMALY_Z_CAP" in page.text
+        assert "XOMTRA_CORRELATION_MAX_Q" in page.text
+        assert "XOMTRA_ANOMALY_Z_CAP" in page.text
 
         post = {
             "key": "correlation_max_q",

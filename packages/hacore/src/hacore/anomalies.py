@@ -2,7 +2,7 @@
 
 Both work on the hourly grid of the correlations (``hacore.correlations``: hourly
 ``mean`` of a measurement, ``delta`` of a counter, ``share`` of the hour in a state),
-with the same exclusions: entities labelled ``hammond_no_analysis``, removed entities,
+with the same exclusions: entities labelled ``xomtra_no_analysis``, removed entities,
 nearly constant series and uptime clocks.
 
 **Anomalies** (``finding_type = 'anomaly'``): the usual value of every hour of the week

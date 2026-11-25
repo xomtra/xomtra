@@ -1,6 +1,6 @@
 import pytest
 
-from hammond_mcp.sqlguard import SQLRejected, check
+from xomtra_mcp.sqlguard import SQLRejected, check
 
 VIEWS = frozenset({"states", "entities"})
 

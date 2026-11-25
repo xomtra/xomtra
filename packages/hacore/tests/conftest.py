@@ -20,7 +20,7 @@ async def fake_ha() -> AsyncIterator[tuple[FakeHA, str]]:
 @pytest.fixture
 def lake(tmp_path: Path) -> Iterator[duckdb.DuckDBPyConnection]:
     """DuckLake with a local catalog and data path; bronze tables created."""
-    ext_dir = os.environ.get("HAMMOND_DUCKDB_EXTENSION_DIR") or None
+    ext_dir = os.environ.get("XOMTRA_DUCKDB_EXTENSION_DIR") or None
     install_extensions(ext_dir)
     con = connect_local(
         str(tmp_path / "catalog.ducklake"), str(tmp_path / "data") + "/", extension_dir=ext_dir

@@ -19,12 +19,12 @@ Every call passes a policy layer by Entra app role and is audited.
 
 Views: `entities`, `states`, `statistics`, `statistics_meta`, `catalog_entity`,
 `catalog_finding`, `catalog_finding_weekly`, `catalog_drift` (Admin only by default). Times are UTC; daily buckets of
-`get_timeseries` use `HAMMOND_TIMEZONE`.
+`get_timeseries` use `XOMTRA_TIMEZONE`.
 
 ## Catalog
 
-The Dagster job `catalog_daily` (04:15 in `HAMMOND_TIMEZONE`) profiles every entity over
-the last `HAMMOND_CATALOG_WINDOW_DAYS` (30) days into `catalog.entity` and appends the
+The Dagster job `catalog_daily` (04:15 in `XOMTRA_TIMEZONE`) profiles every entity over
+the last `XOMTRA_CATALOG_WINDOW_DAYS` (30) days into `catalog.entity` and appends the
 changes against the previous profile to `catalog.drift`: new and removed entities, a
 changed unit, device class, state class, area, name or kind, an entity that stopped or
 resumed reporting, and a shift of the recent median outside the usual range.
@@ -32,7 +32,7 @@ resumed reporting, and a shift of the recent median outside the usual range.
 Run it once right after deploying (the first run records no drift):
 
 ```sh
-sudo docker compose exec dagster-daemon hammond-ingest catalog
+sudo docker compose exec dagster-daemon xomtra-ingest catalog
 ```
 
 ## Correlations (phase 1b.1)
@@ -41,7 +41,7 @@ After the profile, `catalog_daily` looks for entities that move together and wri
 strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
 'correlation'`). The method comes from the prototype script `ha_correlations.py`:
 
-1. An hourly grid over each window of `HAMMOND_CORRELATION_WINDOWS_DAYS` (default
+1. An hourly grid over each window of `XOMTRA_CORRELATION_WINDOWS_DAYS` (default
    `[365, 30]`): hourly means of measurements and hourly increases of counters from the
    HA statistics, and for binary and enum entities the share of the hour spent in a
    state (`on`, or up to three most frequent states). Gaps of up to 3 hours are filled
@@ -50,10 +50,10 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    hours (nearly constant series correlate with anything) and data in the last 3 days
    of the window (statistics of removed entities stay in HA). Clocks such as an uptime
    (the hourly mean grows by the same step) are left out: they only correlate through
-   common restarts. Entities labelled `hammond_no_analysis` or `hammond_no_ingest` in Home
+   common restarts. Entities labelled `xomtra_no_analysis` or `xomtra_no_ingest` in Home
    Assistant (on the entity or its device) are left out; see `ingest.md`.
-2. Residuals after the hour of the day and the day of the week (in `HAMMOND_TIMEZONE`)
-   and, if `HAMMOND_CORRELATION_OUTSIDE_TEMP` names an entity with hourly statistics or
+2. Residuals after the hour of the day and the day of the week (in `XOMTRA_TIMEZONE`)
+   and, if `XOMTRA_CORRELATION_OUTSIDE_TEMP` names an entity with hourly statistics or
    a `weather.*` entity (its `temperature` attribute), the outside temperature. A
    temperature covering less than 70 % of the window is not used (the run notes it);
    hours without it are left out of the analysis. Without it, everything that depends
@@ -63,7 +63,7 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
 3. Correlation of every pair with a lag of 0–24 hours (the best lag wins), on hours
    both series have (Pearson over those hours, residuals clipped to ±4 standard
    deviations so a few spikes cannot carry a pair). Significance (ADR 062,
-   `HAMMOND_CORRELATION_METHOD=v2`, the default): `z = r / sd` with the variance of `r`
+   `XOMTRA_CORRELATION_METHOD=v2`, the default): `z = r / sd` with the variance of `r`
    under independence from the autocorrelations of both series (Bartlett/xDF); the
    p-value (`p_value`) of the pair's largest `|z|` over both directions and all lags
    comes from an empirical null of circularly shifted pairs (whole days, so the daily
@@ -114,7 +114,7 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
      (anomaly, change point) on the admin page *Findings*; every type of finding can
      carry it, from the next run on, until undone.
 
-Stored are at most `HAMMOND_CORRELATION_TOP` (100) findings per window: unflagged ones
+Stored are at most `XOMTRA_CORRELATION_TOP` (100) findings per window: unflagged ones
 first, then explained or unstable ones (`indirect`, `common_factor`, `same_area`,
 `house_context`, `unstable`, ...), trivial ones (`duplicate_suspect`, `same_device`)
 last, each part by `|r|`.
@@ -124,13 +124,13 @@ first run that found the pair; every run replaces the findings of its window. A
 correlation is a hint to look at, not a cause.
 
 ```sh
-sudo docker compose exec dagster-daemon hammond-ingest correlations
+sudo docker compose exec dagster-daemon xomtra-ingest correlations
 ```
 
 ### Outside temperature history from Open-Meteo
 
-A `weather.*` entity only has the history HAmmond collected. With
-`HAMMOND_OPEN_METEO_ENABLED=true`, `catalog_daily` first stores the hourly
+A `weather.*` entity only has the history Xomtra collected. With
+`XOMTRA_OPEN_METEO_ENABLED=true`, `catalog_daily` first stores the hourly
 `temperature_2m` of the [Open-Meteo historical archive](https://open-meteo.com/en/docs/historical-weather-api)
 for the HA home location (from the HA configuration, rounded to two decimals, about
 1 km) into `bronze.ext_outside_temperature`, for the longest correlation window, and
@@ -140,7 +140,7 @@ HTTPS to `archive-api.open-meteo.com`; a failed download is logged and the corre
 run without it. Open-Meteo is free for non-commercial use; check its terms otherwise.
 
 ```sh
-sudo docker compose exec dagster-daemon hammond-ingest outside-temperature
+sudo docker compose exec dagster-daemon xomtra-ingest outside-temperature
 ```
 
 Example question for Claude: *"Use get_findings for the 365-day correlations and
@@ -151,33 +151,33 @@ explain the top five."*
 After the correlations, `catalog_daily` looks at every series of the same hourly grid
 (same exclusions) one by one and writes to `catalog.finding`:
 
-- `finding_type = 'anomaly'` (`window_days` = `HAMMOND_ANOMALY_RECENT_DAYS`, 7): hours
+- `finding_type = 'anomaly'` (`window_days` = `XOMTRA_ANOMALY_RECENT_DAYS`, 7): hours
   of the last 7 days that are unusual for their hour of the week. The usual value is
   the median of the same local hour of the week over the 56 days before
-  (`HAMMOND_ANOMALY_BASELINE_DAYS`; an hour of the week with fewer than 3 values uses
+  (`XOMTRA_ANOMALY_BASELINE_DAYS`; an hour of the week with fewer than 3 values uses
   the hour of the day). The deviation is scaled by the robust standard deviation
   (1.4826 × MAD) of that hour, shrunk towards the series' overall one. Hours with
-  `|z| >= 4` (`HAMMOND_ANOMALY_Z`) of the same sign form an episode (one normal hour in
+  `|z| >= 4` (`XOMTRA_ANOMALY_Z`) of the same sign form an episode (one normal hour in
   between is bridged); one finding per episode, at most 3 per series: `score` = peak z,
   `n_eff` = anomalous hours, `observed`/`expected` = mean value and usual value of
   those hours, `period_start`/`period_end` = the episode. A series needs 14 days of
   baseline, so binary and enum entities (from the state history) take part only once
-  HAmmond has collected that much.
-- `finding_type = 'change_point'` (`window_days` = `HAMMOND_CHANGEPOINT_WINDOW_DAYS`,
+  Xomtra has collected that much.
+- `finding_type = 'change_point'` (`window_days` = `XOMTRA_CHANGEPOINT_WINDOW_DAYS`,
   90): a lasting shift of the daily mean (local days). For every split in the last 30
-  days (`HAMMOND_CHANGEPOINT_RECENT_DAYS`) with at least 14 days before and 7 after, the
+  days (`XOMTRA_CHANGEPOINT_RECENT_DAYS`) with at least 14 days before and 7 after, the
   difference of the medians is scaled by the robust deviation of the days; the
-  strongest split is reported when it reaches 3 (`HAMMOND_CHANGEPOINT_MIN_SHIFT`) and
+  strongest split is reported when it reaches 3 (`XOMTRA_CHANGEPOINT_MIN_SHIFT`) and
   80 % of the days after lie beyond the median before. `period_start` = first day of
   the new level, `observed`/`expected` = median after/before, `n_eff` = days after.
 
-Significance (ADR 062, `HAMMOND_ANOMALY_METHOD=v2`, the default). The rules above
+Significance (ADR 062, `XOMTRA_ANOMALY_METHOD=v2`, the default). The rules above
 propose candidates (episodes with a peak `|z| >= 3`; the strongest shift of each
 series); whether they are reported depends on calibrated p-values and the
-Benjamini–Hochberg FDR over all candidates of a type (`HAMMOND_ANOMALY_MAX_Q`, 0.05),
+Benjamini–Hochberg FDR over all candidates of a type (`XOMTRA_ANOMALY_MAX_Q`, 0.05),
 not on a fixed threshold per series:
 
-- anomalies: the strength of an episode is its peak `|z|` (at most 50, `HAMMOND_ANOMALY_Z_CAP`) times the square
+- anomalies: the strength of an episode is its peak `|z|` (at most 50, `XOMTRA_ANOMALY_Z_CAP`) times the square
   root of its hours. The scale is never below the sensor's resolution (median step
   between its distinct values) nor below a quarter of the series' 99th percentile
   deviation in the baseline (ADR 066: an appliance that idles most hours is not scaled
@@ -197,8 +197,8 @@ not on a fixed threshold per series:
 
 In a small installation the reference is small and the smallest possible p-value is
 larger, so only strong anomalies pass. The run logs the histogram of p and q (no
-entity names). `v1` keeps the fixed thresholds of 0.2.0 (`HAMMOND_ANOMALY_Z`,
-`HAMMOND_CHANGEPOINT_MIN_SHIFT`).
+entity names). `v1` keeps the fixed thresholds of 0.2.0 (`XOMTRA_ANOMALY_Z`,
+`XOMTRA_CHANGEPOINT_MIN_SHIFT`).
 
 Flags (the finding is kept but ranked last and hidden by `get_findings` by default):
 `short` (an anomaly of one hour), `weather` (the outside temperature, when configured,
@@ -207,7 +207,7 @@ was itself unusual: mean `|z| >= 3` over the episode, or a shift of 3 at the sam
 the hours are not unusual for the new one).
 
 ```sh
-sudo docker compose exec dagster-daemon hammond-ingest anomalies
+sudo docker compose exec dagster-daemon xomtra-ingest anomalies
 ```
 
 ## Usefulness and ranking
@@ -228,7 +228,7 @@ A real and direct finding can still be trivial or of no use. Every finding gets
 A trivial relation gets the flag `trivial`: it is kept, ranked last and hidden by
 `get_findings` by default. Relations flagged `indirect` or `common_factor` are hidden
 too, unless the admin setting *Indirect and common-factor relations*
-(`HAMMOND_CORRELATION_STRUCTURE_DISPLAY`) says `lower` (shown after the unflagged
+(`XOMTRA_CORRELATION_STRUCTURE_DISPLAY`) says `lower` (shown after the unflagged
 findings) or `show` (ranked among them). They keep their flags in every mode, so
 evaluations still see them. Within each type and window the findings are ranked
 unflagged first, then by `usefulness`; ties go to the higher priority of the rule, then
@@ -245,29 +245,29 @@ version.
 
 ## Weekly summary
 
-The Dagster job `findings_weekly` (Monday 07:00 in `HAMMOND_TIMEZONE`) copies the
+The Dagster job `findings_weekly` (Monday 07:00 in `XOMTRA_TIMEZONE`) copies the
 current findings to `catalog.finding_weekly` under the Monday of the week just ended
-(`week_start`), keeping 104 weeks (`HAMMOND_FINDINGS_WEEKLY_KEEP_WEEKS`). The MCP tool
+(`week_start`), keeping 104 weeks (`XOMTRA_FINDINGS_WEEKLY_KEEP_WEEKS`). The MCP tool
 `get_weekly_summary` compares a snapshot with the one before: anomalies and change
 points of that week, correlations that are new or gone, and counts per type. It is
 rendered when read, under the caller's policy, so a role never sees entities it may
 not see. Create the first snapshot by hand after deploying:
 
 ```sh
-sudo docker compose exec dagster-daemon hammond-ingest findings-weekly
+sudo docker compose exec dagster-daemon xomtra-ingest findings-weekly
 ```
 
-Example questions: *"What did HAmmond find last week?"*, *"Are there anomalies on the
+Example questions: *"What did Xomtra find last week?"*, *"Are there anomalies on the
 heat pump in the last days?"* (`get_findings` with `entity_id`).
 
 ## Roles and policy
 
-The built-in policy (`services/mcp-server/src/hammond_mcp/policy.yaml`):
+The built-in policy (`services/mcp-server/src/xomtra_mcp/policy.yaml`):
 
 | Role | Tools | Views | Hidden entities | Hidden columns | Rows per call |
 | --- | --- | --- | --- | --- | --- |
-| `HAmmond.Admin` | all | all | none | none | 10 000 |
-| `HAmmond.Reader` | catalog, data and findings tools | all but `catalog_drift` | `person.*`, `device_tracker.*`, `zone.*`, `camera.*`, `image.*`, `lock.*`, `alarm_control_panel.*`, `*_location` | `states.attributes` | 1 000 |
+| `Xomtra.Admin` | all | all | none | none | 10 000 |
+| `Xomtra.Reader` | catalog, data and findings tools | all but `catalog_drift` | `person.*`, `device_tracker.*`, `zone.*`, `camera.*`, `image.*`, `lock.*`, `alarm_control_panel.*`, `*_location` | `states.attributes` | 1 000 |
 | no role | `whoami` only | – | – | – | – |
 
 Hidden entities and columns are filtered inside the database (the views a caller can
@@ -276,9 +276,9 @@ hidden entities are removed from its group lists); asking
 for a hidden entity directly is refused and audited as `denied`. State attributes are
 hidden from Reader because they carry free text (media titles, addresses, coordinates,
 e-mails) also outside the hidden domains. To change
-the policy, mount your own file into the `mcp` container and set `HAMMOND_POLICY_FILE`.
+the policy, mount your own file into the `mcp` container and set `XOMTRA_POLICY_FILE`.
 
-Assign the roles in Entra: **Enterprise applications → HAmmond MCP → Users and groups**
+Assign the roles in Entra: **Enterprise applications → Xomtra MCP → Users and groups**
 (see [Entra app registration](entra-app-registration.md), step 6). A new role takes
 effect after the user reconnects the connector in claude.ai.
 
@@ -288,15 +288,15 @@ effect after the user reconnects the connector in claude.ai.
 without a schema. Table functions, file paths, `ATTACH`, `SET`, `PRAGMA` and functions
 that read files or run SQL from strings are refused. Behind that check the query runs
 on a DuckDB connection with the lake attached read-only, external file and network
-access disabled and the configuration locked, limited by `HAMMOND_QUERY_TIMEOUT_SECONDS`
-(30 s), `HAMMOND_MCP_DUCKDB_MEMORY_LIMIT` and the role's row limit.
+access disabled and the configuration locked, limited by `XOMTRA_QUERY_TIMEOUT_SECONDS`
+(30 s), `XOMTRA_MCP_DUCKDB_MEMORY_LIMIT` and the role's row limit.
 
 ## Audit
 
 Each tool call is one row in `audit.tool_call` (database `audit`): time, Entra object
 id, username, roles, OAuth client, tool, arguments (SQL included), decision, outcome,
-error, rows and duration. The MCP server's role `hammond_audit` may only `INSERT`. The
-same record is logged as a JSON line by the `hammond.audit` logger. If the database
+error, rows and duration. The MCP server's role `xomtra_audit` may only `INSERT`. The
+same record is logged as a JSON line by the `xomtra.audit` logger. If the database
 cannot store the record, the call fails instead of returning data.
 
 Records are kept for `AUDIT_RETENTION_DAYS` (default 90, `0` keeps everything). Once a day
@@ -312,7 +312,7 @@ sudo docker compose exec postgres psql -U postgres -d audit -c \
 ## Upgrade from 1a.2
 
 1. Add `AUDIT_PG_PASSWORD` (e.g. `openssl rand -hex 32`) to `.env`; optionally
-   `HAMMOND_TIMEZONE`, `HAMMOND_QUERY_TIMEOUT_SECONDS`, `HAMMOND_MCP_*` limits.
+   `XOMTRA_TIMEZONE`, `XOMTRA_QUERY_TIMEOUT_SECONDS`, `XOMTRA_MCP_*` limits.
 2. Copy the new `deploy/compose`, pin the new image digests, then
    `sudo docker compose pull && sudo docker compose up -d` (`postgres-init` creates the
    audit database and role).

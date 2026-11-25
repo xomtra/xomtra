@@ -9,7 +9,7 @@ cat > /etc/seaweedfs/s3.json <<JSON
 {
   "identities": [
     {
-      "name": "hammond",
+      "name": "xomtra",
       "credentials": [{"accessKey": "${S3_ACCESS_KEY}", "secretKey": "${S3_SECRET_KEY}"}],
       "actions": ["Admin", "Read", "Write", "List", "Tagging"]
     }

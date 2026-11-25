@@ -110,11 +110,11 @@ async def test_no_ingest_label_skips_states_and_statistics(
     setup_registries(fake)
     # Labelled on the device: every entity of the device is left out.
     fake.results["config/device_registry/list"].append(
-        {"id": "d2", "name": "Noisy", "labels": ["hammond_no_ingest"]}
+        {"id": "d2", "name": "Noisy", "labels": ["xomtra_no_ingest"]}
     )
     fake.results["config/entity_registry/list"] += [
         {"id": "e2", "entity_id": "sensor.noisy", "device_id": "d2"},
-        {"id": "e3", "entity_id": "sensor.private", "labels": ["hammond_no_ingest"]},
+        {"id": "e3", "entity_id": "sensor.private", "labels": ["xomtra_no_ingest"]},
     ]
     fake.results["recorder/list_statistic_ids"].append({"statistic_id": "sensor.noisy"})
     seen: set[str] = set()

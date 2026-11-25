@@ -1,61 +1,61 @@
-# HAmmond stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
+# Xomtra stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
 # + Postgres (DuckLake catalog, Dagster and SQLMesh state) + SeaweedFS (S3).
 # Usage: ./init-env.sh (generates .env with all internal secrets, ADR 061), check the
 # few values it asks about, then docker compose up -d
-# Access (ADR 056): HAMMOND_ACCESS_MODE=public (Claude connector on a public host,
+# Access (ADR 056): XOMTRA_ACCESS_MODE=public (Claude connector on a public host,
 # OAuth) or local (LAN only, personal tokens, Caddy's local CA).
 # Only Caddy is published (HTTPS); the MCP server is reachable only through it and
 # audits every tool call into the Postgres DB "audit" (INSERT-only role). The
 # Dagster UI is published on loopback only (SSH tunnel, see docs/setup/ingest.md).
 
-name: hammond
+name: xomtra
 
 x-lake-env: &lake-env
-  HAMMOND_LAKE_PG_HOST: postgres
-  HAMMOND_LAKE_PG_DB: ${DUCKLAKE_PG_DB:-ducklake}
-  HAMMOND_LAKE_PG_USER: ${DUCKLAKE_PG_USER:-ducklake}
-  HAMMOND_LAKE_PG_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
-  HAMMOND_S3_ENDPOINT: seaweedfs:8333
-  HAMMOND_S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env}
-  HAMMOND_S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env}
-  HAMMOND_S3_BUCKET: ${S3_BUCKET:-hammond}
+  XOMTRA_LAKE_PG_HOST: postgres
+  XOMTRA_LAKE_PG_DB: ${DUCKLAKE_PG_DB:-ducklake}
+  XOMTRA_LAKE_PG_USER: ${DUCKLAKE_PG_USER:-ducklake}
+  XOMTRA_LAKE_PG_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
+  XOMTRA_S3_ENDPOINT: seaweedfs:8333
+  XOMTRA_S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env}
+  XOMTRA_S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env}
+  XOMTRA_S3_BUCKET: ${S3_BUCKET:-xomtra}
 
 x-ops-env: &ops-env
-  HAMMOND_OPS_PG_HOST: postgres
-  HAMMOND_OPS_PG_USER: ${OPS_PG_USER:-hammond_ops}
-  HAMMOND_OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
-  HAMMOND_DAGSTER_PG_DB: ${DAGSTER_PG_DB:-dagster}
-  HAMMOND_SQLMESH_PG_DB: ${SQLMESH_PG_DB:-sqlmesh}
-  HAMMOND_WORKER_PG_DB: ${WORKER_PG_DB:-ops}
+  XOMTRA_OPS_PG_HOST: postgres
+  XOMTRA_OPS_PG_USER: ${OPS_PG_USER:-xomtra_ops}
+  XOMTRA_OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
+  XOMTRA_DAGSTER_PG_DB: ${DAGSTER_PG_DB:-dagster}
+  XOMTRA_SQLMESH_PG_DB: ${SQLMESH_PG_DB:-sqlmesh}
+  XOMTRA_WORKER_PG_DB: ${WORKER_PG_DB:-ops}
   # Analysis settings stored in the admin GUI (ADR 060), schema analysis of the audit DB.
-  HAMMOND_ANALYSIS_SETTINGS_DB: ${AUDIT_PG_DB:-audit}
+  XOMTRA_ANALYSIS_SETTINGS_DB: ${AUDIT_PG_DB:-audit}
 
 x-ingest-env: &ingest-env
   <<: [*lake-env, *ops-env]
-  HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
-  HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
-  HAMMOND_STATES_RETENTION_DAYS: ${HAMMOND_STATES_RETENTION_DAYS:-365}
-  HAMMOND_STATISTICS_5MIN_RETENTION_DAYS: ${HAMMOND_STATISTICS_5MIN_RETENTION_DAYS:-365}
-  HAMMOND_STATISTICS_HOUR_RETENTION_DAYS: ${HAMMOND_STATISTICS_HOUR_RETENTION_DAYS:-1825}
-  HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
-  HAMMOND_CATALOG_WINDOW_DAYS: ${HAMMOND_CATALOG_WINDOW_DAYS:-30}
+  XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
+  XOMTRA_HA_TOKEN: ${XOMTRA_HA_TOKEN:-}
+  XOMTRA_STATES_RETENTION_DAYS: ${XOMTRA_STATES_RETENTION_DAYS:-365}
+  XOMTRA_STATISTICS_5MIN_RETENTION_DAYS: ${XOMTRA_STATISTICS_5MIN_RETENTION_DAYS:-365}
+  XOMTRA_STATISTICS_HOUR_RETENTION_DAYS: ${XOMTRA_STATISTICS_HOUR_RETENTION_DAYS:-1825}
+  XOMTRA_TIMEZONE: ${XOMTRA_TIMEZONE:-UTC}
+  XOMTRA_CATALOG_WINDOW_DAYS: ${XOMTRA_CATALOG_WINDOW_DAYS:-30}
   # Home Assistant label ids that leave entities out (ADR 044).
-  HAMMOND_LABEL_NO_INGEST: ${HAMMOND_LABEL_NO_INGEST:-hammond_no_ingest}
-  HAMMOND_LABEL_NO_ANALYSIS: ${HAMMOND_LABEL_NO_ANALYSIS:-hammond_no_analysis}
+  XOMTRA_LABEL_NO_INGEST: ${XOMTRA_LABEL_NO_INGEST:-xomtra_no_ingest}
+  XOMTRA_LABEL_NO_ANALYSIS: ${XOMTRA_LABEL_NO_ANALYSIS:-xomtra_no_analysis}
   # Correlations (ADR 042): entity_id of the outside temperature (regressed out as a
   # common driver) and the analysed windows in days.
-  HAMMOND_CORRELATION_OUTSIDE_TEMP: ${HAMMOND_CORRELATION_OUTSIDE_TEMP:-}
-  HAMMOND_CORRELATION_WINDOWS_DAYS: ${HAMMOND_CORRELATION_WINDOWS_DAYS:-[365, 30]}
+  XOMTRA_CORRELATION_OUTSIDE_TEMP: ${XOMTRA_CORRELATION_OUTSIDE_TEMP:-}
+  XOMTRA_CORRELATION_WINDOWS_DAYS: ${XOMTRA_CORRELATION_WINDOWS_DAYS:-[365, 30]}
   # Outside temperature history from the Open-Meteo archive (ADR 043); sends the HA
   # home coordinates rounded to ~1 km to archive-api.open-meteo.com.
-  HAMMOND_OPEN_METEO_ENABLED: ${HAMMOND_OPEN_METEO_ENABLED:-false}
+  XOMTRA_OPEN_METEO_ENABLED: ${XOMTRA_OPEN_METEO_ENABLED:-false}
   # Anomalies and change points of single entities (ADR 046), daily after correlations.
-  HAMMOND_ANOMALIES_ENABLED: ${HAMMOND_ANOMALIES_ENABLED:-true}
-  HAMMOND_ANOMALY_Z: ${HAMMOND_ANOMALY_Z:-4.0}
-  # DuckDB budget per process; queries spill to HAMMOND_DUCKDB_TEMP_DIR beyond it.
-  HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_DUCKDB_MEMORY_LIMIT:-2GB}
-  HAMMOND_DUCKDB_THREADS: ${HAMMOND_DUCKDB_THREADS:-2}
-  HAMMOND_DUCKDB_MAX_TEMP_SIZE: ${HAMMOND_DUCKDB_MAX_TEMP_SIZE:-8GB}
+  XOMTRA_ANOMALIES_ENABLED: ${XOMTRA_ANOMALIES_ENABLED:-true}
+  XOMTRA_ANOMALY_Z: ${XOMTRA_ANOMALY_Z:-4.0}
+  # DuckDB budget per process; queries spill to XOMTRA_DUCKDB_TEMP_DIR beyond it.
+  XOMTRA_DUCKDB_MEMORY_LIMIT: ${XOMTRA_DUCKDB_MEMORY_LIMIT:-2GB}
+  XOMTRA_DUCKDB_THREADS: ${XOMTRA_DUCKDB_THREADS:-2}
+  XOMTRA_DUCKDB_MAX_TEMP_SIZE: ${XOMTRA_DUCKDB_MAX_TEMP_SIZE:-8GB}
 
 x-hardening: &hardening
   restart: unless-stopped
@@ -93,15 +93,15 @@ services:
       DUCKLAKE_DB: ${DUCKLAKE_PG_DB:-ducklake}
       DUCKLAKE_USER: ${DUCKLAKE_PG_USER:-ducklake}
       DUCKLAKE_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
-      OPS_USER: ${OPS_PG_USER:-hammond_ops}
+      OPS_USER: ${OPS_PG_USER:-xomtra_ops}
       OPS_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
       DAGSTER_DB: ${DAGSTER_PG_DB:-dagster}
       SQLMESH_DB: ${SQLMESH_PG_DB:-sqlmesh}
       OPS_DB: ${WORKER_PG_DB:-ops}
       AUDIT_DB: ${AUDIT_PG_DB:-audit}
-      AUDIT_USER: ${AUDIT_PG_USER:-hammond_audit}
+      AUDIT_USER: ${AUDIT_PG_USER:-xomtra_audit}
       AUDIT_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD in .env}
-      AUDIT_ADMIN_USER: ${AUDIT_ADMIN_PG_USER:-hammond_audit_admin}
+      AUDIT_ADMIN_USER: ${AUDIT_ADMIN_PG_USER:-xomtra_audit_admin}
       AUDIT_ADMIN_PASSWORD: ${AUDIT_ADMIN_PG_PASSWORD:?set AUDIT_ADMIN_PG_PASSWORD in .env}
       AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-90}
     volumes:
@@ -136,7 +136,7 @@ services:
     image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
     entrypoint: ["/bin/sh", "/create-bucket.sh"]
     environment:
-      S3_BUCKET: ${S3_BUCKET:-hammond}
+      S3_BUCKET: ${S3_BUCKET:-xomtra}
     volumes:
       - ./seaweedfs/create-bucket.sh:/create-bucket.sh:ro
     depends_on:
@@ -145,7 +145,7 @@ services:
     networks: [backend]
 
   ducklake-init:
-    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/xomtra/hammond-mcp:0.4.1}
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.4.1}
     entrypoint: ["python", "-m", "hacore.lake", "init"]
     environment: *lake-env
     depends_on:
@@ -158,37 +158,37 @@ services:
 
   mcp:
     <<: *hardening
-    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/xomtra/hammond-mcp:0.4.1}
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.4.1}
     environment:
       <<: *lake-env
-      HAMMOND_AUTH_MODE: ${HAMMOND_AUTH_MODE:-entra}
-      HAMMOND_ACCESS_MODE: ${HAMMOND_ACCESS_MODE:-public}
-      HAMMOND_BASE_URL: ${HAMMOND_BASE_URL:-}
-      HAMMOND_ENTRA_TENANT_ID: ${HAMMOND_ENTRA_TENANT_ID:-}
-      HAMMOND_ENTRA_CLIENT_ID: ${HAMMOND_ENTRA_CLIENT_ID:-}
-      HAMMOND_ENTRA_CLIENT_SECRET: ${HAMMOND_ENTRA_CLIENT_SECRET:-}
-      # Sign-in with a Home Assistant account (HAMMOND_AUTH_MODE=ha, ADR 053).
-      HAMMOND_HA_AUTH_URL: ${HAMMOND_HA_AUTH_URL:-}
-      HAMMOND_HA_ALLOWED_USERS: ${HAMMOND_HA_ALLOWED_USERS:-}
-      HAMMOND_HA_ROLE_MAP: ${HAMMOND_HA_ROLE_MAP:-admin=HAmmond.Admin,user=HAmmond.Reader}
-      HAMMOND_ENTRA_REQUIRED_SCOPES: ${HAMMOND_ENTRA_REQUIRED_SCOPES:-mcp.access}
-      HAMMOND_JWT_SIGNING_KEY: ${HAMMOND_JWT_SIGNING_KEY:-}
-      HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
-      HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
+      XOMTRA_AUTH_MODE: ${XOMTRA_AUTH_MODE:-entra}
+      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-public}
+      XOMTRA_BASE_URL: ${XOMTRA_BASE_URL:-}
+      XOMTRA_ENTRA_TENANT_ID: ${XOMTRA_ENTRA_TENANT_ID:-}
+      XOMTRA_ENTRA_CLIENT_ID: ${XOMTRA_ENTRA_CLIENT_ID:-}
+      XOMTRA_ENTRA_CLIENT_SECRET: ${XOMTRA_ENTRA_CLIENT_SECRET:-}
+      # Sign-in with a Home Assistant account (XOMTRA_AUTH_MODE=ha, ADR 053).
+      XOMTRA_HA_AUTH_URL: ${XOMTRA_HA_AUTH_URL:-}
+      XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
+      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=Xomtra.Admin,user=Xomtra.Reader}
+      XOMTRA_ENTRA_REQUIRED_SCOPES: ${XOMTRA_ENTRA_REQUIRED_SCOPES:-mcp.access}
+      XOMTRA_JWT_SIGNING_KEY: ${XOMTRA_JWT_SIGNING_KEY:-}
+      XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
+      XOMTRA_HA_TOKEN: ${XOMTRA_HA_TOKEN:-}
       # Audit of every tool call (INSERT-only role, ADR 040).
-      HAMMOND_AUDIT_PG_HOST: postgres
-      HAMMOND_AUDIT_PG_DB: ${AUDIT_PG_DB:-audit}
-      HAMMOND_AUDIT_PG_USER: ${AUDIT_PG_USER:-hammond_audit}
-      HAMMOND_AUDIT_PG_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD in .env}
-      HAMMOND_POLICY_FILE: ${HAMMOND_POLICY_FILE:-}
-      HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
-      HAMMOND_QUERY_TIMEOUT_SECONDS: ${HAMMOND_QUERY_TIMEOUT_SECONDS:-30}
+      XOMTRA_AUDIT_PG_HOST: postgres
+      XOMTRA_AUDIT_PG_DB: ${AUDIT_PG_DB:-audit}
+      XOMTRA_AUDIT_PG_USER: ${AUDIT_PG_USER:-xomtra_audit}
+      XOMTRA_AUDIT_PG_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD in .env}
+      XOMTRA_POLICY_FILE: ${XOMTRA_POLICY_FILE:-}
+      XOMTRA_TIMEZONE: ${XOMTRA_TIMEZONE:-UTC}
+      XOMTRA_QUERY_TIMEOUT_SECONDS: ${XOMTRA_QUERY_TIMEOUT_SECONDS:-30}
       # DuckDB of query_sql/get_timeseries; spills to /data beyond the memory limit.
-      HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_MCP_DUCKDB_MEMORY_LIMIT:-768MB}
-      HAMMOND_DUCKDB_THREADS: ${HAMMOND_DUCKDB_THREADS:-2}
-      HAMMOND_DUCKDB_TEMP_DIR: /data/duckdb-tmp
-      HAMMOND_DUCKDB_MAX_TEMP_SIZE: ${HAMMOND_MCP_DUCKDB_MAX_TEMP_SIZE:-2GB}
-    mem_limit: ${HAMMOND_MCP_MEM_LIMIT:-1536m}
+      XOMTRA_DUCKDB_MEMORY_LIMIT: ${XOMTRA_MCP_DUCKDB_MEMORY_LIMIT:-768MB}
+      XOMTRA_DUCKDB_THREADS: ${XOMTRA_DUCKDB_THREADS:-2}
+      XOMTRA_DUCKDB_TEMP_DIR: /data/duckdb-tmp
+      XOMTRA_DUCKDB_MAX_TEMP_SIZE: ${XOMTRA_MCP_DUCKDB_MAX_TEMP_SIZE:-2GB}
+    mem_limit: ${XOMTRA_MCP_MEM_LIMIT:-1536m}
     volumes:
       - mcp-data:/data
     read_only: true
@@ -201,19 +201,19 @@ services:
   # Live state_changed stream with catch-up (writes bronze.ha_states continuously).
   ingest-stream:
     <<: *hardening
-    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/xomtra/hammond-ingest:0.4.1}
-    command: ["hammond-ingest", "stream"]
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.4.1}
+    command: ["xomtra-ingest", "stream"]
     environment:
       <<: *ingest-env
-      HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_STREAM_DUCKDB_MEMORY_LIMIT:-512MB}
+      XOMTRA_DUCKDB_MEMORY_LIMIT: ${XOMTRA_STREAM_DUCKDB_MEMORY_LIMIT:-512MB}
     # Hard caps per container: a runaway query is killed here, not the whole VM.
-    mem_limit: ${HAMMOND_STREAM_MEM_LIMIT:-1g}
+    mem_limit: ${XOMTRA_STREAM_MEM_LIMIT:-1g}
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
     healthcheck:
       # The heartbeat file is touched after every flush (default every 30 s).
-      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/hammond-stream.heartbeat') < 180 else 1)"]
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/xomtra-stream.heartbeat') < 180 else 1)"]
       interval: 60s
       timeout: 5s
       retries: 3
@@ -226,14 +226,14 @@ services:
   # retention). Runs execute in this container.
   dagster-daemon:
     <<: *hardening
-    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/xomtra/hammond-ingest:0.4.1}
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.4.1}
     command: ["dagster-daemon", "run", "-w", "/app/dagster/workspace.yaml"]
     environment:
       <<: *ingest-env
       # DuckDB spills here (disk volume); /tmp is tmpfs and would take RAM again.
-      HAMMOND_DUCKDB_TEMP_DIR: /data/duckdb-tmp
-    # Keep above HAMMOND_DUCKDB_MEMORY_LIMIT + ~1 GB for Python, Dagster and SQLMesh.
-    mem_limit: ${HAMMOND_DAGSTER_MEM_LIMIT:-3g}
+      XOMTRA_DUCKDB_TEMP_DIR: /data/duckdb-tmp
+    # Keep above XOMTRA_DUCKDB_MEMORY_LIMIT + ~1 GB for Python, Dagster and SQLMesh.
+    mem_limit: ${XOMTRA_DAGSTER_MEM_LIMIT:-3g}
     volumes:
       - ingest-data:/data
     read_only: true
@@ -248,16 +248,16 @@ services:
   # http://127.0.0.1:3000/admin/dagster/
   dagster-webserver:
     <<: *hardening
-    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/xomtra/hammond-ingest:0.4.1}
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.4.1}
     command:
       [
         "dagster-webserver", "-h", "0.0.0.0", "-p", "3000",
         "--path-prefix", "/admin/dagster", "-w", "/app/dagster/workspace.yaml",
       ]
     environment: *ingest-env
-    mem_limit: ${HAMMOND_DAGSTER_WEBSERVER_MEM_LIMIT:-1g}
+    mem_limit: ${XOMTRA_DAGSTER_WEBSERVER_MEM_LIMIT:-1g}
     ports:
-      - "${HAMMOND_DAGSTER_BIND:-127.0.0.1}:3000:3000"
+      - "${XOMTRA_DAGSTER_BIND:-127.0.0.1}:3000:3000"
     volumes:
       - ingest-data:/data
     read_only: true
@@ -277,39 +277,39 @@ services:
   # retention, audit; guards the Dagster UI for Caddy (forward_auth).
   admin:
     <<: *hardening
-    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/xomtra/hammond-mcp:0.4.1}
-    # The image entrypoint is hammond-mcp; the admin GUI is another program in it.
-    entrypoint: ["hammond-admin"]
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.4.1}
+    # The image entrypoint is xomtra-mcp; the admin GUI is another program in it.
+    entrypoint: ["xomtra-admin"]
     environment:
       <<: *lake-env
-      HAMMOND_AUTH_MODE: ${HAMMOND_AUTH_MODE:-entra}
-      HAMMOND_ACCESS_MODE: ${HAMMOND_ACCESS_MODE:-public}
-      HAMMOND_BASE_URL: ${HAMMOND_BASE_URL:-}
-      HAMMOND_ENTRA_TENANT_ID: ${HAMMOND_ENTRA_TENANT_ID:-}
-      HAMMOND_ENTRA_CLIENT_ID: ${HAMMOND_ENTRA_CLIENT_ID:-}
-      HAMMOND_ENTRA_CLIENT_SECRET: ${HAMMOND_ENTRA_CLIENT_SECRET:-}
-      # Sign-in with a Home Assistant account (HAMMOND_AUTH_MODE=ha, ADR 053).
-      HAMMOND_HA_AUTH_URL: ${HAMMOND_HA_AUTH_URL:-}
-      HAMMOND_HA_ALLOWED_USERS: ${HAMMOND_HA_ALLOWED_USERS:-}
-      HAMMOND_HA_ROLE_MAP: ${HAMMOND_HA_ROLE_MAP:-admin=HAmmond.Admin,user=HAmmond.Reader}
-      HAMMOND_ADMIN_SESSION_KEY: ${HAMMOND_ADMIN_SESSION_KEY:?set HAMMOND_ADMIN_SESSION_KEY in .env}
+      XOMTRA_AUTH_MODE: ${XOMTRA_AUTH_MODE:-entra}
+      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-public}
+      XOMTRA_BASE_URL: ${XOMTRA_BASE_URL:-}
+      XOMTRA_ENTRA_TENANT_ID: ${XOMTRA_ENTRA_TENANT_ID:-}
+      XOMTRA_ENTRA_CLIENT_ID: ${XOMTRA_ENTRA_CLIENT_ID:-}
+      XOMTRA_ENTRA_CLIENT_SECRET: ${XOMTRA_ENTRA_CLIENT_SECRET:-}
+      # Sign-in with a Home Assistant account (XOMTRA_AUTH_MODE=ha, ADR 053).
+      XOMTRA_HA_AUTH_URL: ${XOMTRA_HA_AUTH_URL:-}
+      XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
+      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=Xomtra.Admin,user=Xomtra.Reader}
+      XOMTRA_ADMIN_SESSION_KEY: ${XOMTRA_ADMIN_SESSION_KEY:?set XOMTRA_ADMIN_SESSION_KEY in .env}
       # MCP endpoint shown with new personal tokens (local access); default <base_url>/mcp.
-      HAMMOND_MCP_URL: ${HAMMOND_MCP_URL:-}
-      HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
-      HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
-      HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
-      HAMMOND_AUDIT_PG_HOST: postgres
-      HAMMOND_AUDIT_PG_DB: ${AUDIT_PG_DB:-audit}
-      HAMMOND_AUDIT_ADMIN_USER: ${AUDIT_ADMIN_PG_USER:-hammond_audit_admin}
-      HAMMOND_AUDIT_ADMIN_PASSWORD: ${AUDIT_ADMIN_PG_PASSWORD:?set AUDIT_ADMIN_PG_PASSWORD in .env}
-      HAMMOND_STATES_RETENTION_DAYS: ${HAMMOND_STATES_RETENTION_DAYS:-365}
-      HAMMOND_STATISTICS_5MIN_RETENTION_DAYS: ${HAMMOND_STATISTICS_5MIN_RETENTION_DAYS:-365}
-      HAMMOND_STATISTICS_HOUR_RETENTION_DAYS: ${HAMMOND_STATISTICS_HOUR_RETENTION_DAYS:-1825}
-      HAMMOND_CATALOG_WINDOW_DAYS: ${HAMMOND_CATALOG_WINDOW_DAYS:-30}
-      HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_ADMIN_DUCKDB_MEMORY_LIMIT:-256MB}
-      HAMMOND_DUCKDB_THREADS: "1"
-      HAMMOND_DUCKDB_TEMP_DIR: /tmp/duckdb
-    mem_limit: ${HAMMOND_ADMIN_MEM_LIMIT:-512m}
+      XOMTRA_MCP_URL: ${XOMTRA_MCP_URL:-}
+      XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
+      XOMTRA_HA_TOKEN: ${XOMTRA_HA_TOKEN:-}
+      XOMTRA_TIMEZONE: ${XOMTRA_TIMEZONE:-UTC}
+      XOMTRA_AUDIT_PG_HOST: postgres
+      XOMTRA_AUDIT_PG_DB: ${AUDIT_PG_DB:-audit}
+      XOMTRA_AUDIT_ADMIN_USER: ${AUDIT_ADMIN_PG_USER:-xomtra_audit_admin}
+      XOMTRA_AUDIT_ADMIN_PASSWORD: ${AUDIT_ADMIN_PG_PASSWORD:?set AUDIT_ADMIN_PG_PASSWORD in .env}
+      XOMTRA_STATES_RETENTION_DAYS: ${XOMTRA_STATES_RETENTION_DAYS:-365}
+      XOMTRA_STATISTICS_5MIN_RETENTION_DAYS: ${XOMTRA_STATISTICS_5MIN_RETENTION_DAYS:-365}
+      XOMTRA_STATISTICS_HOUR_RETENTION_DAYS: ${XOMTRA_STATISTICS_HOUR_RETENTION_DAYS:-1825}
+      XOMTRA_CATALOG_WINDOW_DAYS: ${XOMTRA_CATALOG_WINDOW_DAYS:-30}
+      XOMTRA_DUCKDB_MEMORY_LIMIT: ${XOMTRA_ADMIN_DUCKDB_MEMORY_LIMIT:-256MB}
+      XOMTRA_DUCKDB_THREADS: "1"
+      XOMTRA_DUCKDB_TEMP_DIR: /tmp/duckdb
+    mem_limit: ${XOMTRA_ADMIN_MEM_LIMIT:-512m}
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -325,19 +325,19 @@ services:
 
   caddy:
     <<: *hardening
-    image: ${HAMMOND_CADDY_IMAGE:-ghcr.io/xomtra/hammond-caddy:0.4.1}
+    image: ${XOMTRA_CADDY_IMAGE:-ghcr.io/xomtra/xomtra-caddy:0.4.1}
     # The image checks the values its access mode needs at start (deploy/caddy/start.sh).
     environment:
-      HAMMOND_ACCESS_MODE: ${HAMMOND_ACCESS_MODE:-public}
-      HAMMOND_PUBLIC_HOST: ${HAMMOND_PUBLIC_HOST:-}
+      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-public}
+      XOMTRA_PUBLIC_HOST: ${XOMTRA_PUBLIC_HOST:-}
       ACME_EMAIL: ${ACME_EMAIL:-}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       CLAUDE_IP_RANGES: ${CLAUDE_IP_RANGES:-}
-      HAMMOND_LOCAL_HOST: ${HAMMOND_LOCAL_HOST:-}
+      XOMTRA_LOCAL_HOST: ${XOMTRA_LOCAL_HOST:-}
       LAN_CIDR: ${LAN_CIDR:-10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7}
       ADMIN_CIDR: ${ADMIN_CIDR:?set ADMIN_CIDR in .env}
     ports:
-      - "${HAMMOND_HTTPS_BIND:-0.0.0.0}:443:8443"
+      - "${XOMTRA_HTTPS_BIND:-0.0.0.0}:443:8443"
     volumes:
       - caddy-data:/data
       - caddy-config:/config

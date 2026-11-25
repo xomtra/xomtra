@@ -1,7 +1,7 @@
 [project]
-name = "hammond-mcp"
+name = "xomtra-mcp"
 version = "0.4.1"
-description = "HAmmond MCP server (FastMCP) with OAuth proxy to Microsoft Entra ID"
+description = "Xomtra MCP server (FastMCP) with OAuth proxy to Microsoft Entra ID"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "Apache-2.0"
@@ -15,15 +15,15 @@ dependencies = [
 ]
 
 [project.scripts]
-hammond-mcp = "hammond_mcp.__main__:main"
-hammond-admin = "hammond_mcp.admin.__main__:main"
+xomtra-mcp = "xomtra_mcp.__main__:main"
+xomtra-admin = "xomtra_mcp.admin.__main__:main"
 
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hammond_mcp"]
+packages = ["src/xomtra_mcp"]
 
 [tool.uv.sources]
 hacore = { workspace = true }

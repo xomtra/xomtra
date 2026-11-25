@@ -208,7 +208,7 @@ def _stage(
     records: Iterable[Mapping[str, Any]],
 ) -> int:
     """Load records into a temporary table via an NDJSON file; returns the row count."""
-    fd, path = tempfile.mkstemp(prefix=f"hammond-{name}-", suffix=".ndjson")
+    fd, path = tempfile.mkstemp(prefix=f"xomtra-{name}-", suffix=".ndjson")
     count = 0
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:

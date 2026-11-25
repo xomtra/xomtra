@@ -2,8 +2,8 @@ import pytest
 from pydantic import SecretStr
 
 from hacore.analysis_settings import BY_KEY, SPECS, parse_stored
-from hammond_ingest import analysis_store
-from hammond_ingest.settings import IngestSettings
+from xomtra_ingest import analysis_store
+from xomtra_ingest.settings import IngestSettings
 
 
 def test_specs_match_ingest_settings() -> None:
@@ -47,8 +47,8 @@ def test_parse_stored_skips_unknown_and_invalid() -> None:
 
 
 def test_stored_values_win_over_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HAMMOND_CORRELATION_MIN_R", "0.35")
-    monkeypatch.setenv("HAMMOND_ANOMALY_MAX_Q", "0.1")
+    monkeypatch.setenv("XOMTRA_CORRELATION_MIN_R", "0.35")
+    monkeypatch.setenv("XOMTRA_ANOMALY_MAX_Q", "0.1")
     s = IngestSettings()
     out = analysis_store.with_overrides(s, {"correlation_min_r": 0.5, "ha_token": "x"})  # type: ignore[dict-item]
     assert out.correlation_min_r == 0.5

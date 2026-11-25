@@ -1,6 +1,6 @@
 # Host VM (Proxmox, Debian 13)
 
-The VM is the only Internet-facing part of HAmmond. It goes into an **existing DMZ
+The VM is the only Internet-facing part of Xomtra. It goes into an **existing DMZ
 network** (`<dmz-cidr>`) that is isolated from the internal networks by the router; no
 new VLAN is needed. Placeholders: `<vm-ip>` (static address of the VM in the DMZ),
 `<ha-ip>` (Home Assistant), `<admin-cidr>` (network you administer from).
@@ -50,8 +50,8 @@ Add the VM to your Proxmox Backup Server job.
 ```bash
 ssh <admin>@<vm-ip>
 sudo apt-get update && sudo apt-get install -y git
-git clone https://github.com/xomtra/xomtra.git ~/hammond
-sudo ADMIN_CIDR=<admin-cidr> ~/hammond/deploy/vm/bootstrap-debian13.sh
+git clone https://github.com/xomtra/xomtra.git ~/xomtra
+sudo ADMIN_CIDR=<admin-cidr> ~/xomtra/deploy/vm/bootstrap-debian13.sh
 ```
 
 `<admin-cidr>` is the network **of the machine you are typing on** (check its address),
@@ -77,18 +77,18 @@ Compare the new fingerprint (`qm guest exec <vmid> -- ssh-keygen -lf
 
 Prerequisites: [Entra app registration](entra-app-registration.md), DNS record and
 Cloudflare token from the [connector guide](claude-connector.md), and the GHCR packages
-`hammond-mcp` and `hammond-caddy` set to *Public* (otherwise `docker login ghcr.io`
+`xomtra-mcp` and `xomtra-caddy` set to *Public* (otherwise `docker login ghcr.io`
 with a read-only token first).
 
-`/opt/hammond` is readable by root only (it holds `.env`), so work in a root shell:
+`/opt/xomtra` is readable by root only (it holds `.env`), so work in a root shell:
 
 ```bash
 sudo -i
-install -d -m 750 /opt/hammond
-cp -r ~<admin>/hammond/deploy/compose/. /opt/hammond/
-cp /opt/hammond/.env.example /opt/hammond/.env
-chmod 600 /opt/hammond/.env && editor /opt/hammond/.env   # fill in all values
-cd /opt/hammond
+install -d -m 750 /opt/xomtra
+cp -r ~<admin>/xomtra/deploy/compose/. /opt/xomtra/
+cp /opt/xomtra/.env.example /opt/xomtra/.env
+chmod 600 /opt/xomtra/.env && editor /opt/xomtra/.env   # fill in all values
+cd /opt/xomtra
 docker compose pull
 docker compose up -d
 docker compose ps                     # ducklake-init exited (0), mcp healthy, caddy up
@@ -97,9 +97,9 @@ exit
 ```
 
 Before the first deployment take the `*_IMAGE` lines from the release asset
-`hammond-<version>-images.env` and verify the signatures ([Releases](../releasing.md)).
+`xomtra-<version>-images.env` and verify the signatures ([Releases](../releasing.md)).
 Automatic pull + verification comes in a later iteration.
 
 Home Assistant: create a dedicated **non-admin** HA user, a long-lived access token
-for it, and set `HAMMOND_HA_URL=http://<ha-ip>:8123` and `HAMMOND_HA_TOKEN` in `.env`.
+for it, and set `XOMTRA_HA_URL=http://<ha-ip>:8123` and `XOMTRA_HA_TOKEN` in `.env`.
 The ingest (phase 1a.2) needs it; see [Data ingest](ingest.md).

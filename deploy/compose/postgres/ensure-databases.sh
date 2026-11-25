@@ -1,5 +1,5 @@
 #!/bin/sh
-# Idempotently creates the roles and databases of HAmmond (runs on every `up`, so that
+# Idempotently creates the roles and databases of Xomtra (runs on every `up`, so that
 # existing installations get databases added by newer versions). Passwords are kept in
 # sync with .env.
 set -eu

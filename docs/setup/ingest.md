@@ -29,7 +29,7 @@ Layers in the lake (DuckLake, schema per layer):
 
 ## 1. Home Assistant user and network
 
-The ingest uses the same `HAMMOND_HA_URL` / `HAMMOND_HA_TOKEN` as the MCP server: a
+The ingest uses the same `XOMTRA_HA_URL` / `XOMTRA_HA_TOKEN` as the MCP server: a
 long-lived token of a dedicated **non-admin** user. Read access is all it needs
 (registries, history, statistics); the contract tests in CI verify this with a non-admin
 user on every pull request. The VM needs TCP 8123 to Home Assistant (firewall rule from
@@ -40,56 +40,56 @@ the DMZ to the HA host only).
 New values compared to 1a.1 (see `.env.example`):
 
 ```bash
-HAMMOND_INGEST_IMAGE=ghcr.io/xomtra/hammond-ingest@sha256:...   # verified digest
+XOMTRA_INGEST_IMAGE=ghcr.io/xomtra/xomtra-ingest@sha256:...   # verified digest
 OPS_PG_PASSWORD=<openssl rand -hex 32>   # role owning the Dagster + SQLMesh databases
-HAMMOND_STATES_RETENTION_DAYS=365            # state history
-HAMMOND_STATISTICS_5MIN_RETENTION_DAYS=365   # 5-minute statistics
-HAMMOND_STATISTICS_HOUR_RETENTION_DAYS=1825  # hourly statistics (5 years)
-HAMMOND_TIMEZONE=Europe/Prague           # time zone of the schedules
-HAMMOND_DAGSTER_BIND=127.0.0.1           # Dagster UI on loopback only
+XOMTRA_STATES_RETENTION_DAYS=365            # state history
+XOMTRA_STATISTICS_5MIN_RETENTION_DAYS=365   # 5-minute statistics
+XOMTRA_STATISTICS_HOUR_RETENTION_DAYS=1825  # hourly statistics (5 years)
+XOMTRA_TIMEZONE=Europe/Prague           # time zone of the schedules
+XOMTRA_DAGSTER_BIND=127.0.0.1           # Dagster UI on loopback only
 ```
 
 Verify the image signature like the others (README, `cosign verify`) and pin the digest.
 
 ### Editions: full and lite (ADR 050)
 
-`HAMMOND_EDITION` selects the defaults of a resource profile; every value can still be
+`XOMTRA_EDITION` selects the defaults of a resource profile; every value can still be
 set explicitly with its own variable.
 
 | | `full` (default, compose/VM) | `lite` (HA add-on, small machines) |
 |---|---|---|
-| Lake data files | object storage (`HAMMOND_S3_*`) | local directory `HAMMOND_LAKE_DATA_PATH` |
+| Lake data files | object storage (`XOMTRA_S3_*`) | local directory `XOMTRA_LAKE_DATA_PATH` |
 | State / 5-minute / hourly retention | 365 / 365 / 1825 days | 90 / 90 / 1825 days |
 | DuckDB memory per process | 2 GB | 512 MB |
 
-`HAMMOND_LAKE_DATA_PATH` (an absolute path) puts the data files on the local file
-system; the `HAMMOND_S3_*` variables are then not needed and the DuckLake catalog stays
+`XOMTRA_LAKE_DATA_PATH` (an absolute path) puts the data files on the local file
+system; the `XOMTRA_S3_*` variables are then not needed and the DuckLake catalog stays
 in Postgres. Keep the directory on an SSD, not on an SD card or eMMC.
 
 **Lite stack with Docker compose.** `compose.lite.yaml` turns `compose.yaml` into the
 lite edition: no SeaweedFS and no Dagster; the lake data files are in the volume
-`lake-data`, and one `worker` container (`hammond-ingest worker`) runs the live stream
+`lake-data`, and one `worker` container (`xomtra-ingest worker`) runs the live stream
 and the scheduled jobs with the same schedules as Dagster (hourly ingest at :07,
-retention 03:30, analyses 04:15, weekly snapshot Monday 07:00, in `HAMMOND_TIMEZONE`).
+retention 03:30, analyses 04:15, weekly snapshot Monday 07:00, in `XOMTRA_TIMEZONE`).
 
 ```bash
 docker compose -f compose.yaml -f compose.lite.yaml up -d
-docker compose -f compose.yaml -f compose.lite.yaml exec worker hammond-ingest runs
-docker compose -f compose.yaml -f compose.lite.yaml exec worker hammond-ingest job catalog_daily
+docker compose -f compose.yaml -f compose.lite.yaml exec worker xomtra-ingest runs
+docker compose -f compose.yaml -f compose.lite.yaml exec worker xomtra-ingest job catalog_daily
 ```
 
 The worker records its runs in the Postgres database `ops` (`worker.job_run`, kept 90
 days). Jobs run one at a time; a schedule missed while the worker was down runs once
 after the start. Below 10 % free space on the lake's disk
-(`HAMMOND_WORKER_MIN_FREE_RATIO`) it logs a warning and runs the retention early, at
+(`XOMTRA_WORKER_MIN_FREE_RATIO`) it logs a warning and runs the retention early, at
 most once a day.
 
 ## 3. Deploy
 
 ```bash
 sudo -i
-cd /opt/hammond
-cp -r ~<admin>/hammond/deploy/compose/. /opt/hammond/   # keeps your .env
+cd /opt/xomtra
+cp -r ~<admin>/xomtra/deploy/compose/. /opt/xomtra/   # keeps your .env
 editor .env                                              # values from step 2
 docker compose pull
 docker compose up -d
@@ -123,9 +123,9 @@ Copy what Home Assistant still has in its recorder (default 10 days of states, 1
 of 5-minute statistics, hourly statistics for up to 5 years):
 
 ```bash
-sudo docker compose -f /opt/hammond/compose.yaml exec dagster-daemon \
-  hammond-ingest backfill --start 10d
-sudo docker compose -f /opt/hammond/compose.yaml exec dagster-daemon hammond-ingest sync
+sudo docker compose -f /opt/xomtra/compose.yaml exec dagster-daemon \
+  xomtra-ingest backfill --start 10d
+sudo docker compose -f /opt/xomtra/compose.yaml exec dagster-daemon xomtra-ingest sync
 ```
 
 Or in the UI: *Jobs → history_backfill → Launchpad*, config `start: "10d"`. The backfill
@@ -138,18 +138,18 @@ them on an entity or on a device (a device label also covers its future entities
 
 | Label | Effect |
 |-------|--------|
-| `hammond_no_ingest` | Not stored at all: live stream, catch-up, history backfill, statistics. Data stored before stays. |
-| `hammond_no_analysis` | Stored and queryable, but left out of correlations, anomalies and change points. |
+| `xomtra_no_ingest` | Not stored at all: live stream, catch-up, history backfill, statistics. Data stored before stays. |
+| `xomtra_no_analysis` | Stored and queryable, but left out of correlations, anomalies and change points. |
 
-The label ids are settings: `HAMMOND_LABEL_NO_INGEST` and `HAMMOND_LABEL_NO_ANALYSIS`
+The label ids are settings: `XOMTRA_LABEL_NO_INGEST` and `XOMTRA_LABEL_NO_ANALYSIS`
 (defaults above) take the id of any label you already use. Home Assistant derives a
 label's id from its name when the label is created (lower case, spaces become `_`) and
 keeps it when the label is renamed later; after changing a setting restart the
 `ingest-stream` and `dagster-daemon` containers.
 
-`hammond_no_ingest` implies `hammond_no_analysis`. The stream re-reads the labels every
+`xomtra_no_ingest` implies `xomtra_no_analysis`. The stream re-reads the labels every
 5 minutes; the correlations on every run (from `silver.entities`, i.e. after the next
-hourly ingest). Removing `hammond_no_ingest` later backfills only what the HA recorder
+hourly ingest). Removing `xomtra_no_ingest` later backfills only what the HA recorder
 still keeps (its retention, 10 days by default). Who sees what over MCP stays with
 `policy.yaml`.
 
@@ -157,15 +157,15 @@ still keeps (its retention, 10 days by default). Who sees what over MCP stays wi
 
 | Task | Command (in `dagster-daemon`) |
 | --- | --- |
-| Run ingest + transformations now | `hammond-ingest sync` |
-| Recompute silver for a range | `hammond-ingest restate --start 2026-01-01 --end 2026-02-01` |
-| Retention / maintenance now | `hammond-ingest retention`, `hammond-ingest maintenance` |
+| Run ingest + transformations now | `xomtra-ingest sync` |
+| Recompute silver for a range | `xomtra-ingest restate --start 2026-01-01 --end 2026-02-01` |
+| Retention / maintenance now | `xomtra-ingest retention`, `xomtra-ingest maintenance` |
 | Stream status | `docker compose logs ingest-stream`, health check = flush heartbeat |
 
 Notes:
 
 * **Gaps.** After an outage of the VM or Home Assistant the stream catches up from the HA
-  history API, up to `HAMMOND_STREAM_MAX_CATCHUP_DAYS` (10, the default recorder
+  history API, up to `XOMTRA_STREAM_MAX_CATCHUP_DAYS` (10, the default recorder
   retention of HA). Data of longer outages is not recovered. When a catch-up reaches
   further back than the silver lookback (2 hours), the stream records the range and the
   sensor `restate_after_catchup` starts `silver_restate` for it within 5 minutes.

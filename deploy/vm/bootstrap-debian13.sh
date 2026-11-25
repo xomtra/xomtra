@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap a fresh Debian 13 (trixie) VM as the HAmmond host.
+# Bootstrap a fresh Debian 13 (trixie) VM as the Xomtra host.
 #
 #   sudo ADMIN_CIDR=192.0.2.0/24 ./bootstrap-debian13.sh
 #
@@ -11,7 +11,7 @@ set -euo pipefail
 
 : "${ADMIN_CIDR:?Set ADMIN_CIDR to the network allowed to SSH in, e.g. ADMIN_CIDR=192.0.2.0/24}"
 ADMIN_USER="${ADMIN_USER:-${SUDO_USER:-}}"
-HAMMOND_DIR=/opt/hammond
+XOMTRA_DIR=/opt/xomtra
 
 [[ $EUID -eq 0 ]] || { echo "Run as root (sudo)." >&2; exit 1; }
 . /etc/os-release
@@ -67,7 +67,7 @@ systemctl enable docker
 systemctl restart docker
 
 echo "==> SSH hardening"
-cat > /etc/ssh/sshd_config.d/10-hammond.conf <<CONF
+cat > /etc/ssh/sshd_config.d/10-xomtra.conf <<CONF
 PermitRootLogin no
 PasswordAuthentication no
 KbdInteractiveAuthentication no
@@ -86,10 +86,10 @@ ufw --force enable
 # Note: ports published by Docker bypass ufw. The compose stack publishes only Caddy
 # (443); the router's port forward and Caddy's IP rules control who reaches it.
 
-echo "==> Application directory ${HAMMOND_DIR}"
-install -d -m 0750 -o root -g root "$HAMMOND_DIR"
+echo "==> Application directory ${XOMTRA_DIR}"
+install -d -m 0750 -o root -g root "$XOMTRA_DIR"
 
 echo
 echo "Done. Next steps (docs/setup/homelab-vm.md):"
-echo "  1. Copy deploy/compose/* to ${HAMMOND_DIR}, create ${HAMMOND_DIR}/.env (chmod 600)."
-echo "  2. docker compose -f ${HAMMOND_DIR}/compose.yaml up -d"
+echo "  1. Copy deploy/compose/* to ${XOMTRA_DIR}, create ${XOMTRA_DIR}/.env (chmod 600)."
+echo "  2. docker compose -f ${XOMTRA_DIR}/compose.yaml up -d"

@@ -169,7 +169,7 @@ def test_labelled_entities_left_out(plain: duckdb.DuckDBPyConnection) -> None:
     seed(plain)
     plain.execute(
         "INSERT INTO lake.silver.entities VALUES "
-        "('sensor.power', NULL, ['hammond_no_analysis']), ('sensor.level', NULL, [])"
+        "('sensor.power', NULL, ['xomtra_no_analysis']), ('sensor.level', NULL, [])"
     )
     res = an.run(plain, params(), now=NOW)
     assert res.series_excluded == 1
@@ -180,7 +180,7 @@ def test_custom_label(plain: duckdb.DuckDBPyConnection) -> None:
     seed(plain)
     plain.execute(
         "INSERT INTO lake.silver.entities VALUES ('sensor.power', NULL, ['private']), "
-        "('sensor.level', NULL, ['hammond_no_analysis'])"
+        "('sensor.level', NULL, ['xomtra_no_analysis'])"
     )
     labels = ExclusionLabels(no_analysis="private")
     res = an.run(plain, params(labels=labels), now=NOW)

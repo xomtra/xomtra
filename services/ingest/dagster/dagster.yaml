@@ -1,12 +1,12 @@
-# Dagster instance of HAmmond ingest. DAGSTER_HOME points to this (read-only) directory;
+# Dagster instance of Xomtra ingest. DAGSTER_HOME points to this (read-only) directory;
 # run data, logs and artifacts go to the /data volume, run/event storage to Postgres.
 storage:
   postgres:
     postgres_db:
-      hostname: { env: HAMMOND_OPS_PG_HOST }
-      username: { env: HAMMOND_OPS_PG_USER }
-      password: { env: HAMMOND_OPS_PG_PASSWORD }
-      db_name: { env: HAMMOND_DAGSTER_PG_DB }
+      hostname: { env: XOMTRA_OPS_PG_HOST }
+      username: { env: XOMTRA_OPS_PG_USER }
+      password: { env: XOMTRA_OPS_PG_PASSWORD }
+      db_name: { env: XOMTRA_DAGSTER_PG_DB }
       port: 5432
 
 # One run at a time: ingest, transformations and retention never compete for DuckLake

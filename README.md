@@ -1,6 +1,6 @@
-# HAmmond
+# Xomtra
 
-HAmmond turns the history of a [Home Assistant](https://www.home-assistant.io/) installation
+Xomtra turns the history of a [Home Assistant](https://www.home-assistant.io/) installation
 into a queryable data platform and exposes it to AI assistants (e.g. Claude) through the
 [Model Context Protocol](https://modelcontextprotocol.io/), with identity and roles from
 Microsoft Entra ID.
@@ -32,13 +32,13 @@ uv run pytest
 # Contract tests against a real Home Assistant in a container (see the CI `contract` job)
 docker run -d --name ha -p 127.0.0.1:8123:8123 \
   -v "$PWD/packages/hacore/tests/contract/ha-config:/config" homeassistant/home-assistant:stable
-HAMMOND_CONTRACT_HA_URL=http://127.0.0.1:8123 uv run pytest -m contract
+XOMTRA_CONTRACT_HA_URL=http://127.0.0.1:8123 uv run pytest -m contract
 
 cp deploy/compose/.env.example deploy/compose/.env   # then edit the values
 docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.dev.yaml up -d --build
 ```
 
-Without Entra configuration the MCP server can run with `HAMMOND_AUTH_MODE=none`, which is
+Without Entra configuration the MCP server can run with `XOMTRA_AUTH_MODE=none`, which is
 only allowed when it listens on a loopback address (local development).
 
 ## Releases and installation
@@ -54,12 +54,12 @@ Please report vulnerabilities privately, see [SECURITY.md](SECURITY.md).
 Container images are published to `ghcr.io/xomtra/` and signed with
 [cosign](https://docs.sigstore.dev/) v3 (keyless, GitHub OIDC; the signature is stored
 in the new bundle format, which cosign v2 does not find). Verify with cosign v3 before
-deploying (the repository name in the identity is case-sensitive: `HAmmond`). Released
+deploying (the repository name in the identity is case-sensitive: `Xomtra`). Released
 images carry a second signature from the release workflow, see
 [docs/releasing.md](docs/releasing.md); development builds of `main` only this one:
 
 ```bash
-cosign verify ghcr.io/xomtra/hammond-mcp@sha256:<digest> \
+cosign verify ghcr.io/xomtra/xomtra-mcp@sha256:<digest> \
   --certificate-identity-regexp '^https://github.com/xomtra/xomtra/\.github/workflows/ci\.yml@refs/heads/main$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```

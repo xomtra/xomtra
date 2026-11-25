@@ -1,4 +1,4 @@
-"""HAmmond core library."""
+"""Xomtra core library."""
 
 from hacore.client import HAClient, websocket_url
 from hacore.errors import (

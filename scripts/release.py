@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Release helper for HAmmond (see docs/releasing.md). Standard library only.
+"""Release helper for Xomtra (see docs/releasing.md). Standard library only.
 
     python3 scripts/release.py prepare 0.2.0        # release PR: versions, compose, CHANGELOG
     python3 scripts/release.py prepare 0.2.0-rc.1   # pre-release (beta channel)
@@ -36,9 +36,9 @@ IMAGE_REFERENCES = (
     "deploy/compose/compose.lite.yaml",
     "deploy/compose/.env.example",
 )
-IMAGES = ("hammond-mcp", "hammond-ingest", "hammond-caddy")
+IMAGES = ("xomtra-mcp", "xomtra-ingest", "xomtra-caddy")
 # Home Assistant add-on: the Supervisor pulls <image>:<version of config.yaml>.
-ADDON_CONFIG = "addon/hammond/config.yaml"
+ADDON_CONFIG = "addon/xomtra/config.yaml"
 REGISTRY = "ghcr.io/xomtra"
 CHANGELOG = "CHANGELOG.md"
 REPO_URL = "https://github.com/xomtra/xomtra"
@@ -258,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"\nNext: review CHANGELOG.md, open a PR 'Release {version.semver}', "
                 f"squash-merge it, wait for the main CI to publish the images, then\n"
                 f"  git switch main && git pull && "
-                f"git tag -s {version.tag} -m 'HAmmond {version.semver}' && "
+                f"git tag -s {version.tag} -m 'Xomtra {version.semver}' && "
                 f"git push origin {version.tag}"
             )
         elif args.command == "check":

@@ -1,0 +1,46 @@
+# Home Assistant add-on (lite edition, ADR 050, 063). Everything runs in one container:
+# Postgres (DuckLake catalog, audit, tokens), the worker (live stream + scheduled jobs),
+# the MCP server for the LAN (local access, ADR 056) and the admin GUI (Ingress, ADR 070).
+name: Xomtra
+version: "0.4.1"
+slug: xomtra
+description: History and analyses of your Home Assistant for Claude (MCP server)
+url: https://github.com/xomtra/xomtra
+arch:
+  - amd64
+  - aarch64
+image: ghcr.io/xomtra/xomtra-addon-{arch}
+init: false
+startup: application
+boot: auto
+homeassistant_api: true
+# Admin GUI in the sidebar, for Home Assistant administrators only (ADR 070).
+ingress: true
+ingress_port: 8100
+panel_icon: mdi:chart-timeline-variant
+panel_title: Xomtra
+panel_admin: true
+# The Supervisor restarts the add-on when the MCP server stops answering.
+watchdog: http://[HOST]:[PORT:8000]/healthz
+ports:
+  8000/tcp: 8000
+ports_description:
+  8000/tcp: MCP endpoint in the LAN (personal access tokens)
+# Postgres must not be copied while it writes; the lake (Parquet files, tens of GB)
+# stays out of Home Assistant backups.
+backup: cold
+backup_exclude:
+  - lake/*
+  - duckdb-tmp/*
+options:
+  log_level: info
+  states_retention_days: 90
+  statistics_5min_retention_days: 90
+  statistics_hour_retention_days: 1825
+  mcp_url: ""
+schema:
+  log_level: list(debug|info|warning|error)
+  states_retention_days: int(1,3650)
+  statistics_5min_retention_days: int(1,3650)
+  statistics_hour_retention_days: int(1,3650)
+  mcp_url: url?

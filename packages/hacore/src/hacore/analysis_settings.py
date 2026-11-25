@@ -1,6 +1,6 @@
 """Analysis settings an admin may change at run time (ADR 060).
 
-The ingest reads its settings from the environment (``HAMMOND_*``). The analysis
+The ingest reads its settings from the environment (``XOMTRA_*``). The analysis
 thresholds below can also be stored in the database by the admin GUI; a stored value
 wins over the environment, which wins over the default. ``SPECS`` is the one list of
 those keys with their bounds: the admin GUI validates with it, the ingest applies the
@@ -33,7 +33,7 @@ class Spec:
 
     @property
     def env(self) -> str:
-        return f"HAMMOND_{self.key.upper()}"
+        return f"XOMTRA_{self.key.upper()}"
 
     def bounds(self) -> str:
         if self.kind == "choice":

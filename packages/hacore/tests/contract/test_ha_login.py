@@ -1,8 +1,8 @@
 """Sign-in with a Home Assistant account (ADR 053) against a real Home Assistant.
 
 Lives with the hacore contract tests because they share the onboarded instance; the
-code under test is in hammond_mcp.ha_auth. Checks what the implementation relies on:
-HA accepts a client_id on another host than HA itself (HAmmond's URL), with the redirect
+code under test is in xomtra_mcp.ha_auth. Checks what the implementation relies on:
+HA accepts a client_id on another host than HA itself (Xomtra's URL), with the redirect
 URI on that host; the code exchange without secret or PKCE; auth/current_user; refresh;
 and revocation of the whole session.
 """
@@ -15,15 +15,15 @@ import pytest
 
 from hacore import HAClient, HAError
 from hacore.onboarding import OnboardedTokens
-from hammond_mcp.ha_auth import (
+from xomtra_mcp.ha_auth import (
     HomeAssistantLogin,
     HomeAssistantTokenVerifier,
     RoleMap,
     fetch_current_user,
 )
 
-CLIENT_ID = "https://hammond.example.org/"
-REDIRECT = "https://hammond.example.org/admin/auth/callback"
+CLIENT_ID = "https://xomtra.example.org/"
+REDIRECT = "https://xomtra.example.org/admin/auth/callback"
 
 
 async def create_user(ha_url: str, admin_token: str, admin: bool) -> tuple[str, str]:
@@ -100,7 +100,7 @@ async def test_mcp_tokens_refresh_and_revoke(ha_url: str, tokens: OnboardedToken
     verifier = HomeAssistantTokenVerifier(ha_url=ha_url, role_map=RoleMap())
     access = await verifier.verify_token(issued["access_token"])
     assert access is not None
-    assert access.claims["roles"] == ["HAmmond.Reader"]
+    assert access.claims["roles"] == ["Xomtra.Reader"]
     assert access.claims["preferred_username"] == username
 
     refreshed = await token_request(

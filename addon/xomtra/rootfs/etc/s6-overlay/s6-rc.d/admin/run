@@ -1,0 +1,11 @@
+#!/bin/sh
+# Admin GUI in the Home Assistant sidebar (Ingress, ADR 070): HA signs the user in,
+# only the Supervisor's proxy may connect.
+. /usr/local/bin/xomtra-env
+cd /data/home
+export HOME=/data/home XOMTRA_HOST=0.0.0.0 XOMTRA_ADMIN_PORT=8100 \
+  XOMTRA_AUTH_MODE=ingress XOMTRA_DAGSTER_UI=false \
+  XOMTRA_AUDIT_ADMIN_USER=xomtra_audit_admin \
+  XOMTRA_AUDIT_ADMIN_PASSWORD=$AUDIT_ADMIN_PG_PASSWORD \
+  XOMTRA_DUCKDB_MEMORY_LIMIT=256MB XOMTRA_DUCKDB_THREADS=1
+exec s6-setuidgid xomtra xomtra-admin

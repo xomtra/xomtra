@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to HAmmond are documented in this file. The format follows
+All notable changes to Xomtra are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see
 [docs/releasing.md](docs/releasing.md)). Before 1.0.0 a minor release may contain
@@ -17,21 +17,21 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   the worker and the MCP server for the LAN, supervised by s6-overlay; internal secrets
   and the Postgres cluster are generated on the first start in `/data`; Home Assistant
   is reached through the Supervisor. Built, scanned and started in CI (job `addon`).
-  `HAMMOND_HA_URL=http://supervisor/core` uses the Supervisor's WebSocket endpoint.
-- Admin GUI behind Home Assistant Ingress (ADR 070, add-on): `HAMMOND_AUTH_MODE=ingress`
+  `XOMTRA_HA_URL=http://supervisor/core` uses the Supervisor's WebSocket endpoint.
+- Admin GUI behind Home Assistant Ingress (ADR 070, add-on): `XOMTRA_AUTH_MODE=ingress`
   takes the user from the Supervisor's `X-Remote-User-*` headers, accepts only the
   Ingress proxy's address and serves its links under `X-Ingress-Path`;
-  `HAMMOND_DAGSTER_UI=false` hides the Dagster link. The add-on shows the GUI in the
+  `XOMTRA_DAGSTER_UI=false` hides the Dagster link. The add-on shows the GUI in the
   sidebar for HA administrators.
 - Home Assistant add-on repository (`repository.yaml`): the add-on images
-  `hammond-addon-amd64` and `hammond-addon-aarch64` are built natively, signed and
+  `xomtra-addon-amd64` and `xomtra-addon-aarch64` are built natively, signed and
   published with every commit of `main` and promoted with every release;
   `scripts/release.py` keeps the add-on version in step.
 - Admin GUI page *Analysis settings* (ADR 060): thresholds of correlations, anomalies
   and change points can be changed without a restart, with a preview of their effect on
   the current findings and a history of changes. A stored value wins over the ingest's
   environment variable. New schema `analysis` in the audit database (created by
-  `ensure-databases`), new ingest variable `HAMMOND_ANALYSIS_SETTINGS_DB` (default
+  `ensure-databases`), new ingest variable `XOMTRA_ANALYSIS_SETTINGS_DB` (default
   `audit`).
 - Admin GUI page *Findings* (ADR 060 point 6): a finding can be dismissed (the pair of
   entities of a correlation, the entity of an anomaly or change point), for good or
@@ -54,7 +54,7 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   `usefulness`, `action_category` and `trivial_rule`, and `ranking_version` in
   `methods`; the admin page *Findings* shows them.
 - Analysis setting *Indirect and common-factor relations* (ADR 062 point 10,
-  `HAMMOND_CORRELATION_STRUCTURE_DISPLAY`): `hide` (default), `lower` or `show`. New
+  `XOMTRA_CORRELATION_STRUCTURE_DISPLAY`): `hide` (default), `lower` or `show`. New
   column `hidden` in `catalog.finding` decides what `get_findings`, the weekly summary
   and the admin hide by default (older rows: any flag). The weekly summary orders by
   usefulness.
@@ -75,13 +75,21 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Changed
 
-- The project moved to the organization **xomtra**: repository
-  `github.com/xomtra/xomtra`, images `ghcr.io/xomtra/hammond-{mcp,ingest,caddy}` and the
-  add-on images `ghcr.io/xomtra/hammond-addon-{amd64,aarch64}`. Releases up to 0.4.1
-  keep the image addresses of their `images.env`; signatures of new releases name the
-  new repository
-  (`cosign verify --certificate-identity https://github.com/xomtra/xomtra/...`).
-  Upgrade: take the `*_IMAGE` lines from the release's `images.env` as usual.
+- **Breaking: HAmmond is now Xomtra (ADR 071).** The project moved to the organization
+  **xomtra** (repository `github.com/xomtra/xomtra`) and every name follows: images
+  `ghcr.io/xomtra/xomtra-{mcp,ingest,caddy}` and `xomtra-addon-{amd64,aarch64}`, Python
+  packages `xomtra_mcp` and `xomtra_ingest`, commands `xomtra-*`, environment variables
+  `XOMTRA_*`, compose project `xomtra` (containers and volumes), lake bucket `xomtra`,
+  Postgres roles `xomtra_ops`, `xomtra_audit` and `xomtra_audit_admin`, Entra roles
+  `Xomtra.Admin` and `Xomtra.Reader`, Home Assistant labels `xomtra_no_ingest` and
+  `xomtra_no_analysis`, personal tokens `xmt_…` and the add-on slug `xomtra`. Releases up
+  to 0.4.1 keep the image addresses of their `images.env`; signatures of new releases
+  name the new repository. Upgrade: put the `*_IMAGE` lines of the release's
+  `images.env` into `.env` (still under the old names) and run
+  `deploy/compose/migrate-from-hammond.sh`: it rewrites `.env`, copies the volumes,
+  renames the Postgres roles, copies the bucket and updates the DuckLake catalog,
+  keeping the old data until you remove it. Then add the Entra roles, rename the labels
+  in Home Assistant and issue new personal tokens (the old `hmd_…` tokens stop working).
 - Anomalies v2 (ADR 066): the scale of a series is at least a quarter of its 99th
   percentile deviation in the baseline. Heavy-tailed series (appliances idling most
   hours) were scaled by their idle noise, so their ordinary use saturated the z cap and
