@@ -35,6 +35,11 @@ def open_lake() -> Iterator[duckdb.DuckDBPyConnection]:
     con = lake.connect(lake.LakeSettings.from_env())
     try:
         bronze.ensure_schema(con)
+        # Finding tables with the columns of this release, before any analysis runs:
+        # the MCP server reads them right after an upgrade (ADR 062: p_value,
+        # explained_by).
+        correlations.ensure_schema(con)
+        findings.ensure_schema(con)
         yield con
     finally:
         con.close()
@@ -157,6 +162,7 @@ def find_correlations(settings: IngestSettings | None = None) -> list[dict[str, 
                 outside_temp=s.correlation_outside_temp or None,
                 timezone=s.timezone,
                 labels=s.labels,
+                method=s.correlation_method,
             )
             out.append(correlations.run(con, params).as_dict())
     return out

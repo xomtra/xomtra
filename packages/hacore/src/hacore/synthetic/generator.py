@@ -4,7 +4,7 @@ A household is drawn from an *archetype* with parameters sampled from ranges, so
 every seed is a different home. Hidden drivers (outside temperature, solar irradiance,
 occupancy of the home and of each room) generate the sensors HAmmond sees; planted
 relations of known strength and lag (automations, chains A -> C -> B and hidden common
-drivers) are added on top, and the rest are unrelated sensors. Realistic defects:
+drivers of 3-5 series) are added on top, and the rest are unrelated sensors. Realistic defects:
 quantisation, missing hours, outage blocks, a Zigbee-like outage of a whole room,
 duplicated entities.
 
@@ -177,6 +177,11 @@ class Household:
         if shared - weather:
             return Relation.COMMON
         return Relation.WEATHER
+
+    def shared_hidden(self, a: str, b: str) -> frozenset[str]:
+        """Hidden drivers both series depend on (``h:...`` nodes)."""
+        both = (self.ancestors(a) | {a}) & (self.ancestors(b) | {b})
+        return frozenset(n for n in both if n.startswith("h:"))
 
     def direct_pairs(self) -> list[tuple[str, str, float, int]]:
         """Planted direct relations between observed series: (parent, child, |r|, lag)."""
@@ -482,7 +487,7 @@ def _planted(b: _Builder, archetype: str, budget: int) -> None:
     i = 0
     while budget >= 2:
         kind = str(b.rng.choice(["direct", "chain", "common"], p=[0.5, 0.25, 0.25]))
-        if kind == "chain" and budget < 3:
+        if kind in ("chain", "common") and budget < 3:
             kind = "direct"
         lag0 = archetype == "power_user" and b.rng.random() < 0.7
 
@@ -508,12 +513,16 @@ def _planted(b: _Builder, archetype: str, budget: int) -> None:
             b.add(b.name(f"sensor.planted_{i}_b"), y, [Parent(ck, l2, w2)])
             budget -= 3
         else:
+            # A hidden driver of 3-5 series. With two or three children no
+            # observational test tells it from direct relations (no tetrad); the
+            # evaluation reports those apart.
             node = b.hidden(f"h:planted_{i}")
-            for side in ("a", "b"):
+            children = min(budget, int(b.rng.integers(3, 6)))
+            for side in "abdefg"[:children]:
                 w, lg = strength(), lag()
                 y = w * b.shift(src, lg) + math.sqrt(1 - w * w) * b.ar1(0.7)[:, 0]
                 b.add(b.name(f"sensor.planted_{i}_{side}"), y, [Parent(node, lg, w)])
-            budget -= 2
+            budget -= children
         i += 1
 
 

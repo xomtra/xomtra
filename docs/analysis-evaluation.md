@@ -48,6 +48,24 @@ uv run python -m hacore.synthetic.evaluate --sizes 10,100,1000 --seeds 4 --days 
 | `recall_strong` | planted direct relations with \|r\| >= 0.5 found |
 | `recall` | all planted direct relations found |
 | `duplicates_flagged` | duplicate pairs found that carry `duplicate_suspect` |
+| `structure_flagged` | found planted chains and hidden drivers with at least four observed children that carry `indirect` / `common_factor` (Gate 1c: >= 80 %) |
+| `structure_unidentifiable` | found pairs of hidden drivers with only three observed children: no observational test can tell them from direct relations |
+| `direct_overflagged` | planted direct relations found but flagged `indirect` / `common_factor` |
+| `occupancy_common_share` | findings caused only by the occupancy of the home or a room (local hidden drivers) |
 
 Each metric is reported per archetype and size and as the 90th percentile over the
-households of a cell.
+households of a cell. `--method v1` evaluates the method of 0.3.0 for comparison.
+
+## Gate 1c criterion 6 (ADR 062, ADR 064)
+
+- **FDR** over findings without the flag `same_area`: relations between entities in
+  one Home Assistant area (motion, light and CO₂ of one room) are explained, not false;
+  they are left out of both the numerator and the denominator. The report gives the FDR
+  with them too, and separately for households with incomplete areas.
+- **Structures flagged >= 80 %:** planted chains A -> C -> B and hidden drivers with at
+  least four observed children. A hidden driver of three series is not identifiable
+  from observational data (a one-factor model with three indicators is just
+  identified: no tetrad constrains it), so it is reported apart
+  (`structure_unidentifiable`) and not counted. `same_area` relations do not count as
+  found structures.
+- Planted direct relations must not be flagged (`direct_overflagged`).
