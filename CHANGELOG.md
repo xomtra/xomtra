@@ -16,7 +16,7 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Anomalies v2 found nothing on a real installation: a few nearly constant sensors had
   a robust scale near 0 and z in the millions, which made the pooled reference so heavy
   that no episode passed. The scale is now at least the sensor's resolution and the
-  episode statistic caps `|z|` at 50.
+  episode statistic caps `|z|` at 50 (`HAMMOND_ANOMALY_Z_CAP`).
 - Correlations: the stored top 100 of a window held only duplicates and same-device
   pairs after the unflagged ones, so explained relations (`indirect`, `house_context`,
   ...) were never stored. Explained and unstable pairs now come before the trivial

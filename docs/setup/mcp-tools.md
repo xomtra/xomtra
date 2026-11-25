@@ -168,7 +168,7 @@ series); whether they are reported depends on calibrated p-values and the
 Benjamini–Hochberg FDR over all candidates of a type (`HAMMOND_ANOMALY_MAX_Q`, 0.05),
 not on a fixed threshold per series:
 
-- anomalies: the strength of an episode is its peak `|z|` (at most 50) times the square
+- anomalies: the strength of an episode is its peak `|z|` (at most 50, `HAMMOND_ANOMALY_Z_CAP`) times the square
   root of its hours. The scale is never below the sensor's resolution (median step
   between its distinct values); with the cap, a nearly constant sensor whose rare jumps
   reach a z of millions cannot own the tail of the pooled reference. Every baseline week is scored against the other baseline weeks; the strongest
