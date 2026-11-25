@@ -114,16 +114,16 @@ the model is simplified.
 - **Test rater:** the test set is rated by another model than the one whose ratings
   trained the ranking model, preferably of another vendor, with the frozen prompt and
   rubric; self-preference is reported. No AI rater sees strength, evidence, q, the
-  score or any order (checked in the prompt in the repository), so that its ratings do
+  score or any order (checked by a CI test of the prompt in the repository), so that its ratings do
   not follow R0 by construction.
 - **Metric:** NDCG@10 per household (gain 2^(rating − 1) − 1, AI consensus rating) on
   the test set, averaged over households. Secondary: precision@10 (relevant =
   rating ≥ 3).
 - **Baselines:** random order, the ranking of ADR 047 (unflagged first, |score|), R0;
   upper bound: the order of the AI consensus ratings.
-- **Human pool (required, ADR 069):** in 10 test houses drawn with the seed, the panel
+- **Human pool (required, ADR 069):** in 15 test houses drawn with the seed, the panel
   rates the union of the top 10 of the model, R0 and the random order (pooling as in
-  TREC, about 200–250 findings, same rubric and adjudication; findings already rated by
+  TREC, about 330–375 findings, same rubric and adjudication; findings already rated by
   the panel keep their rating). The ideal DCG is computed from the pool.
 - **Success:** both hold:
   (a) AI: NDCG@10(model) − NDCG@10(R0) > 0 with the **lower bound of the 95 % paired
@@ -164,3 +164,26 @@ With an AI as good as α ≈ 0.72, 200 human ratings pass the gate in 96 % of th
 simulations, 100 only in 60 %. The sample stays at **200**. The cluster bootstrap with
 20 households gives narrower intervals than the normal approximation of section 4
 (which ignored the clustering); the gate uses the bootstrap.
+
+**Power of the human pool (condition (b) of section 6).**
+`simulate_pool_power` (seed 0, 100 simulations, 300 cluster-bootstrap resamples each,
+50 findings per household, three raters with noise 0.55): R0 and the model rank by the
+latent usefulness plus normal noise (R0 SD 1.0; model SD 1.0, 0.8, 0.6), the pool is the
+union of the top 10 of the model, R0 and a random order.
+
+| Households | True difference NDCG@10 | Share meeting (b) |
+|---|---|---|
+| 10 | 0.00 | 0.35 |
+| 10 | +0.05 | 0.78 |
+| 10 | +0.09 | 1.00 |
+| 15 | 0.00 | 0.46 |
+| 15 | +0.05 | 0.91 |
+| 15 | +0.09 | 1.00 |
+| 20 | 0.00 | 0.42 |
+| 20 | +0.05 | 0.95 |
+| 20 | +0.09 | 1.00 |
+
+A model no better than R0 is held back about half the time, which is intended (R0 is
+the default and needs no human support). A model better by 0.05 passes in 78 % of the
+simulations with 10 households and in 91 % with 15; the pool has **15 households**.
+

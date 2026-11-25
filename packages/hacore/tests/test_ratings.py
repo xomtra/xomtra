@@ -59,3 +59,12 @@ def test_power_simulation_runs() -> None:
     assert 0 < res.alpha_mean < 1
     assert res.half_width_mean > 0
     assert 0 <= res.lower_bound_above_060 <= 1
+
+
+def test_pool_power_grows_with_a_better_model() -> None:
+    same = r.simulate_pool_power(10, model_sd=1.0, simulations=20, n_boot=100)
+    better = r.simulate_pool_power(10, model_sd=0.6, simulations=20, n_boot=100)
+    assert abs(same.difference_mean) < 0.03
+    assert better.difference_mean > 0.05
+    assert better.passed > same.passed
+    assert better.passed >= 0.9
