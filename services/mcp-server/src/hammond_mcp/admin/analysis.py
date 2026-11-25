@@ -9,7 +9,7 @@ default. The ingest reads them at the start of every analysis run.
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -32,10 +32,43 @@ class Change:
     reason: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class DismissalRow:
+    id: int
+    finding_type: str
+    entity_id: str
+    related_entity_id: str | None
+    reason: str | None
+    until: datetime | None
+    dismissed_at: datetime
+    dismissed_by: str | None
+    revoked_at: datetime | None = None
+    revoked_by: str | None = None
+
+    def active(self, now: datetime | None = None) -> bool:
+        now = now or datetime.now(UTC)
+        return self.revoked_at is None and (self.until is None or self.until > now)
+
+
+FINDING_TYPES = ("correlation", "anomaly", "change_point")
+
+
 class SettingsStore(Protocol):
     def current(self) -> dict[str, Change]: ...
     def history(self, limit: int = 50) -> list[Change]: ...
     def set(self, key: str, value: Value | None, *, by: str | None, reason: str | None) -> None: ...
+    def dismissals(self, limit: int = 200) -> list[DismissalRow]: ...
+    def dismiss(
+        self,
+        finding_type: str,
+        entity_id: str,
+        related_entity_id: str | None,
+        *,
+        by: str | None,
+        reason: str | None,
+        until: datetime | None,
+    ) -> int: ...
+    def undo(self, dismissal_id: int, by: str | None) -> bool: ...
 
 
 class MemorySettingsStore:
@@ -43,6 +76,40 @@ class MemorySettingsStore:
 
     def __init__(self) -> None:
         self.changes: list[Change] = []
+        self.dismissed: list[DismissalRow] = []
+
+    def dismissals(self, limit: int = 200) -> list[DismissalRow]:
+        return list(reversed(self.dismissed))[:limit]
+
+    def dismiss(
+        self,
+        finding_type: str,
+        entity_id: str,
+        related_entity_id: str | None,
+        *,
+        by: str | None,
+        reason: str | None,
+        until: datetime | None,
+    ) -> int:
+        row = DismissalRow(
+            len(self.dismissed) + 1,
+            finding_type,
+            entity_id,
+            related_entity_id,
+            reason,
+            until,
+            datetime.now(UTC),
+            by,
+        )
+        self.dismissed.append(row)
+        return row.id
+
+    def undo(self, dismissal_id: int, by: str | None) -> bool:
+        for i, d in enumerate(self.dismissed):
+            if d.id == dismissal_id and d.revoked_at is None:
+                self.dismissed[i] = replace(d, revoked_at=datetime.now(UTC), revoked_by=by)
+                return True
+        return False
 
     def current(self) -> dict[str, Change]:
         out: dict[str, Change] = {}
@@ -111,6 +178,41 @@ class PostgresSettingsStore:
             (key, None if value is None else Json(value), by, reason),
         )
 
+    def dismissals(self, limit: int = 200) -> list[DismissalRow]:
+        rows = self._run(
+            "SELECT id, finding_type, entity_id, related_entity_id, reason, until, "
+            "dismissed_at, dismissed_by, revoked_at, revoked_by "
+            "FROM analysis.finding_dismissal ORDER BY id DESC LIMIT %s",
+            (limit,),
+        )
+        return [DismissalRow(*r) for r in rows]
+
+    def dismiss(
+        self,
+        finding_type: str,
+        entity_id: str,
+        related_entity_id: str | None,
+        *,
+        by: str | None,
+        reason: str | None,
+        until: datetime | None,
+    ) -> int:
+        rows = self._run(
+            "INSERT INTO analysis.finding_dismissal (finding_type, entity_id, "
+            "related_entity_id, reason, until, dismissed_by) VALUES (%s, %s, %s, %s, %s, %s) "
+            "RETURNING id",
+            (finding_type, entity_id, related_entity_id, reason, until, by),
+        )
+        return int(rows[0][0])
+
+    def undo(self, dismissal_id: int, by: str | None) -> bool:
+        rows = self._run(
+            "UPDATE analysis.finding_dismissal SET revoked_at = now(), revoked_by = %s "
+            "WHERE id = %s AND revoked_at IS NULL RETURNING id",
+            (by, dismissal_id),
+        )
+        return bool(rows)
+
 
 # ---- impact preview (ADR 060 point 4) ------------------------------------------------
 
@@ -150,3 +252,28 @@ def preview(data: DataAccess, key: str, value: Value) -> dict[str, Any] | None:
         "unflagged": unflagged,
         "kept_unflagged": kept_unflagged,
     }
+
+
+def current_findings(
+    data: DataAccess, finding_type: str = "", include_flagged: bool = False, limit: int = 300
+) -> list[dict[str, Any]]:
+    """Current findings for the dismiss page (trusted, fixed SQL)."""
+    where = ["TRUE"]
+    params: dict[str, Any] = {"limit": limit}
+    if finding_type in FINDING_TYPES:
+        where.append("finding_type = $type")
+        params["type"] = finding_type
+    if not include_flagged:
+        where.append("len(coalesce(flags, [])) = 0")
+    sql = (
+        "SELECT finding_type, entity_id, related_entity_id, window_days, "  # noqa: S608
+        "round(score, 3) AS score, q_value, flags, period_start FROM lake.catalog.finding "
+        f"WHERE {' AND '.join(where)} ORDER BY finding_type, window_days DESC, rank LIMIT $limit"
+    )
+    with data.trusted_cursor() as cur:
+        try:
+            cur.execute(sql, params)
+        except duckdb.Error:  # no findings table yet
+            return []
+        cols = [d[0] for d in cur.description or []]
+        return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]

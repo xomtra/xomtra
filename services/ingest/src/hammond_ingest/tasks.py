@@ -165,7 +165,15 @@ def find_correlations(settings: IngestSettings | None = None) -> list[dict[str, 
                 method=s.correlation_method,
             )
             out.append(correlations.run(con, params).as_dict())
+        _dismiss(con, s)
     return out
+
+
+def _dismiss(con: duckdb.DuckDBPyConnection, s: IngestSettings) -> None:
+    """Flag the findings the user dismissed in the admin GUI (ADR 060 point 6)."""
+    flagged = findings.apply_dismissals(con, analysis_store.load_dismissals(s))
+    if flagged:
+        logger.info("Findings flagged dismissed: %d", flagged)
 
 
 def find_anomalies(settings: IngestSettings | None = None) -> dict[str, Any]:
@@ -190,7 +198,9 @@ def find_anomalies(settings: IngestSettings | None = None) -> dict[str, Any]:
         z_cap=s.anomaly_z_cap,
     )
     with open_lake() as con:
-        return anomalies.run(con, params).as_dict()
+        result = anomalies.run(con, params).as_dict()
+        _dismiss(con, s)
+        return result
 
 
 def snapshot_findings(settings: IngestSettings | None = None) -> dict[str, Any]:

@@ -105,6 +105,7 @@ VIEWS: dict[str, View] = {
             "weather, level_shift, common_factor (shared or hidden driver), indirect "
             "(explained by the series in explained_by), same_area (both in one HA area), "
             "house_context (explained by the residents' presence), "
+            "dismissed (an admin chose not to see it), "
             "unstable (does not replicate in "
             "both halves of the window); p_value = calibrated p-value of the pair; "
             "rank 1 = strongest within type and window.",

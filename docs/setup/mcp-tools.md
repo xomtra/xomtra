@@ -104,6 +104,9 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    (presence) that `hacore.areas` builds from the HA registries (`hacore.context`).
    The run logs the histogram of p- and q-values (no entity names) for the
    calibration of `q`.
+   - `dismissed` (ADR 060): an admin dismissed the pair (correlation) or the entity
+     (anomaly, change point) on the admin page *Findings*; every type of finding can
+     carry it, from the next run on, until undone.
 
 Stored are at most `HAMMOND_CORRELATION_TOP` (100) findings per window: unflagged ones
 first, then explained or unstable ones (`indirect`, `common_factor`, `same_area`,

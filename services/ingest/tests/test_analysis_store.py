@@ -66,3 +66,7 @@ def test_unreachable_database_falls_back(caplog: pytest.LogCaptureFixture) -> No
     s = IngestSettings(ops_pg_host="127.0.0.1", ops_pg_port=1, ops_pg_password=SecretStr("x"))
     assert analysis_store.load_overrides(s) == {}
     assert "using the environment" in caplog.text
+
+
+def test_no_database_means_no_dismissals() -> None:
+    assert analysis_store.load_dismissals(IngestSettings(ops_pg_password=SecretStr(""))) == []

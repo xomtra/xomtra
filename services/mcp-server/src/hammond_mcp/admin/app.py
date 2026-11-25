@@ -27,11 +27,13 @@ from starlette.routing import Route
 from hacore.analysis_settings import BY_KEY, SPECS, Spec, Value
 from hammond_mcp.admin import status
 from hammond_mcp.admin.analysis import (
+    FINDING_TYPES,
     PREVIEW_KEYS,
     Change,
     PostgresSettingsStore,
     SettingsStore,
     SettingsStoreError,
+    current_findings,
     preview,
 )
 from hammond_mcp.admin.config import PREFIX, AdminSettings
@@ -59,6 +61,7 @@ HEADERS = {
 }
 TOKEN_ROLES = ("HAmmond.Reader", "HAmmond.Admin")
 TOKEN_DAYS = (30, 90, 365, 0)
+DISMISS_DAYS = (0, 30, 90, 365)
 
 type Handler = Callable[[Request, dict[str, Any]], Awaitable[Response]]
 
@@ -604,6 +607,181 @@ class AdminApp:
             )
         return RedirectResponse(f"{PREFIX}/analysis", status_code=303)
 
+    # ---- dismissed findings (ADR 060 point 6) ---------------------------------------
+
+    async def findings_page(
+        self, request: Request, user: dict[str, Any], *, note: str = "", status_code: int = 200
+    ) -> Response:
+        title = "Findings"
+        if self.analysis is None:
+            body = "<p class=warn>The audit database is not configured for the admin GUI.</p>"
+            return HTMLResponse(page(title, body, user.get("username")))
+        ftype = request.query_params.get("type", "")
+        ftype = ftype if ftype in FINDING_TYPES else ""
+        flagged = request.query_params.get("flagged") == "1"
+        try:
+            dismissed = await asyncio.to_thread(self.analysis.dismissals, 200)
+        except SettingsStoreError:
+            body = "<p class=bad>The settings store is unavailable.</p>"
+            return HTMLResponse(page(title, body, user.get("username")), 503)
+        rows = (
+            await asyncio.to_thread(current_findings, self.data, ftype, flagged)
+            if self.data is not None
+            else []
+        )
+        options = "".join(
+            f"<option value='{t}'{' selected' if t == ftype else ''}>{t or 'all types'}</option>"
+            for t in ("", *FINDING_TYPES)
+        )
+        body = note + (
+            "<p class=muted>A dismissed finding is flagged <code>dismissed</code> from the "
+            "next analysis run on and hidden like the other flags (Claude sees it only with "
+            "<code>include_flagged</code>). It applies to the pair of entities (correlation) "
+            "or the entity (anomaly, change point) in every window, until undone or the "
+            "chosen date.</p>"
+            "<form class=filters method=get>"
+            f"<select name=type>{options}</select>"
+            f"<label><input type=checkbox name=flagged value=1{' checked' if flagged else ''}>"
+            " include flagged</label><button>Filter</button></form>"
+        )
+        until = "".join(
+            f"<option value={d}>{f'{d} days' if d else 'for good'}</option>" for d in DISMISS_DAYS
+        )
+
+        def form(r: dict[str, Any]) -> str:
+            if "dismissed" in (r.get("flags") or []):
+                return "dismissed"
+            related = r.get("related_entity_id") or ""
+            return (
+                f"<form class=filters method=post action='{PREFIX}/findings/dismiss'>"
+                f"<input type=hidden name=type value='{e(r['finding_type'])}'>"
+                f"<input type=hidden name=entity value='{e(r['entity_id'])}'>"
+                f"<input type=hidden name=related value='{e(related)}'>"
+                "<input name=reason size=14 maxlength=200 placeholder='reason'>"
+                f"<select name=days>{until}</select><button>Dismiss</button></form>"
+            )
+
+        body += f"<p class=muted>{len(rows)} findings (max 300)</p>" + table(
+            ["type", "entity", "related", "window", "score", "q", "flags", "period start", ""],
+            [
+                [
+                    r["finding_type"],
+                    r["entity_id"],
+                    r["related_entity_id"],
+                    r["window_days"],
+                    r["score"],
+                    r["q_value"],
+                    r["flags"],
+                    r["period_start"],
+                    form(r),
+                ]
+                for r in rows
+            ],
+            {3, 4, 5},
+            trusted_html={8},
+        )
+        body += "<h2>Dismissed</h2>" + table(
+            ["type", "entity", "related", "reason", "until", "by", "when", ""],
+            [
+                [
+                    d.finding_type,
+                    d.entity_id,
+                    d.related_entity_id,
+                    d.reason,
+                    d.until,
+                    d.dismissed_by,
+                    d.dismissed_at,
+                    (
+                        f"<form method=post action='{PREFIX}/findings/undo'>"
+                        f"<input type=hidden name=id value='{d.id}'><button>Undo</button></form>"
+                    )
+                    if d.active()
+                    else ("undone by " + e(d.revoked_by) if d.revoked_at else "expired"),
+                ]
+                for d in dismissed
+            ],
+            trusted_html={7},
+        )
+        return HTMLResponse(page(title, body, user.get("username")), status_code)
+
+    async def finding_dismiss(self, request: Request, user: dict[str, Any]) -> Response:
+        form = await self._form(request)
+        ftype = form.get("type", "")
+        entity = form.get("entity", "")[:255]
+        related = form.get("related", "")[:255] or None
+        reason = form.get("reason", "")[:200] or None
+        try:
+            days = int(form.get("days", "0"))
+        except ValueError:
+            days = -1
+        valid = ftype in FINDING_TYPES and entity and days in DISMISS_DAYS
+        if ftype == "correlation" and not related:
+            valid = False
+        if not valid or self.analysis is None:
+            return await self.findings_page(
+                request, user, note="<p class=bad>Invalid finding.</p>", status_code=400
+            )
+        if ftype != "correlation":
+            related = None
+        until = datetime.now(UTC) + timedelta(days=days) if days else None
+        try:
+            new_id = await asyncio.to_thread(
+                self.analysis.dismiss,
+                ftype,
+                entity,
+                related,
+                by=user.get("username"),
+                reason=reason,
+                until=until,
+            )
+            await self._audit(
+                "finding_dismiss",
+                user,
+                arguments={
+                    "id": new_id,
+                    "type": ftype,
+                    "entity_id": entity,
+                    "related_entity_id": related,
+                    "days": days,
+                    "reason": reason,
+                },
+            )
+        except (SettingsStoreError, AuditError):
+            return await self.findings_page(
+                request,
+                user,
+                note="<p class=bad>Not saved: the settings store or audit is unavailable.</p>",
+                status_code=503,
+            )
+        return RedirectResponse(f"{PREFIX}/findings", status_code=303)
+
+    async def finding_undo(self, request: Request, user: dict[str, Any]) -> Response:
+        try:
+            dismissal_id = int((await self._form(request)).get("id", ""))
+        except ValueError:
+            dismissal_id = -1
+        if self.analysis is None or dismissal_id < 0:
+            return await self.findings_page(
+                request, user, note="<p class=bad>Invalid request.</p>", status_code=400
+            )
+        try:
+            done = await asyncio.to_thread(self.analysis.undo, dismissal_id, user.get("username"))
+            await self._audit(
+                "finding_undismiss",
+                user,
+                arguments={"id": dismissal_id},
+                outcome="ok" if done else "error",
+                error=None if done else "not found or already undone",
+            )
+        except (SettingsStoreError, AuditError):
+            return await self.findings_page(
+                request,
+                user,
+                note="<p class=bad>The settings store or audit is unavailable.</p>",
+                status_code=503,
+            )
+        return RedirectResponse(f"{PREFIX}/findings", status_code=303)
+
     # ---- personal tokens and client setup (local access, ADR 056/059) ---------------
 
     def _local_only(self, user: dict[str, Any], title: str) -> Response | None:
@@ -839,6 +1017,17 @@ class AdminApp:
             Route(
                 f"{PREFIX}/analysis",
                 p("analysis_setting", self.analysis_post, audit=False),
+                methods=["POST"],
+            ),
+            Route(f"{PREFIX}/findings", p("findings", self.findings_page)),
+            Route(
+                f"{PREFIX}/findings/dismiss",
+                p("finding_dismiss", self.finding_dismiss, audit=False),
+                methods=["POST"],
+            ),
+            Route(
+                f"{PREFIX}/findings/undo",
+                p("finding_undismiss", self.finding_undo, audit=False),
                 methods=["POST"],
             ),
             Route(f"{PREFIX}/tokens", p("tokens", self.tokens_page)),
