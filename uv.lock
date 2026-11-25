@@ -1058,7 +1058,7 @@ wheels = [
 
 [[package]]
 name = "hacore"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "packages/hacore" }
 dependencies = [
     { name = "duckdb" },
@@ -1075,7 +1075,7 @@ requires-dist = [
 
 [[package]]
 name = "hammond-ingest"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "services/ingest" }
 dependencies = [
     { name = "dagster" },
@@ -1100,7 +1100,7 @@ requires-dist = [
 
 [[package]]
 name = "hammond-mcp"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "services/mcp-server" }
 dependencies = [
     { name = "fastmcp" },

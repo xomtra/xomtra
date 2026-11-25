@@ -143,7 +143,7 @@ services:
     networks: [backend]
 
   ducklake-init:
-    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/zettabyte-cz/hammond-mcp:0.4.0}
+    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/zettabyte-cz/hammond-mcp:0.4.1}
     entrypoint: ["python", "-m", "hacore.lake", "init"]
     environment: *lake-env
     depends_on:
@@ -156,7 +156,7 @@ services:
 
   mcp:
     <<: *hardening
-    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/zettabyte-cz/hammond-mcp:0.4.0}
+    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/zettabyte-cz/hammond-mcp:0.4.1}
     environment:
       <<: *lake-env
       HAMMOND_AUTH_MODE: ${HAMMOND_AUTH_MODE:-entra}
@@ -199,7 +199,7 @@ services:
   # Live state_changed stream with catch-up (writes bronze.ha_states continuously).
   ingest-stream:
     <<: *hardening
-    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:0.4.0}
+    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:0.4.1}
     command: ["hammond-ingest", "stream"]
     environment:
       <<: *ingest-env
@@ -224,7 +224,7 @@ services:
   # retention). Runs execute in this container.
   dagster-daemon:
     <<: *hardening
-    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:0.4.0}
+    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:0.4.1}
     command: ["dagster-daemon", "run", "-w", "/app/dagster/workspace.yaml"]
     environment:
       <<: *ingest-env
@@ -246,7 +246,7 @@ services:
   # http://127.0.0.1:3000/admin/dagster/
   dagster-webserver:
     <<: *hardening
-    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:0.4.0}
+    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:0.4.1}
     command:
       [
         "dagster-webserver", "-h", "0.0.0.0", "-p", "3000",
@@ -275,7 +275,7 @@ services:
   # retention, audit; guards the Dagster UI for Caddy (forward_auth).
   admin:
     <<: *hardening
-    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/zettabyte-cz/hammond-mcp:0.4.0}
+    image: ${HAMMOND_MCP_IMAGE:-ghcr.io/zettabyte-cz/hammond-mcp:0.4.1}
     # The image entrypoint is hammond-mcp; the admin GUI is another program in it.
     entrypoint: ["hammond-admin"]
     environment:
@@ -323,7 +323,7 @@ services:
 
   caddy:
     <<: *hardening
-    image: ${HAMMOND_CADDY_IMAGE:-ghcr.io/zettabyte-cz/hammond-caddy:0.4.0}
+    image: ${HAMMOND_CADDY_IMAGE:-ghcr.io/zettabyte-cz/hammond-caddy:0.4.1}
     # The image checks the values its access mode needs at start (deploy/caddy/start.sh).
     environment:
       HAMMOND_ACCESS_MODE: ${HAMMOND_ACCESS_MODE:-public}
