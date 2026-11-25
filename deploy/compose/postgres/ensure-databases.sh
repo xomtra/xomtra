@@ -31,7 +31,8 @@ SQL
 }
 
 ensure "$DUCKLAKE_USER" "$DUCKLAKE_PASSWORD" "$DUCKLAKE_DB"
-ensure "$OPS_USER" "$OPS_PASSWORD" "$DAGSTER_DB" "$SQLMESH_DB"
+# OPS_DB: runs and cursors of the built-in worker (lite edition, ADR 050).
+ensure "$OPS_USER" "$OPS_PASSWORD" "$DAGSTER_DB" "$SQLMESH_DB" "${OPS_DB:-ops}"
 
 # Audit of MCP tool calls (ADR 040): the database and table belong to postgres; the MCP
 # server's role may only connect and INSERT, so it can neither read nor change history.

@@ -16,6 +16,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Editions (ADR 050): `HAMMOND_EDITION=full|lite` selects default retention and DuckDB
   memory; `HAMMOND_LAKE_DATA_PATH` keeps the lake data files in a local directory
   instead of object storage (no SeaweedFS needed). Existing installations are unchanged.
+- `hammond-ingest worker` (ADR 050): live stream and the scheduled jobs in one process
+  instead of Dagster, with runs in the new Postgres database `ops`; `hammond-ingest job`
+  and `hammond-ingest runs`. `deploy/compose/compose.lite.yaml` runs the lite edition
+  (no SeaweedFS, no Dagster, lake data in a local volume).
 
 ## [0.3.0] - 2026-11-24
 

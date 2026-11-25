@@ -12,6 +12,8 @@ dependencies = [
   "dagster-postgres>=0.29,<0.30",
   "sqlmesh>=0.236",
   "pydantic-settings>=2.10",
+  # Run store of the built-in worker (also pulled in by dagster-postgres today).
+  "psycopg2-binary>=2.9",
 ]
 
 [project.scripts]

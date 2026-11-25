@@ -26,6 +26,7 @@ x-ops-env: &ops-env
   HAMMOND_OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
   HAMMOND_DAGSTER_PG_DB: ${DAGSTER_PG_DB:-dagster}
   HAMMOND_SQLMESH_PG_DB: ${SQLMESH_PG_DB:-sqlmesh}
+  HAMMOND_WORKER_PG_DB: ${WORKER_PG_DB:-ops}
 
 x-ingest-env: &ingest-env
   <<: [*lake-env, *ops-env]
@@ -94,6 +95,7 @@ services:
       OPS_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
       DAGSTER_DB: ${DAGSTER_PG_DB:-dagster}
       SQLMESH_DB: ${SQLMESH_PG_DB:-sqlmesh}
+      OPS_DB: ${WORKER_PG_DB:-ops}
       AUDIT_DB: ${AUDIT_PG_DB:-audit}
       AUDIT_USER: ${AUDIT_PG_USER:-hammond_audit}
       AUDIT_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD in .env}

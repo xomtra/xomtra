@@ -66,6 +66,24 @@ set explicitly with its own variable.
 system; the `HAMMOND_S3_*` variables are then not needed and the DuckLake catalog stays
 in Postgres. Keep the directory on an SSD, not on an SD card or eMMC.
 
+**Lite stack with Docker compose.** `compose.lite.yaml` turns `compose.yaml` into the
+lite edition: no SeaweedFS and no Dagster; the lake data files are in the volume
+`lake-data`, and one `worker` container (`hammond-ingest worker`) runs the live stream
+and the scheduled jobs with the same schedules as Dagster (hourly ingest at :07,
+retention 03:30, analyses 04:15, weekly snapshot Monday 07:00, in `HAMMOND_TIMEZONE`).
+
+```bash
+docker compose -f compose.yaml -f compose.lite.yaml up -d
+docker compose -f compose.yaml -f compose.lite.yaml exec worker hammond-ingest runs
+docker compose -f compose.yaml -f compose.lite.yaml exec worker hammond-ingest job catalog_daily
+```
+
+The worker records its runs in the Postgres database `ops` (`worker.job_run`, kept 90
+days). Jobs run one at a time; a schedule missed while the worker was down runs once
+after the start. Below 10 % free space on the lake's disk
+(`HAMMOND_WORKER_MIN_FREE_RATIO`) it logs a warning and runs the retention early, at
+most once a day.
+
 ## 3. Deploy
 
 ```bash

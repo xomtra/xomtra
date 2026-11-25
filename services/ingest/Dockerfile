@@ -37,7 +37,7 @@ RUN apt-get update \
  && rm -rf /usr/local/lib/python3.13/ensurepip /usr/local/bin/pip* \
  && groupadd --system --gid 10001 hammond \
  && useradd --system --uid 10001 --gid hammond --home-dir /data --no-create-home hammond \
- && mkdir -p /data && chown hammond:hammond /data
+ && mkdir -p /data /lake && chown hammond:hammond /data /lake
 COPY --from=build /app /app
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
