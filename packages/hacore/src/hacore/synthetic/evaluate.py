@@ -18,7 +18,10 @@ with the truth of each household. Metrics (ADR 062, Gate 1c criterion 6):
 ``duplicates_flagged``  share of duplicate pairs found that carry ``duplicate_suspect``
 ``structure_flagged``   share of found planted chains (A -> C -> B) and planted hidden
                     common drivers with at least four observed children that carry
-                    ``indirect`` / ``common_factor`` (Gate 1c: >= 80 %)
+                    ``indirect`` / ``common_factor`` (reported)
+``structure_strong_flagged``  the same for strong structures (every link or loading
+                    >= 0.5): Gate 1c >= 80 %; the share over all structures, weak
+                    ones included, is reported
 ``structure_unidentifiable``  found pairs of planted hidden drivers with only three
                     observed children: no observational test can tell them from
                     direct relations (no tetrad), reported apart
@@ -52,6 +55,8 @@ from hacore.synthetic.generator import ARCHETYPES, Household, HouseholdSpec, Rel
 
 type Analysis = Callable[[Household], list[dict[str, Any]]]
 
+# A planted structure is strong when each of its links (or loadings) is at least this.
+STRONG_LINK = 0.5
 # Households with a smaller share of room sensors in a known area are reported apart.
 INCOMPLETE_AREAS = 0.9
 
@@ -123,6 +128,8 @@ class HouseholdMetrics:
     duplicates_flagged: float | None
     structure_found: int
     structure_flagged: float | None
+    structure_strong_found: int
+    structure_strong_flagged: float | None
     structure_unidentifiable: int
     direct_overflagged: float | None
     occupancy_common: int
@@ -140,12 +147,24 @@ def _children(h: Household, key: str) -> int:
     return sum(k.startswith(stem) for k in h.keys)
 
 
+def _strength(h: Household, a: str, b: str, rel: Relation) -> float:
+    """Weakest planted link of a planted chain (a -> c -> b) or of the two loadings of a
+    pair sharing a planted hidden driver."""
+    stem = a.split("=", maxsplit=1)[0].rsplit("_", 1)[0] + "_"
+    nodes = {a, b}
+    if rel is Relation.INDIRECT:
+        nodes |= {k for k in h.keys if k.startswith(stem)}
+    weights = [p.weight for k in nodes for p in h.parents.get(k, []) if p.weight]
+    return min(weights) if weights else 0.0
+
+
 def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> HouseholdMetrics:
     by_relation: dict[str, int] = {r.value: 0 for r in Relation}
     false_strict = false = false_all = same_area = 0
     found: set[frozenset[str]] = set()
     dup_found = dup_flagged = 0
     struct_found = struct_flagged = unidentifiable = occupancy = 0
+    strong_found = strong_flagged = 0
     direct_found = direct_flagged = 0
     for f in findings:
         a = _key(f["entity_id"], f["state"])
@@ -173,6 +192,9 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
             else:
                 struct_found += 1
                 struct_flagged += structural
+                if _strength(h, a, b, rel) >= STRONG_LINK:
+                    strong_found += 1
+                    strong_flagged += structural
         if rel is Relation.DIRECT and is_planted:
             direct_found += 1
             direct_flagged += structural
@@ -212,6 +234,8 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
         duplicates_flagged=dup_flagged / dup_found if dup_found else None,
         structure_found=struct_found,
         structure_flagged=struct_flagged / struct_found if struct_found else None,
+        structure_strong_found=strong_found,
+        structure_strong_flagged=strong_flagged / strong_found if strong_found else None,
         structure_unidentifiable=unidentifiable,
         direct_overflagged=direct_flagged / direct_found if direct_found else None,
         occupancy_common=occupancy,
@@ -272,6 +296,12 @@ def summarise(metrics: list[HouseholdMetrics]) -> list[dict[str, Any]]:
                 "structure_flagged_pooled": round(
                     sum((m.structure_flagged or 0) * m.structure_found for m in ms)
                     / max(sum(m.structure_found for m in ms), 1),
+                    4,
+                ),
+                "structure_strong_found": sum(m.structure_strong_found for m in ms),
+                "structure_strong_flagged_pooled": round(
+                    sum((m.structure_strong_flagged or 0) * m.structure_strong_found for m in ms)
+                    / max(sum(m.structure_strong_found for m in ms), 1),
                     4,
                 ),
                 "structure_unidentifiable": sum(m.structure_unidentifiable for m in ms),

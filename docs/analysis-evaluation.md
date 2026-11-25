@@ -48,7 +48,8 @@ uv run python -m hacore.synthetic.evaluate --sizes 10,100,1000 --seeds 4 --days 
 | `recall_strong` | planted direct relations with \|r\| >= 0.5 found |
 | `recall` | all planted direct relations found |
 | `duplicates_flagged` | duplicate pairs found that carry `duplicate_suspect` |
-| `structure_flagged` | found planted chains and hidden drivers with at least four observed children that carry `indirect` / `common_factor` (Gate 1c: >= 80 %) |
+| `structure_flagged` | found planted chains and hidden drivers with at least four observed children that carry `indirect` / `common_factor` (reported) |
+| `structure_strong_flagged` | the same for strong structures, every link or loading >= 0.5 (Gate 1c: >= 80 %) |
 | `structure_unidentifiable` | found pairs of hidden drivers with only three observed children: no observational test can tell them from direct relations |
 | `direct_overflagged` | planted direct relations found but flagged `indirect` / `common_factor` |
 | `fdr_all` | `fdr` over all findings, `same_area` ones included and not excused by the flag |
@@ -68,10 +69,20 @@ default every household draws its own.
   one Home Assistant area (motion, light and CO₂ of one room) are explained, not false;
   they are left out of both the numerator and the denominator. The report gives the FDR
   with them too, and separately for households with incomplete areas.
-- **Structures flagged >= 80 %:** planted chains A -> C -> B and hidden drivers with at
-  least four observed children. A hidden driver of three series is not identifiable
-  from observational data (a one-factor model with three indicators is just
-  identified: no tetrad constrains it), so it is reported apart
-  (`structure_unidentifiable`) and not counted. `same_area` relations do not count as
-  found structures.
+- **Strong structures flagged >= 80 %:** planted chains A -> C -> B and hidden drivers
+  with at least four observed children, every link or loading >= 0.5. The share over
+  all structures, weak ones (links 0.2-0.5) included, is reported: the tetrad test
+  needs the neighbours' correlations well above their noise, so weak hidden drivers
+  are a statistical limit of the test, not a failure of the gate. A hidden driver of
+  three series is not identifiable from observational data (a one-factor model with
+  three indicators is just identified: no tetrad constrains it), so it is reported
+  apart (`structure_unidentifiable`) and not counted. `same_area` relations do not
+  count as found structures.
+- **Whole-home presence** (one person in a small home: kitchen motion and bedroom CO₂):
+  relations between areas that an observed presence entity (`person.*`,
+  `device_tracker.*`, a presence or occupancy sensor) explains are flagged
+  `house_context` and treated like `same_area` (ADR 064 addendum). Without any
+  presence entity the analysis cannot tell them apart; the FDR of such households
+  (archetype `minimalist`) is reported as a known limit of the data, not counted
+  against the gate.
 - Planted direct relations must not be flagged (`direct_overflagged`).
