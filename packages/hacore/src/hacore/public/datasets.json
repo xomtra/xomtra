@@ -8,7 +8,7 @@
     "url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/2d181564-6f25-4312-b11d-c1b44ad97105/content",
     "file": "auxiliarydata.zip",
     "members": "^auxiliarydata/hourly_readings/home\\d+_.+\\.csv\\.gz$",
-    "member_list_sha256": null
+    "member_list_sha256": "b2de500699c5550635a68393c91bef3bf3dfc20de7e83972ea40e9a7f438536f"
   },
   "refit": {
     "title": "REFIT Electrical Load Measurements (cleaned)",

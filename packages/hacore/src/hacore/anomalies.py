@@ -622,6 +622,14 @@ def detect_anomalies_v2(
     )
     null = sig.reference_null(np.array(reference))
     stats["reference_size"] = null.size
+    if reference:
+        ref = np.array(reference)
+        stats["reference_quantiles"] = {
+            "p50": round(float(np.percentile(ref, 50)), 2),
+            "p90": round(float(np.percentile(ref, 90)), 2),
+            "p99": round(float(np.percentile(ref, 99)), 2),
+            "zero_share": round(float((ref == 0).mean()), 3),
+        }
     temp_z = _driver_z(grid, z, params.outside_temp)
     hours = [corr._to_dt(h) for h in grid.hours]
     cands: list[dict[str, Any]] = []

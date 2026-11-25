@@ -35,7 +35,7 @@ import json
 import os
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -58,6 +58,9 @@ MIN_CHANNEL_COVERAGE = 0.8
 EPOCH = np.datetime64("2001-01-01T00", "h")
 CONTEXT_FLAGS = frozenset({"same_area", "house_context"})
 MAGNITUDES = (4.0, 6.0, 8.0)
+# A series is heavy-tailed when its robust deviation is under this share of the spread
+# of its residuals (a normal series has about 1).
+HEAVY_TAIL_RATIO = 0.25
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +90,15 @@ class RunMetrics:
     change_points: int = 0
     planted: dict[str, int] = field(default_factory=dict)
     planted_found: dict[str, int] = field(default_factory=dict)
+    # Diagnostics of the planted episodes, per magnitude: among the candidates at all
+    # (one of the strongest episodes of its series in the recent week), and the p-value
+    # and peak |z| of the strongest overlapping candidate.
+    planted_candidate: dict[str, int] = field(default_factory=dict)
+    planted_p: dict[str, list[float]] = field(default_factory=dict)
+    planted_peak_z: dict[str, list[float]] = field(default_factory=dict)
+    reference_quantiles: dict[str, float] = field(default_factory=dict)
+    planted_shape: dict[str, int] = field(default_factory=dict)
+    planted_found_shape: dict[str, int] = field(default_factory=dict)
     new_after_planting: int = 0
 
 
@@ -186,14 +198,20 @@ def score_correlations(m: RunMetrics, findings: list[dict[str, Any]]) -> None:
             m.unflagged_cross += cross
 
 
-def _robust_scale(grid: corr.Grid, params: an.AnomalyParams) -> FloatArray:
+def _robust_scale(grid: corr.Grid, params: an.AnomalyParams) -> tuple[FloatArray, FloatArray]:
+    """Robust deviation of every series in the recent week, and whether the series is
+    heavy-tailed: its robust deviation is under ``HEAVY_TAIL_RATIO`` of the 5-95 %
+    spread of its baseline residuals (an appliance that idles most hours)."""
     t = len(grid.hours)
     first_recent = t - params.recent_days * 24
     idx = np.arange(t)
     baseline = (idx < first_recent) & (idx >= first_recent - params.baseline_days * 24)
     how = (grid.local_dow - 1) * 24 + grid.local_hour
     exp = an.expectation(grid.values, how, grid.local_hour, baseline, grid.series)
-    return np.asarray(np.nanmedian(exp.scale[first_recent:], axis=0), dtype=np.float64)
+    scale = np.asarray(np.nanmedian(exp.scale[first_recent:], axis=0), dtype=np.float64)
+    resid = grid.values[baseline] - exp.expected[baseline]
+    spread = (np.nanpercentile(resid, 95, axis=0) - np.nanpercentile(resid, 5, axis=0)) / 3.29
+    return scale, np.asarray(scale < HEAVY_TAIL_RATIO * spread)
 
 
 def _anomalies(grid: corr.Grid, params: an.AnomalyParams) -> tuple[list[dict[str, Any]], int]:
@@ -212,7 +230,7 @@ def score_anomalies(
     m.anomalies = len(base)
     m.series_weeks = len(grid.series) * max(1, len(grid.hours) // (24 * 7))
     seen = {(f["entity_id"], f["period_start"]) for f in base}
-    scale = _robust_scale(grid, params)
+    scale, heavy = _robust_scale(grid, params)
     t = len(grid.hours)
     first_recent = t - params.recent_days * 24
     k = max(1, len(grid.series) // 10)
@@ -220,7 +238,7 @@ def score_anomalies(
         len(grid.series), size=min(k * len(MAGNITUDES), len(grid.series)), replace=False
     )
     values = grid.values.copy()
-    planted: list[tuple[str, float, int, int]] = []
+    planted: list[tuple[str, float, int, int, str]] = []
     for n, j in enumerate(cols):
         if not np.isfinite(scale[j]) or scale[j] <= 0:
             continue
@@ -228,21 +246,35 @@ def score_anomalies(
         length = int(rng.integers(3, 13))
         start = int(rng.integers(first_recent, t - length))
         values[start : start + length, j] += mag * scale[j] * rng.choice([-1.0, 1.0])
-        planted.append((grid.series[j].entity_id, mag, start, start + length))
+        shape = "heavy_tailed" if heavy[j] else "regular"
+        planted.append((grid.series[j].entity_id, mag, start, start + length, shape))
     injected = corr.Grid(grid.hours, grid.local_hour, grid.local_dow, grid.series, values)
-    after, _ = _anomalies(injected, params)
+    # Every candidate with its p- and q-value; the reported ones are q <= max_q.
+    everything = replace(params, max_q=1.0, top=1_000_000)
+    cps, _ = an.detect_change_points_v2(injected, params)
+    cands, stats = an.detect_anomalies_v2(injected, everything, an._shift_hours(injected, cps))
+    m.reference_quantiles = stats.get("reference_quantiles", {})
+    after = [f for f in cands if f["q_value"] <= params.max_q]
     hours = [corr._to_dt(h) for h in grid.hours]
-    hit_series: set[str] = set()
-    for entity, mag, a, b in planted:
+    for entity, mag, a, b, shape in planted:
         key = f"{mag:g}"
         m.planted[key] = m.planted.get(key, 0) + 1
+        m.planted_shape[shape] = m.planted_shape.get(shape, 0) + 1
         lo, hi = hours[a], hours[b - 1]
-        if any(
-            f["entity_id"] == entity and f["period_start"] <= hi and f["period_end"] > lo
-            for f in after
-        ):
+        overlap = [
+            f
+            for f in cands
+            if f["entity_id"] == entity and f["period_start"] <= hi and f["period_end"] > lo
+        ]
+        if not overlap:
+            continue
+        best = min(overlap, key=lambda f: f["p_value"])
+        m.planted_candidate[key] = m.planted_candidate.get(key, 0) + 1
+        m.planted_p.setdefault(key, []).append(float(best["p_value"]))
+        m.planted_peak_z.setdefault(key, []).append(abs(float(best["score"])))
+        if best["q_value"] <= params.max_q:
             m.planted_found[key] = m.planted_found.get(key, 0) + 1
-            hit_series.add(entity)
+            m.planted_found_shape[shape] = m.planted_found_shape.get(shape, 0) + 1
     planted_entities = {p[0] for p in planted}
     m.new_after_planting = sum(
         1
@@ -316,6 +348,24 @@ def summarise(metrics: list[RunMetrics], per_house: int) -> dict[str, Any]:
             planted[k] = planted.get(k, 0) + v
         for k, v in m.planted_found.items():
             found[k] = found.get(k, 0) + v
+    candidate: dict[str, int] = {}
+    p_values: dict[str, list[float]] = {}
+    peak_z: dict[str, list[float]] = {}
+    for m in metrics:
+        for k, v in m.planted_candidate.items():
+            candidate[k] = candidate.get(k, 0) + v
+        for k, ps in m.planted_p.items():
+            p_values.setdefault(k, []).extend(ps)
+        for k, zs in m.planted_peak_z.items():
+            peak_z.setdefault(k, []).extend(zs)
+    quantiles = [m.reference_quantiles for m in metrics if m.reference_quantiles]
+    shape: dict[str, int] = {}
+    shape_found: dict[str, int] = {}
+    for m in metrics:
+        for k, v in m.planted_shape.items():
+            shape[k] = shape.get(k, 0) + v
+        for k, v in m.planted_found_shape.items():
+            shape_found[k] = shape_found.get(k, 0) + v
     out: dict[str, Any] = {
         "runs": len(metrics),
         "channels_per_house": per_house,
@@ -332,6 +382,18 @@ def summarise(metrics: list[RunMetrics], per_house: int) -> dict[str, Any]:
         "anomalies_per_100_series_weeks": _ratio(100 * tot["anomalies"], tot["series_weeks"]),
         "planted": planted,
         "recall_by_magnitude": {k: _ratio(found.get(k, 0), v) for k, v in sorted(planted.items())},
+        "planted_by_shape": shape,
+        "recall_by_shape": {k: _ratio(shape_found.get(k, 0), v) for k, v in sorted(shape.items())},
+        "planted_candidate_share": {
+            k: _ratio(candidate.get(k, 0), v) for k, v in sorted(planted.items())
+        },
+        "planted_p_median": {k: _pct(v, 50, 4) for k, v in sorted(p_values.items())},
+        "planted_peak_z_median": {k: _pct(v, 50) for k, v in sorted(peak_z.items())},
+        "reference_quantiles_median": {
+            k: _pct([q[k] for q in quantiles], 50) for k in ("p50", "p90", "p99", "zero_share")
+        }
+        if quantiles
+        else {},
     }
     if per_house == 1:
         out["null_runs_with_findings"] = _ratio(sum(m.findings > 0 for m in metrics), len(metrics))
@@ -342,8 +404,8 @@ def _mean(v: list[int]) -> float | None:
     return round(float(np.mean(v)), 1) if v else None
 
 
-def _pct(v: list[float], q: float) -> float | None:
-    return round(float(np.percentile(v, q)), 2) if v else None
+def _pct(v: list[float], q: float, digits: int = 2) -> float | None:
+    return round(float(np.percentile(v, q)), digits) if v else None
 
 
 def manifest(
