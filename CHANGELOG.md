@@ -78,7 +78,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - The project moved to the organization **xomtra**: repository
   `github.com/xomtra/xomtra`, images `ghcr.io/xomtra/hammond-{mcp,ingest,caddy}` and the
   add-on images `ghcr.io/xomtra/hammond-addon-{amd64,aarch64}`. Releases up to 0.4.1
-  stay at `ghcr.io/zettabyte-cz`; signatures of new releases name the new repository
+  keep the image addresses of their `images.env`; signatures of new releases name the
+  new repository
   (`cosign verify --certificate-identity https://github.com/xomtra/xomtra/...`).
   Upgrade: take the `*_IMAGE` lines from the release's `images.env` as usual.
 - Anomalies v2 (ADR 066): the scale of a series is at least a quarter of its 99th
