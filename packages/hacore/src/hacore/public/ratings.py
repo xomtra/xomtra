@@ -172,6 +172,7 @@ def simulate_alpha_power(
         consensus = np.round(np.median(humans, axis=1))
         ai = rate(true_noise)
         pair = np.column_stack([ai, consensus])
+
         def alpha(idx: npt.NDArray[np.int64], pair: FloatArray = pair) -> float:
             return krippendorff_alpha_ordinal(pair[idx])
 
