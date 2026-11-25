@@ -15,11 +15,18 @@ PREFIX = "/admin"
 class AdminSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HAMMOND_", extra="ignore")
 
-    auth_mode: Literal["entra", "ha", "none"] = "entra"
+    # ingress: behind Home Assistant Ingress (add-on, ADR 070); HA signs the user in and
+    # the Supervisor's proxy passes them in X-Remote-User-* headers.
+    auth_mode: Literal["entra", "ha", "ingress", "none"] = "entra"
     access_mode: Literal["public", "local"] = "public"
     host: str = "0.0.0.0"  # noqa: S104 - container port, only reachable through Caddy
     admin_port: int = Field(default=8100, ge=1, le=65535)
     log_level: str = "INFO"
+    # Address of the Supervisor's Ingress proxy, the only peer trusted with
+    # auth_mode=ingress (Home Assistant's fixed address in the hassio network).
+    ingress_proxy: str = "172.30.32.2"
+    # Dagster UI under /admin/dagster/ (full edition); the lite edition has none.
+    dagster_ui: bool = True
 
     base_url: AnyHttpUrl | None = None
     entra_tenant_id: str | None = None
@@ -69,7 +76,7 @@ class AdminSettings(BaseSettings):
 
     @model_validator(mode="after")
     def _check(self) -> Self:
-        if self.auth_mode == "none":
+        if self.auth_mode in ("none", "ingress"):
             return self
         required: tuple[str, ...] = ("base_url", "admin_session_key")
         if self.auth_mode == "entra":

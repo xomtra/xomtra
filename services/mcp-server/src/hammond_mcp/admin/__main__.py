@@ -1,4 +1,4 @@
-"""Entry point: ``hammond-admin`` (admin GUI, behind Caddy under /admin)."""
+"""Entry point: ``hammond-admin`` (admin GUI, behind Caddy under /admin or HA Ingress)."""
 
 from __future__ import annotations
 
@@ -33,7 +33,9 @@ def main() -> None:
         app,
         host=settings.host,
         port=settings.admin_port,
-        proxy_headers=True,
+        # Behind Ingress the peer address itself is checked (only the Supervisor's
+        # proxy), so X-Forwarded-For must not replace it.
+        proxy_headers=settings.auth_mode != "ingress",
         forwarded_allow_ips="*",
         log_level=settings.log_level.lower(),
         server_header=False,

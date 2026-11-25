@@ -18,6 +18,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   and the Postgres cluster are generated on the first start in `/data`; Home Assistant
   is reached through the Supervisor. Built, scanned and started in CI (job `addon`).
   `HAMMOND_HA_URL=http://supervisor/core` uses the Supervisor's WebSocket endpoint.
+- Admin GUI behind Home Assistant Ingress (ADR 070, add-on): `HAMMOND_AUTH_MODE=ingress`
+  takes the user from the Supervisor's `X-Remote-User-*` headers, accepts only the
+  Ingress proxy's address and serves its links under `X-Ingress-Path`;
+  `HAMMOND_DAGSTER_UI=false` hides the Dagster link. The add-on shows the GUI in the
+  sidebar for HA administrators.
 - Admin GUI page *Analysis settings* (ADR 060): thresholds of correlations, anomalies
   and change points can be changed without a restart, with a preview of their effect on
   the current findings and a history of changes. A stored value wins over the ingest's

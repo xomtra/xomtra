@@ -6,7 +6,7 @@ from collections.abc import Iterable, Sequence
 from html import escape
 from typing import Any
 
-from hammond_mcp.admin.config import PREFIX
+from hammond_mcp.admin import view
 
 CSS = """
 :root { --fg:#1d2330; --muted:#5c6475; --bg:#f6f7f9; --card:#fff;
@@ -21,7 +21,7 @@ header { display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:12p
 header strong { margin-right:12px; }
 header a { color:var(--fg); text-decoration:none; }
 header a:hover { color:var(--accent); }
-header form { margin-left:auto; }
+header form, header .who { margin-left:auto; }
 main { padding:20px; max-width:1300px; margin:0 auto; }
 h1 { font-size:20px; margin:0 0 16px; }
 h2 { font-size:16px; margin:24px 0 8px; }
@@ -72,10 +72,14 @@ def e(value: Any) -> str:
 
 
 def page(title: str, body: str, user: str | None) -> str:
-    links = "".join(f'<a href="{PREFIX}{path}">{escape(label)}</a>' for path, label in NAV)
+    v = view.current.get()
+    nav = (item for item in NAV if v.dagster or item[0] != "/dagster/")
+    links = "".join(f'<a href="{v.prefix}{path}">{escape(label)}</a>' for path, label in nav)
     logout = (
-        f'<form method="post" action="{PREFIX}/logout"><span class="muted">{e(user)}</span> '
+        f'<form method="post" action="{v.prefix}/logout"><span class="muted">{e(user)}</span> '
         '<button type="submit">Sign out</button></form>'
+        if user and v.sign_out
+        else f'<span class="muted who">{e(user)}</span>'
         if user
         else ""
     )
@@ -83,7 +87,7 @@ def page(title: str, body: str, user: str | None) -> str:
         "<!doctype html><html lang=en><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width, initial-scale=1">'
         f"<title>{escape(title)} · HAmmond admin</title>"
-        f'<link rel=stylesheet href="{PREFIX}/static.css"></head><body>'
+        f'<link rel=stylesheet href="{v.prefix}/static.css"></head><body>'
         f"<header><strong>HAmmond admin</strong>{links}{logout}</header>"
         f"<main><h1>{escape(title)}</h1>{body}</main></body></html>"
     )
