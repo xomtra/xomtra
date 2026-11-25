@@ -51,10 +51,16 @@ uv run python -m hacore.synthetic.evaluate --sizes 10,100,1000 --seeds 4 --days 
 | `structure_flagged` | found planted chains and hidden drivers with at least four observed children that carry `indirect` / `common_factor` (Gate 1c: >= 80 %) |
 | `structure_unidentifiable` | found pairs of hidden drivers with only three observed children: no observational test can tell them from direct relations |
 | `direct_overflagged` | planted direct relations found but flagged `indirect` / `common_factor` |
+| `fdr_all` | `fdr` over all findings, `same_area` ones included and not excused by the flag |
+| `same_area_share` | findings flagged `same_area` |
+| `area_coverage` | room sensors whose area the analysis knows (HA area or name); `fdr_pooled_incomplete_areas` is the gate FDR of households below 90 % |
 | `occupancy_common_share` | findings caused only by the occupancy of the home or a room (local hidden drivers) |
 
 Each metric is reported per archetype and size and as the 90th percentile over the
 households of a cell. `--method v1` evaluates the method of 0.3.0 for comparison.
+`--area-coverage` (share of rooms with an HA area) and `--descriptive-names` (share of
+the other rooms whose entities are named after the room) fix the area scenario; by
+default every household draws its own.
 
 ## Gate 1c criterion 6 (ADR 062, ADR 064)
 

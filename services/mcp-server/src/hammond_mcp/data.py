@@ -103,7 +103,8 @@ VIEWS: dict[str, View] = {
             "score = shift in robust deviations, observed/expected = level after/before. "
             "flags (trivial or explained findings): duplicate_suspect, same_device, short, "
             "weather, level_shift, common_factor (shared or hidden driver), indirect "
-            "(explained by the series in explained_by), unstable (does not replicate in "
+            "(explained by the series in explained_by), same_area (both in one HA area), "
+            "unstable (does not replicate in "
             "both halves of the window); p_value = calibrated p-value of the pair; "
             "rank 1 = strongest within type and window.",
             ("entity_group", "related_group", "explained_by"),

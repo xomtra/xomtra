@@ -89,6 +89,12 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
      not significant, lags consistent along A → C → B); C is in `explained_by`.
    - `unstable`: in a window of at least 180 days the relation does not keep its sign
      and `|r| >= 0.2` in both halves.
+   - `same_area` (ADR 064): both entities are in one Home Assistant area (the entity's
+     area, else its device's). Motion, light and CO₂ of one room correlate through its
+     occupancy; such a relation is explained, not a discovery. An entity without an
+     area is matched by its id and name against the area ids, names and aliases
+     (whole words, diacritics ignored, one area only). An entity with no area found
+     gets no flag: its relations stay among the unflagged ones.
    The run logs the histogram of p- and q-values (no entity names) for the
    calibration of `q`.
 

@@ -38,6 +38,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -46,8 +47,8 @@ import duckdb
 import numpy as np
 import numpy.typing as npt
 
+from hacore import areas, weather
 from hacore import significance as sig
-from hacore import weather
 from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, load_no_analysis
 from hacore.lake import LAKE_ALIAS, sql_literal
 
@@ -1033,6 +1034,7 @@ def select_findings(
     series: list[Series],
     params: CorrelationParams,
     devices: dict[str, str],
+    entity_areas: Mapping[str, areas.EntityArea] | None = None,
 ) -> list[dict[str, Any]]:
     """Significant pairs, unflagged ones first, each part by ``|r|``.
 
@@ -1075,6 +1077,8 @@ def select_findings(
         dev = devices.get(a.entity_id)
         if dev is not None and dev == devices.get(b.entity_id):
             flags.append("same_device")
+        if entity_areas and areas.same_area(entity_areas, a.entity_id, b.entity_id):
+            flags.append("same_area")  # explained by the room's occupancy (ADR 064)
         candidates.append(
             {
                 "finding_id": finding_id(params.window_days, a, b),
@@ -1285,7 +1289,9 @@ def run(
     if len(series) >= 2:
         pairs = _pairs(resid, params, result)
         result.pairs_tested = len(pairs.r)
-        findings = select_findings(pairs, series, params, _devices(con, alias))
+        findings = select_findings(
+            pairs, series, params, _devices(con, alias), areas.load(con, alias)
+        )
     write_findings(
         con,
         findings,

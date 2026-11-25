@@ -148,3 +148,32 @@ def test_cli(capsys: pytest.CaptureFixture[str]) -> None:
     out = capsys.readouterr().out
     assert '"archetype": "apartment"' in out
     assert current_method()  # callable factory
+
+
+def test_areas_follow_the_spec() -> None:
+    full = generate(HouseholdSpec("apartment", 40, days=30, seed=2, area_coverage=1.0))
+    assert full.room_of
+    assert full.area_coverage() == 1.0
+    assert full.ha_area == full.room_of
+    none = generate(
+        HouseholdSpec("apartment", 40, days=30, seed=2, area_coverage=0.0, descriptive_names=0.0)
+    )
+    assert not none.ha_area
+    assert none.area_coverage() == 0.0
+    named = generate(
+        HouseholdSpec("apartment", 40, days=30, seed=2, area_coverage=0.0, descriptive_names=1.0)
+    )
+    assert named.area_coverage() == 1.0  # found from the names
+    # The series themselves do not depend on the areas.
+    np.testing.assert_array_equal(full.grid.values, none.grid.values)
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        HouseholdSpec("apartment", 40, area_coverage=1.5)
+
+
+def test_same_area_is_left_out_of_the_gate_fdr() -> None:
+    h = generate(HouseholdSpec("apartment", 30, days=60, seed=1, area_coverage=1.0))
+    findings = current_method()(h)
+    m = score(h, findings, 0.0)
+    assert m.same_area > 0
+    assert m.gate_findings == m.findings - m.same_area
+    assert m.fdr_all >= m.fdr_strict

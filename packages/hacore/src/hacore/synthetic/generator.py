@@ -36,6 +36,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import numpy.typing as npt
 
+from hacore.areas import AreaInfo, EntityArea, resolve
 from hacore.correlations import Grid, Series
 
 type FloatArray = npt.NDArray[np.float64]
@@ -89,12 +90,20 @@ class HouseholdSpec:
     # A Monday at midnight UTC, so the yearly cycle starts in winter.
     start: datetime = datetime(2025, 1, 6, tzinfo=UTC)
     events: bool = False  # insert anomalies and change points (InsertedEvent)
+    # Home Assistant areas (ADR 064): share of rooms whose entities have an area in HA,
+    # and share of the other rooms named after the room (sensor.kitchen_co2) rather than
+    # the device (sensor.th_3f2a_co2). None = drawn per household.
+    area_coverage: float | None = None
+    descriptive_names: float | None = None
 
     def __post_init__(self) -> None:
         if self.archetype not in ARCHETYPES:
             raise ValueError(f"unknown archetype {self.archetype!r}")
         if self.n_series < 4 or self.days < 14:
             raise ValueError("a household needs at least 4 series and 14 days")
+        for share in (self.area_coverage, self.descriptive_names):
+            if share is not None and not 0 <= share <= 1:
+                raise ValueError("area shares must be between 0 and 1")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,8 +131,25 @@ class Household:
     parents: dict[str, list[Parent]]
     duplicates: set[frozenset[str]] = field(default_factory=set)
     events: list[InsertedEvent] = field(default_factory=list)
+    # Room (area id) of each room sensor: the truth, whatever HA knows.
+    room_of: dict[str, str] = field(default_factory=dict)
+    # Area of each entity as set in HA (rooms with an area only), and the areas.
+    ha_area: dict[str, str] = field(default_factory=dict)
+    areas: list[AreaInfo] = field(default_factory=list)
 
     outside_temp: str = OUTSIDE_TEMP
+
+    def entity_areas(self) -> dict[str, EntityArea]:
+        """Areas as the analysis resolves them: HA area, else a match in the name."""
+        entities = {s.entity_id for s in self.grid.series}
+        return resolve(((e, self.ha_area.get(e), None) for e in sorted(entities)), self.areas)
+
+    def area_coverage(self) -> float | None:
+        """Share of room sensors whose area the analysis knows (HA or name)."""
+        if not self.room_of:
+            return None
+        known = self.entity_areas()
+        return sum(e in known for e in self.room_of) / len(self.room_of)
 
     @property
     def keys(self) -> list[str]:
@@ -225,6 +251,21 @@ class _Builder:
         self.parents: dict[str, list[Parent]] = {}
         self.duplicates: set[frozenset[str]] = set()
         self._names: set[str] = set()
+        # Areas use their own generator, so the series stay those of earlier releases.
+        self.area_rng = np.random.default_rng([spec.seed, ARCHETYPES.index(spec.archetype), 64])
+        self.coverage = (
+            spec.area_coverage
+            if spec.area_coverage is not None
+            else float(self.area_rng.uniform(0.4, 1.0))
+        )
+        self.descriptive = (
+            spec.descriptive_names
+            if spec.descriptive_names is not None
+            else float(self.area_rng.uniform(0.3, 1.0))
+        )
+        self.room_area: dict[int, str] = {}
+        self.room_in_ha: dict[int, bool] = {}
+        self.room_label: dict[int, str] = {}
 
     # -- primitives --
 
@@ -355,6 +396,12 @@ def _room(
     occ_node = b.hidden(f"h:room_{k}", [Parent(HOME)])
     dark = solar < 0.05
     room_name = f"{kind}_{k}" if k >= len(ROOM_KINDS) else kind
+    b.room_area[k] = room_name
+    b.room_in_ha[k] = bool(b.area_rng.random() < b.coverage)
+    # Entities of a room without an HA area may still be named after it.
+    named = b.room_in_ha[k] or b.area_rng.random() < b.descriptive
+    b.room_label[k] = room_name if named else f"th_{int(b.area_rng.integers(0, 1 << 16)):04x}"
+    room_name = b.room_label[k]
     sensors = MINIMAL_SENSORS if minimal else ROOM_SENSORS
     rest = list(sensors[1:])
     b.rng.shuffle(rest)  # first sensor always present, the rest in random order
@@ -672,4 +719,13 @@ def generate(spec: HouseholdSpec) -> Household:
         parents=b.parents,
         duplicates=b.duplicates,
         events=events,
+        room_of={
+            s.entity_id: b.room_area[g] for s, g in zip(b.series, b.groups, strict=True) if g >= 0
+        },
+        ha_area={
+            s.entity_id: b.room_area[g]
+            for s, g in zip(b.series, b.groups, strict=True)
+            if g >= 0 and b.room_in_ha[g]
+        },
+        areas=[AreaInfo(a, (a.replace("_", " "),)) for a in sorted(set(b.room_area.values()))],
     )

@@ -6,7 +6,13 @@ with the truth of each household. Metrics (ADR 062, Gate 1c criterion 6):
 
 ``fdr_strict``      share of findings between unrelated series (false by any reading)
 ``fdr``             as above, plus indirect and hidden-common relations reported
-                    without the flag ``indirect``/``common_factor`` (the gate metric)
+                    without the flag ``indirect``/``common_factor``, over the findings
+                    without ``same_area`` (the gate metric, ADR 064)
+``fdr_all``         the same over all findings, ``same_area`` ones included and not
+                    excused by that flag (the overall view, as before ADR 064)
+``same_area_share`` share of findings flagged ``same_area``
+``area_coverage``   share of room sensors whose area the analysis knows (HA or name);
+                    the summary reports the gate FDR apart for households below 90 %
 ``recall_strong``   share of planted direct relations with |r| >= 0.5 that were found
 ``recall``          share of all planted direct relations (|r| 0.2-0.8) found
 ``duplicates_flagged``  share of duplicate pairs found that carry ``duplicate_suspect``
@@ -45,6 +51,9 @@ from hacore import correlations as corr
 from hacore.synthetic.generator import ARCHETYPES, Household, HouseholdSpec, Relation, generate
 
 type Analysis = Callable[[Household], list[dict[str, Any]]]
+
+# Households with a smaller share of room sensors in a known area are reported apart.
+INCOMPLETE_AREAS = 0.9
 
 FLAGGED_OK = {
     Relation.INDIRECT: "indirect",
@@ -87,7 +96,7 @@ def current_method(params: corr.CorrelationParams | None = None, *, method: str 
                 max_q=params_h.max_q,
                 seed=params_h.seed,
             )
-        return corr.select_findings(pairs, series, params_h, {})
+        return corr.select_findings(pairs, series, params_h, {}, h.entity_areas())
 
     return run
 
@@ -100,8 +109,13 @@ class HouseholdMetrics:
     findings: int
     false_strict: int
     false: int
+    false_all: int
+    gate_findings: int
     fdr_strict: float
     fdr: float
+    fdr_all: float
+    same_area: int
+    area_coverage: float | None
     planted: int
     planted_strong: int
     recall: float | None
@@ -128,7 +142,7 @@ def _children(h: Household, key: str) -> int:
 
 def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> HouseholdMetrics:
     by_relation: dict[str, int] = {r.value: 0 for r in Relation}
-    false_strict = false = 0
+    false_strict = false = false_all = same_area = 0
     found: set[frozenset[str]] = set()
     dup_found = dup_flagged = 0
     struct_found = struct_flagged = unidentifiable = occupancy = 0
@@ -140,10 +154,13 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
         by_relation[rel.value] += 1
         found.add(frozenset((a, b)))
         flags = set(f.get("flags", []))
+        explained_by_area = "same_area" in flags
+        same_area += explained_by_area
+        wrong = rel is Relation.UNRELATED or (rel in FLAGGED_OK and FLAGGED_OK[rel] not in flags)
+        false_all += wrong
         if rel is Relation.UNRELATED:
             false_strict += 1
-            false += 1
-        elif rel in FLAGGED_OK and FLAGGED_OK[rel] not in flags:
+        if wrong and not explained_by_area:
             false += 1
         if rel is Relation.DUPLICATE:
             dup_found += 1
@@ -173,6 +190,7 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
         return sum(frozenset((a, b)) in found for a, b, _, _ in ps) / len(ps)
 
     n = len(findings)
+    gate = n - same_area
     return HouseholdMetrics(
         archetype=h.spec.archetype,
         n_series=h.spec.n_series,
@@ -180,8 +198,13 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
         findings=n,
         false_strict=false_strict,
         false=false,
+        false_all=false_all,
+        gate_findings=gate,
         fdr_strict=false_strict / n if n else 0.0,
-        fdr=false / n if n else 0.0,
+        fdr=false / gate if gate else 0.0,
+        fdr_all=false_all / n if n else 0.0,
+        same_area=same_area,
+        area_coverage=h.area_coverage(),
         planted=len(planted),
         planted_strong=len(strong),
         recall=recall(planted),
@@ -231,7 +254,15 @@ def summarise(metrics: list[HouseholdMetrics]) -> list[dict[str, Any]]:
                 "fdr_strict_pooled": round(sum(m.false_strict for m in ms) / findings, 4)
                 if findings
                 else 0.0,
-                "fdr_pooled": round(sum(m.false for m in ms) / findings, 4) if findings else 0.0,
+                "gate_findings": sum(m.gate_findings for m in ms),
+                "fdr_pooled": _ratio(sum(m.false for m in ms), sum(m.gate_findings for m in ms)),
+                "fdr_all_pooled": _ratio(sum(round(m.fdr_all * m.findings) for m in ms), findings),
+                "same_area_share": _ratio(sum(m.same_area for m in ms), findings),
+                "area_coverage_mean": _mean(vals("area_coverage")),
+                "fdr_pooled_incomplete_areas": _ratio(
+                    sum(m.false for m in ms if (m.area_coverage or 0) < INCOMPLETE_AREAS),
+                    sum(m.gate_findings for m in ms if (m.area_coverage or 0) < INCOMPLETE_AREAS),
+                ),
                 "fdr_p90": round(float(np.percentile(vals("fdr"), 90)), 4),
                 "recall_strong_mean": _mean(vals("recall_strong")),
                 "recall_strong_p10": _pct(vals("recall_strong"), 10),
@@ -254,6 +285,10 @@ def summarise(metrics: list[HouseholdMetrics]) -> list[dict[str, Any]]:
     return rows
 
 
+def _ratio(a: int, b: int) -> float | None:
+    return round(a / b, 4) if b else None
+
+
 def _mean(v: list[float]) -> float | None:
     return round(float(np.mean(v)), 4) if v else None
 
@@ -263,10 +298,23 @@ def _pct(v: list[float], q: float) -> float | None:
 
 
 def specs(
-    sizes: Iterable[int], seeds: int, days: int, archetypes: Iterable[str] = ARCHETYPES
+    sizes: Iterable[int],
+    seeds: int,
+    days: int,
+    archetypes: Iterable[str] = ARCHETYPES,
+    *,
+    area_coverage: float | None = None,
+    descriptive_names: float | None = None,
 ) -> list[HouseholdSpec]:
     return [
-        HouseholdSpec(archetype=a, n_series=n, days=days, seed=s)
+        HouseholdSpec(
+            archetype=a,
+            n_series=n,
+            days=days,
+            seed=s,
+            area_coverage=area_coverage,
+            descriptive_names=descriptive_names,
+        )
         for a in archetypes
         for n in sizes
         for s in range(seeds)
@@ -280,6 +328,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--days", type=int, default=90)
     parser.add_argument("--archetypes", default=",".join(ARCHETYPES))
     parser.add_argument("--method", choices=["v1", "v2"], default="v2")
+    parser.add_argument(
+        "--area-coverage", type=float, help="share of rooms with an HA area (default: drawn)"
+    )
+    parser.add_argument(
+        "--descriptive-names",
+        type=float,
+        help="share of rooms without an area named after the room (default: drawn)",
+    )
     parser.add_argument("--households", action="store_true", help="also print each household")
     args = parser.parse_args(argv)
     metrics = evaluate(
@@ -288,6 +344,8 @@ def main(argv: list[str] | None = None) -> int:
             args.seeds,
             args.days,
             args.archetypes.split(","),
+            area_coverage=args.area_coverage,
+            descriptive_names=args.descriptive_names,
         ),
         current_method(method=args.method),
     )

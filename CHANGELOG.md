@@ -27,6 +27,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Correlation findings carry `p_value` and `explained_by`, and new flags
   `common_factor`, `indirect` and `unstable` (ADR 062). `get_findings` returns them;
   flagged findings are hidden unless `include_flagged`.
+- Correlation flag `same_area` (ADR 064): a relation between two entities in one Home
+  Assistant area (or, without an area, one area named in their ids or names) is
+  explained by the room's occupancy and ranked after the unflagged findings.
 
 ### Changed
 
