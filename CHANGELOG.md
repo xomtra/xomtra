@@ -11,6 +11,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-25
+
 ### Added
 
 - Editions (ADR 050): `HAMMOND_EDITION=full|lite` selects default retention and DuckDB
@@ -142,7 +144,8 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/zettabyte-cz/HAmmond/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/zettabyte-cz/HAmmond/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/zettabyte-cz/HAmmond/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/zettabyte-cz/HAmmond/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/zettabyte-cz/HAmmond/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/zettabyte-cz/HAmmond/releases/tag/v0.1.0
