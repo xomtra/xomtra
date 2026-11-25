@@ -199,8 +199,8 @@ def score_correlations(m: RunMetrics, findings: list[dict[str, Any]]) -> None:
 
 
 def _robust_scale(grid: corr.Grid, params: an.AnomalyParams) -> tuple[FloatArray, FloatArray]:
-    """Robust deviation of every series in the recent week, and whether the series is
-    heavy-tailed: its robust deviation is under ``HEAVY_TAIL_RATIO`` of the 5-95 %
+    """Deviation of every series in the recent week as the method scales it, and
+    whether the series is heavy-tailed: its robust deviation is under ``HEAVY_TAIL_RATIO`` of the 5-95 %
     spread of its baseline residuals (an appliance that idles most hours)."""
     t = len(grid.hours)
     first_recent = t - params.recent_days * 24
@@ -208,10 +208,13 @@ def _robust_scale(grid: corr.Grid, params: an.AnomalyParams) -> tuple[FloatArray
     baseline = (idx < first_recent) & (idx >= first_recent - params.baseline_days * 24)
     how = (grid.local_dow - 1) * 24 + grid.local_hour
     exp = an.expectation(grid.values, how, grid.local_hour, baseline, grid.series)
-    scale = np.asarray(np.nanmedian(exp.scale[first_recent:], axis=0), dtype=np.float64)
+    robust = np.nanmedian(exp.scale[first_recent:], axis=0)
     resid = grid.values[baseline] - exp.expected[baseline]
     spread = (np.nanpercentile(resid, 95, axis=0) - np.nanpercentile(resid, 5, axis=0)) / 3.29
-    return scale, np.asarray(scale < HEAVY_TAIL_RATIO * spread)
+    # Planted in the deviations the method measures in (the scale with its floor).
+    floor = an.scale_floor(grid.values, baseline, exp)
+    scale = np.nanmedian(np.fmax(exp.scale[first_recent:], floor[None, :]), axis=0)
+    return np.asarray(scale, dtype=np.float64), np.asarray(robust < HEAVY_TAIL_RATIO * spread)
 
 
 def _anomalies(grid: corr.Grid, params: an.AnomalyParams) -> tuple[list[dict[str, Any]], int]:

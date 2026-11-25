@@ -301,6 +301,27 @@ def test_anomalies_v2_nearly_constant_series_do_not_own_the_reference() -> None:
     assert an._episode_stat(1e6, 4) == pytest.approx(an.Z_CAP * 2)
 
 
+def test_anomalies_v2_heavy_tailed_series_are_scaled_by_their_use() -> None:
+    """Appliances idle most hours: the robust scale is the idle noise and every use is a
+    z in the hundreds, capped. Without the tail floor such series fill the reference at
+    the cap and a long episode cannot stand out (IDEAL, 0.4.1)."""
+    rng = np.random.default_rng(4)
+    days, n = 63, 30
+    t = days * 24
+    hours = np.array([END - timedelta(hours=t - i) for i in range(t)])
+    use = rng.random((t, n)) < 0.1
+    values = 5 + rng.normal(0, 0.5, (t, n)) + use * rng.lognormal(5, 1, (t, n))
+    values[-40:-30, 0] = 1000.0  # a 1 kW load left on for 10 hours in the recent week
+    series = [an.corr.Series(f"sensor.a{j}", "mean", None) for j in range(n)]
+    local = np.array([h.hour for h in hours])
+    dow = np.array([h.isoweekday() for h in hours])
+    grid = an.corr.Grid(hours=hours, local_hour=local, local_dow=dow, series=series, values=values)
+    found, _ = an.detect_anomalies_v2(grid, an.AnomalyParams(timezone="UTC"))
+    assert [f["entity_id"] for f in found] == ["sensor.a0"]
+    floor = an._tail_floor(values, np.ones(t, dtype=bool), an.Expectation(np.zeros((t, n)), None))
+    assert floor[1] > 10 * 0.5  # far above the idle noise
+
+
 def test_resolution() -> None:
     v = np.array([[1.0, 0.0], [1.5, 0.0], [2.0, 0.0], [np.nan, 0.0]])
     res = an._resolution(v, np.ones(4, dtype=bool))

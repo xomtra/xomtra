@@ -20,6 +20,14 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   and memory. The nightly workflow `validation.yml` runs both on amd64 and arm64 and
   prints only aggregate metrics.
 
+### Changed
+
+- Anomalies v2 (ADR 066): the scale of a series is at least a quarter of its 99th
+  percentile deviation in the baseline. Heavy-tailed series (appliances idling most
+  hours) were scaled by their idle noise, so their ordinary use saturated the z cap and
+  real episodes could not stand out (recall of planted episodes on the IDEAL homes was
+  about 0). Normal series are not affected.
+
 ## [0.4.1] - 2026-11-25
 
 ### Fixed
