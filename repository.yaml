@@ -1,5 +1,5 @@
 # Home Assistant add-on repository (Settings of the add-on store -> Repositories):
-# https://github.com/zettabyte-cz/HAmmond. The add-on itself is in addon/hammond.
+# https://github.com/xomtra/xomtra. The add-on itself is in addon/hammond.
 name: HAmmond
-url: https://github.com/zettabyte-cz/HAmmond
-maintainer: Zettabyte <info@zettabyte.cz>
+url: https://github.com/xomtra/xomtra
+maintainer: Xomtra <support@xomtra.com>

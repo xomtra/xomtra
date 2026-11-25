@@ -30,7 +30,7 @@ jobs:
       TAG: ${{ github.ref_name }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      REGISTRY: ghcr.io/zettabyte-cz
+      REGISTRY: ghcr.io/xomtra
       IMAGES: hammond-mcp hammond-ingest hammond-caddy hammond-addon-amd64 hammond-addon-aarch64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

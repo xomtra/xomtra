@@ -7,10 +7,10 @@
   "long_description": "Connects Claude Desktop to a HAmmond server on your local network. Issue a personal token in the HAmmond admin GUI (Tokens) and enter it here. Read-only: HAmmond never changes anything in Home Assistant.",
   "author": {
     "name": "HAmmond contributors",
-    "url": "https://github.com/zettabyte-cz/hammond"
+    "url": "https://github.com/xomtra/xomtra"
   },
-  "homepage": "https://github.com/zettabyte-cz/hammond",
-  "documentation": "https://github.com/zettabyte-cz/hammond/blob/main/docs/setup/local-access.md",
+  "homepage": "https://github.com/xomtra/xomtra",
+  "documentation": "https://github.com/xomtra/xomtra/blob/main/docs/setup/local-access.md",
   "license": "Apache-2.0",
   "keywords": ["home assistant", "smart home", "history", "energy"],
   "server": {

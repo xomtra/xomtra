@@ -31,13 +31,17 @@ PYPROJECTS = (
     "services/mcp-server/pyproject.toml",
 )
 # Files whose default image references follow the release version.
-IMAGE_REFERENCES = ("deploy/compose/compose.yaml", "deploy/compose/.env.example")
+IMAGE_REFERENCES = (
+    "deploy/compose/compose.yaml",
+    "deploy/compose/compose.lite.yaml",
+    "deploy/compose/.env.example",
+)
 IMAGES = ("hammond-mcp", "hammond-ingest", "hammond-caddy")
 # Home Assistant add-on: the Supervisor pulls <image>:<version of config.yaml>.
 ADDON_CONFIG = "addon/hammond/config.yaml"
-REGISTRY = "ghcr.io/zettabyte-cz"
+REGISTRY = "ghcr.io/xomtra"
 CHANGELOG = "CHANGELOG.md"
-REPO_URL = "https://github.com/zettabyte-cz/HAmmond"
+REPO_URL = "https://github.com/xomtra/xomtra"
 
 _SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta|rc)\.([1-9]\d*))?$")
 _PEP440_PRE = {"alpha": "a", "beta": "b", "rc": "rc"}

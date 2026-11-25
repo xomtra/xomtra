@@ -25,7 +25,7 @@ RUN uv sync --locked --no-dev --no-editable --package hammond-mcp
 RUN /app/.venv/bin/python -m hacore.lake install-extensions
 
 FROM ${PYTHON_IMAGE} AS runtime
-LABEL org.opencontainers.image.source="https://github.com/zettabyte-cz/hammond" \
+LABEL org.opencontainers.image.source="https://github.com/xomtra/xomtra" \
       org.opencontainers.image.description="HAmmond MCP server" \
       org.opencontainers.image.licenses="Apache-2.0"
 # Apply Debian security updates on top of the pinned base image and drop pip/ensurepip:

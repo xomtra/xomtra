@@ -51,7 +51,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
-    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:0.3.0}
+    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/xomtra/hammond-ingest:0.4.1}
     command: ["hammond-ingest", "worker"]
     environment:
       HAMMOND_LAKE_PG_HOST: postgres

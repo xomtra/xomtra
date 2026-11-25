@@ -5,11 +5,11 @@ name: HAmmond
 version: "0.4.1"
 slug: hammond
 description: History and analyses of your Home Assistant for Claude (MCP server)
-url: https://github.com/zettabyte-cz/hammond
+url: https://github.com/xomtra/xomtra
 arch:
   - amd64
   - aarch64
-image: ghcr.io/zettabyte-cz/hammond-addon-{arch}
+image: ghcr.io/xomtra/hammond-addon-{arch}
 init: false
 startup: application
 boot: auto

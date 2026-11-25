@@ -51,7 +51,7 @@ described in [docs/releasing.md](docs/releasing.md), then follow the
 ## Security
 
 Please report vulnerabilities privately, see [SECURITY.md](SECURITY.md).
-Container images are published to `ghcr.io/zettabyte-cz/` and signed with
+Container images are published to `ghcr.io/xomtra/` and signed with
 [cosign](https://docs.sigstore.dev/) v3 (keyless, GitHub OIDC; the signature is stored
 in the new bundle format, which cosign v2 does not find). Verify with cosign v3 before
 deploying (the repository name in the identity is case-sensitive: `HAmmond`). Released
@@ -59,8 +59,8 @@ images carry a second signature from the release workflow, see
 [docs/releasing.md](docs/releasing.md); development builds of `main` only this one:
 
 ```bash
-cosign verify ghcr.io/zettabyte-cz/hammond-mcp@sha256:<digest> \
-  --certificate-identity-regexp '^https://github.com/zettabyte-cz/HAmmond/\.github/workflows/ci\.yml@refs/heads/main$' \
+cosign verify ghcr.io/xomtra/hammond-mcp@sha256:<digest> \
+  --certificate-identity-regexp '^https://github.com/xomtra/xomtra/\.github/workflows/ci\.yml@refs/heads/main$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 

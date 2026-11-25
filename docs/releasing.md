@@ -11,7 +11,7 @@ release carries the same version (ADR 045).
 - Before 1.0.0 a **minor** release may break things (configuration, schema, API); the
   CHANGELOG lists each such change with an upgrade note. A **patch** release is always a
   drop-in update.
-- Image tags in `ghcr.io/zettabyte-cz/hammond-{mcp,ingest,caddy}` and of the Home
+- Image tags in `ghcr.io/xomtra/hammond-{mcp,ingest,caddy}` and of the Home
   Assistant add-on `hammond-addon-{amd64,aarch64}` (the Supervisor pulls the tag of the
   `version` in `addon/hammond/config.yaml`, which `prepare` sets):
 
@@ -68,7 +68,7 @@ Every pull request with a user-visible change adds a line under `[Unreleased]` i
 ## Installing a release
 
 ```bash
-git clone --branch v0.2.0 --depth 1 https://github.com/zettabyte-cz/HAmmond.git
+git clone --branch v0.2.0 --depth 1 https://github.com/xomtra/xomtra.git
 cd HAmmond/deploy/compose
 cp .env.example .env && chmod 600 .env
 # fill in .env, then replace the three *_IMAGE lines with the ones from
@@ -78,8 +78,8 @@ cp .env.example .env && chmod 600 .env
 Verify the release signature of each image (cosign v3) before the first start:
 
 ```bash
-cosign verify ghcr.io/zettabyte-cz/hammond-mcp@sha256:<digest> \
-  --certificate-identity https://github.com/zettabyte-cz/HAmmond/.github/workflows/release.yml@refs/tags/v0.2.0 \
+cosign verify ghcr.io/xomtra/hammond-mcp@sha256:<digest> \
+  --certificate-identity https://github.com/xomtra/xomtra/.github/workflows/release.yml@refs/tags/v0.2.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
