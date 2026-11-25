@@ -45,7 +45,7 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db') \gexec
 SELECT format('REVOKE ALL ON DATABASE %I FROM PUBLIC', :'db') \gexec
 SQL
 psql -v ON_ERROR_STOP=1 -U postgres -d "$AUDIT_DB" -v usr="$AUDIT_USER" -v db="$AUDIT_DB" \
-  -v adm="$AUDIT_ADMIN_USER" -v days="$AUDIT_RETENTION_DAYS" <<'SQL'
+  -v adm="$AUDIT_ADMIN_USER" -v ops="$OPS_USER" -v days="$AUDIT_RETENTION_DAYS" <<'SQL'
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 CREATE SCHEMA IF NOT EXISTS audit AUTHORIZATION postgres;
 CREATE TABLE IF NOT EXISTS audit.tool_call (
@@ -124,5 +124,33 @@ SELECT format('GRANT USAGE ON SCHEMA access TO %I, %I', :'usr', :'adm') \gexec
 SELECT format('GRANT EXECUTE ON FUNCTION access.verify_token(bytea) TO %I', :'usr') \gexec
 SELECT format('GRANT SELECT, INSERT ON access.token TO %I', :'adm') \gexec
 SELECT format('GRANT UPDATE (revoked_at, revoked_by) ON access.token TO %I', :'adm') \gexec
+
+-- Analysis settings changed in the admin GUI (ADR 060): an append-only history, the
+-- latest row of a key is its value (NULL = back to the environment or the default). The
+-- admin GUI reads and appends; the ingest (ops role) may only call
+-- analysis.current_settings().
+CREATE SCHEMA IF NOT EXISTS analysis AUTHORIZATION postgres;
+CREATE TABLE IF NOT EXISTS analysis.setting_change (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  key        text NOT NULL,
+  value      jsonb,
+  changed_at timestamptz NOT NULL DEFAULT now(),
+  changed_by text,
+  reason     text
+);
+CREATE INDEX IF NOT EXISTS setting_change_key ON analysis.setting_change (key, id);
+CREATE OR REPLACE FUNCTION analysis.current_settings()
+RETURNS TABLE (key text, value jsonb, changed_at timestamptz, changed_by text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $f$
+  SELECT c.key, c.value, c.changed_at, c.changed_by FROM (
+    SELECT DISTINCT ON (s.key) s.key, s.value, s.changed_at, s.changed_by
+    FROM analysis.setting_change s ORDER BY s.key, s.id DESC) c
+  WHERE c.value IS NOT NULL
+$f$;
+REVOKE ALL ON FUNCTION analysis.current_settings() FROM PUBLIC;
+SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'db', :'ops') \gexec
+SELECT format('GRANT USAGE ON SCHEMA analysis TO %I, %I', :'adm', :'ops') \gexec
+SELECT format('GRANT SELECT, INSERT ON analysis.setting_change TO %I', :'adm') \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION analysis.current_settings() TO %I, %I', :'adm', :'ops') \gexec
 SQL
 echo "Postgres roles and databases are in place."

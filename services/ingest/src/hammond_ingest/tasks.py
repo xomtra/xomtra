@@ -24,7 +24,7 @@ from hacore import (
     weather,
 )
 from hacore.client import HAClient
-from hammond_ingest import transform
+from hammond_ingest import analysis_store, transform
 from hammond_ingest.settings import IngestSettings
 
 logger = logging.getLogger(__name__)
@@ -148,7 +148,7 @@ def sync_outside_temperature(settings: IngestSettings | None = None) -> dict[str
 
 def find_correlations(settings: IngestSettings | None = None) -> list[dict[str, Any]]:
     """Correlations for every configured window (ADR 042), findings in catalog.finding."""
-    s = settings or IngestSettings()
+    s = analysis_store.with_overrides(settings or IngestSettings())
     out = []
     with open_lake() as con:
         for days in s.correlation_windows_days:
@@ -170,7 +170,7 @@ def find_correlations(settings: IngestSettings | None = None) -> list[dict[str, 
 
 def find_anomalies(settings: IngestSettings | None = None) -> dict[str, Any]:
     """Anomalies and change points of single entities (ADR 046) into catalog.finding."""
-    s = settings or IngestSettings()
+    s = analysis_store.with_overrides(settings or IngestSettings())
     if not s.anomalies_enabled:
         return {"skipped": "HAMMOND_ANOMALIES_ENABLED is off"}
     params = anomalies.AnomalyParams(

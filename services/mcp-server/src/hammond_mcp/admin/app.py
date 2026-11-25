@@ -24,7 +24,16 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
 
+from hacore.analysis_settings import BY_KEY, SPECS, Spec, Value
 from hammond_mcp.admin import status
+from hammond_mcp.admin.analysis import (
+    PREVIEW_KEYS,
+    Change,
+    PostgresSettingsStore,
+    SettingsStore,
+    SettingsStoreError,
+    preview,
+)
 from hammond_mcp.admin.config import PREFIX, AdminSettings
 from hammond_mcp.admin.html import CSS, cards, e, page, table
 from hammond_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
@@ -64,6 +73,7 @@ class AdminApp:
         oidc: EntraOIDC | None = None,
         ha_login: HomeAssistantLogin | None = None,
         tokens: TokenStore | None = None,
+        analysis: SettingsStore | None = None,
     ) -> None:
         self.settings = settings
         self.data = data
@@ -94,6 +104,9 @@ class AdminApp:
         if tokens is None and settings.access_mode == "local" and dsn:
             tokens = PostgresTokenStore(dsn)
         self.tokens = tokens
+        if analysis is None and dsn:
+            analysis = PostgresSettingsStore(dsn)
+        self.analysis = analysis
         self.headers = dict(HEADERS)
         if ha_login is not None:
             origin = urlparse(ha_login.ha_auth_url)
@@ -449,6 +462,148 @@ class AdminApp:
 
         return await asyncio.to_thread(query)
 
+    # ---- analysis settings (ADR 060) -----------------------------------------------
+
+    @staticmethod
+    def _shown(spec: Spec, value: Value | None) -> str:
+        if value is None:
+            return ""
+        if spec.kind == "bool":
+            return "on" if value else "off"
+        return f"{value:g}" if isinstance(value, float) else str(value)
+
+    def _setting_row(self, spec: Spec, stored: Change | None) -> list[Any]:
+        value = self._shown(spec, stored.value if stored else None)
+        if spec.kind in ("bool", "choice"):
+            options = ("on", "off") if spec.kind == "bool" else spec.choices
+            current = value or self._shown(spec, spec.default)
+            field = (
+                "<select name=value>"
+                + "".join(
+                    f"<option{' selected' if o == current else ''}>{e(o)}</option>" for o in options
+                )
+                + "</select>"
+            )
+        else:
+            field = (
+                f"<input name=value size=8 value='{e(value)}' "
+                f"placeholder='{e(self._shown(spec, spec.default))}'>"
+            )
+        buttons = "<button name=action value=save>Save</button>"
+        if spec.key in PREVIEW_KEYS:
+            buttons += " <button name=action value=preview>Preview</button>"
+        if stored is not None:
+            buttons += " <button name=action value=reset>Reset</button>"
+        form = (
+            f"<form class=filters method=post action='{PREFIX}/analysis'>"
+            f"<input type=hidden name=key value='{e(spec.key)}'>{field}"
+            "<input name=reason size=18 maxlength=200 placeholder='reason (optional)'>"
+            f"{buttons}</form>"
+        )
+        label = f"{e(spec.label)}<br><code>{e(spec.env)}</code>"
+        if spec.help:
+            label += f"<br><span class=muted>{e(spec.help)}</span>"
+        who = f"{e(stored.changed_by)}, {e(stored.changed_at)}" if stored else ""
+        return [label, self._shown(spec, spec.default), spec.bounds(), value or None, who, form]
+
+    async def analysis_page(
+        self, request: Request, user: dict[str, Any], *, note: str = "", status_code: int = 200
+    ) -> Response:
+        title = "Analysis settings"
+        if self.analysis is None:
+            body = "<p class=warn>The audit database is not configured for the admin GUI.</p>"
+            return HTMLResponse(page(title, body, user.get("username")))
+        try:
+            current = await asyncio.to_thread(self.analysis.current)
+            history = await asyncio.to_thread(self.analysis.history, 50)
+        except SettingsStoreError:
+            body = "<p class=bad>The settings store is unavailable.</p>"
+            return HTMLResponse(page(title, body, user.get("username")), 503)
+        body = note + (
+            "<p class=muted>A stored value wins over the ingest's environment variable, which "
+            "wins over the default. The next analysis run (daily) uses it; no restart. "
+            "The thresholds set the rate of false findings, not their number (ADR 060, "
+            "062): a larger home rightly finds more.</p>"
+        )
+        for group in dict.fromkeys(s.group for s in SPECS):
+            rows = [self._setting_row(s, current.get(s.key)) for s in SPECS if s.group == group]
+            body += f"<h2>{e(group)}</h2>" + table(
+                ["setting", "default", "allowed", "stored", "changed", ""],
+                rows,
+                trusted_html={0, 5},
+            )
+        body += "<h2>History</h2>" + table(
+            ["when", "setting", "value", "by", "reason"],
+            [
+                [
+                    c.changed_at,
+                    c.key,
+                    "back to default"
+                    if c.value is None
+                    else self._shown(BY_KEY[c.key], c.value)
+                    if c.key in BY_KEY
+                    else c.value,
+                    c.changed_by,
+                    c.reason,
+                ]
+                for c in history
+            ],
+        )
+        return HTMLResponse(page(title, body, user.get("username")), status_code)
+
+    async def analysis_post(self, request: Request, user: dict[str, Any]) -> Response:
+        form = await self._form(request)
+        spec = BY_KEY.get(form.get("key", ""))
+        action = form.get("action", "save")
+        reason = form.get("reason", "")[:200] or None
+        if spec is None or action not in ("save", "reset", "preview") or self.analysis is None:
+            return await self.analysis_page(
+                request, user, note="<p class=bad>Unknown setting.</p>", status_code=400
+            )
+        value: Value | None = None
+        if action != "reset":
+            try:
+                value = spec.parse(form.get("value", ""))
+            except ValueError as err:
+                return await self.analysis_page(
+                    request, user, note=f"<p class=bad>{e(err)}</p>", status_code=400
+                )
+        if action == "preview":
+            assert value is not None  # noqa: S101 - parsed above
+            result = (
+                await asyncio.to_thread(preview, self.data, spec.key, value)
+                if self.data is not None
+                else None
+            )
+            if result is None:
+                note = "<p class=warn>No findings to preview yet.</p>"
+            else:
+                note = (
+                    f"<p class=ok>With {e(spec.key)} = {e(self._shown(spec, value))}: "
+                    f"{result['kept']} of {result['now']} current findings remain "
+                    f"({result['kept_unflagged']} of {result['unflagged']} without flags). "
+                    "Exact when tightening; when loosening, weaker candidates that were not "
+                    "stored may also appear. Nothing was saved.</p>"
+                )
+            return await self.analysis_page(request, user, note=note)
+        try:
+            await asyncio.to_thread(
+                self.analysis.set, spec.key, value, by=user.get("username"), reason=reason
+            )
+            await self._audit(
+                "analysis_setting",
+                user,
+                arguments={"key": spec.key, "value": value, "reason": reason},
+            )
+        except (SettingsStoreError, AuditError):
+            return await self.analysis_page(
+                request,
+                user,
+                note="<p class=bad>Not saved: the settings store or audit is unavailable.</p>",
+                status_code=503,
+            )
+        return RedirectResponse(f"{PREFIX}/analysis", status_code=303)
+
     # ---- personal tokens and client setup (local access, ADR 056/059) ---------------
 
     def _local_only(self, user: dict[str, Any], title: str) -> Response | None:
@@ -680,6 +835,12 @@ class AdminApp:
             Route(f"{PREFIX}/drift", p("drift", self.drift)),
             Route(f"{PREFIX}/retention", p("retention", self.retention)),
             Route(f"{PREFIX}/audit", p("audit", self.audit_page)),
+            Route(f"{PREFIX}/analysis", p("analysis", self.analysis_page)),
+            Route(
+                f"{PREFIX}/analysis",
+                p("analysis_setting", self.analysis_post, audit=False),
+                methods=["POST"],
+            ),
             Route(f"{PREFIX}/tokens", p("tokens", self.tokens_page)),
             Route(
                 f"{PREFIX}/tokens/issue",

@@ -75,6 +75,9 @@ class IngestSettings(BaseSettings):
     anomaly_max_q: float = Field(default=0.05, gt=0, le=1)
     # v2: |z| counted at most this in the episode statistic (nearly constant sensors).
     anomaly_z_cap: float = Field(default=50.0, gt=3)
+    # Database of the analysis settings changed in the admin GUI (ADR 060; schema
+    # ``analysis`` next to the audit). They win over the variables above; empty = off.
+    analysis_settings_db: str = "audit"
     # Weekly snapshots of the findings (ADR 048) kept this many weeks.
     findings_weekly_keep_weeks: int = Field(default=104, ge=1, le=520)
 

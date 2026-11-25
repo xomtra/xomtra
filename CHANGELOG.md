@@ -13,6 +13,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Added
 
+- Admin GUI page *Analysis settings* (ADR 060): thresholds of correlations, anomalies
+  and change points can be changed without a restart, with a preview of their effect on
+  the current findings and a history of changes. A stored value wins over the ingest's
+  environment variable. New schema `analysis` in the audit database (created by
+  `ensure-databases`), new ingest variable `HAMMOND_ANALYSIS_SETTINGS_DB` (default
+  `audit`).
 - Validation on public data (ADR 065, Gate 1c point 6): `hacore.public` fetches the IDEAL
   hourly readings with HTTP range requests (member list pinned, CRC-32 checked) and
   measures the cross-household null of correlations and anomalies
