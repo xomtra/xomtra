@@ -54,6 +54,7 @@ import numpy as np
 
 from hacore import areas
 from hacore import correlations as corr
+from hacore.context import EMPTY, Context
 from hacore.synthetic.generator import ARCHETYPES, Household, HouseholdSpec, Relation, generate
 
 type Analysis = Callable[[Household], list[dict[str, Any]]]
@@ -92,33 +93,32 @@ def current_method(params: corr.CorrelationParams | None = None, *, method: str 
             method=method,
             seed=h.spec.seed,
         )
-        grid = corr.clean(h.grid, params_h.min_coverage, h.outside_temp)
-        resid, series = corr.residuals(grid, h.outside_temp)
-        resid = corr.highpass(resid)
-        if len(series) < 2:
-            return []
-        if method == "v1":
-            pairs = corr.lagged_correlations(resid, params_h.max_lag)
-        else:
-            pairs, _ = corr.lagged_correlations_v2(
-                resid,
-                params_h.max_lag,
-                min_r=params_h.min_r,
-                max_q=params_h.max_q,
-                seed=params_h.seed,
-            )
-        return corr.select_findings(
-            pairs,
-            series,
-            params_h,
-            {},
-            context=areas.context_of(
-                h.entity_areas(),
-                {s.entity_id for s in h.grid.series if areas.is_presence(s.entity_id)},
-            ),
+        context = areas.context_of(
+            h.entity_areas(),
+            {s.entity_id for s in h.grid.series if areas.is_presence(s.entity_id)},
         )
+        return analyse_grid(h.grid, params_h, context)
 
     return run
+
+
+def analyse_grid(
+    grid: corr.Grid, params: corr.CorrelationParams, context: Context = EMPTY
+) -> list[dict[str, Any]]:
+    """The correlation pipeline of ``hacore.correlations.run`` without the lake: clean,
+    residuals, high-pass, lagged correlations (v1 or v2), findings."""
+    grid = corr.clean(grid, params.min_coverage, params.outside_temp)
+    resid, series = corr.residuals(grid, params.outside_temp)
+    resid = corr.highpass(resid)
+    if len(series) < 2:
+        return []
+    if params.method == "v1":
+        pairs = corr.lagged_correlations(resid, params.max_lag)
+    else:
+        pairs, _ = corr.lagged_correlations_v2(
+            resid, params.max_lag, min_r=params.min_r, max_q=params.max_q, seed=params.seed
+        )
+    return corr.select_findings(pairs, series, params, {}, context=context)
 
 
 @dataclass(frozen=True, slots=True)

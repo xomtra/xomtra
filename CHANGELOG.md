@@ -11,6 +11,15 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Validation on public data (ADR 065, Gate 1c point 6): `hacore.public` fetches the IDEAL
+  hourly readings with HTTP range requests (member list pinned, CRC-32 checked) and
+  measures the cross-household null of correlations and anomalies
+  (`python -m hacore.public.crosshouse`); `hacore.synthetic.benchmark` measures run time
+  and memory. The nightly workflow `validation.yml` runs both on amd64 and arm64 and
+  prints only aggregate metrics.
+
 ## [0.4.1] - 2026-11-25
 
 ### Fixed
