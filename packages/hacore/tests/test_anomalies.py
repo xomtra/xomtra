@@ -87,9 +87,9 @@ def rows(con: duckdb.DuckDBPyConnection, kind: str) -> list[dict[str, object]]:
     return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
 
 
-def test_anomaly_episode_found(plain: duckdb.DuckDBPyConnection) -> None:
+def test_anomaly_episode_found_v1(plain: duckdb.DuckDBPyConnection) -> None:
     seed(plain)
-    res = an.run(plain, params(), now=NOW)
+    res = an.run(plain, params(method="v1"), now=NOW)
     assert res.notes == []
     found = rows(plain, "anomaly")
     power = [f for f in found if f["entity_id"] == "sensor.power"]
@@ -111,6 +111,34 @@ def test_anomaly_episode_found(plain: duckdb.DuckDBPyConnection) -> None:
     assert flagged == sorted(flagged)
 
 
+def test_anomaly_episode_found_v2(plain: duckdb.DuckDBPyConnection) -> None:
+    """v2: the five unusual hours get a conformal p-value and q; the noise stays quiet.
+    With three series the reference is small (168 series-days), so the single unusual
+    hour does not pass BH: that is the price of the calibration in a tiny installation."""
+    seed(plain)
+    res = an.run(plain, params(), now=NOW)
+    sig = res.significance["anomaly"]
+    assert sig["reference_size"] > 0
+    found = rows(plain, "anomaly")
+    long = next(f for f in found if f["entity_id"] == "sensor.power" and not f["flags"])
+    assert long["period_start"] == END - timedelta(hours=30)
+    assert long["n_eff"] == 5
+    assert float(long["q_value"]) <= 0.05  # type: ignore[arg-type]
+    assert float(long["p_value"]) <= float(long["q_value"])  # type: ignore[arg-type]
+    assert not [f for f in found if f["entity_id"] == "sensor.normal"]
+    # The level shift 12 days ago makes the recent week unusual: flagged, not new.
+    shifted = [f for f in found if f["entity_id"] == "sensor.level"]
+    assert all("level_shift" in f["flags"] for f in shifted)  # type: ignore[operator]
+
+
+def test_change_point_found_v1(plain: duckdb.DuckDBPyConnection) -> None:
+    seed(plain)
+    an.run(plain, params(method="v1"), now=NOW)
+    found = rows(plain, "change_point")
+    assert [f["entity_id"] for f in found] == ["sensor.level"]
+    assert float(found[0]["score"]) > 3  # type: ignore[arg-type]
+
+
 def test_change_point_found(plain: duckdb.DuckDBPyConnection) -> None:
     seed(plain)
     an.run(plain, params(), now=NOW)
@@ -122,6 +150,7 @@ def test_change_point_found(plain: duckdb.DuckDBPyConnection) -> None:
     assert abs((start - (END - timedelta(days=12))).total_seconds()) <= 24 * 3600
     assert float(cp["observed"]) - float(cp["expected"]) == pytest.approx(4, abs=0.5)  # type: ignore[arg-type]
     assert float(cp["score"]) > 3  # type: ignore[arg-type]
+    assert float(cp["q_value"]) <= 0.05  # type: ignore[arg-type]
     assert cp["window_days"] == 90
 
 
@@ -203,3 +232,46 @@ def test_on_ducklake(lake: duckdb.DuckDBPyConnection) -> None:
     res = an.run(lake, params(), now=NOW)
     assert res.anomalies > 0
     assert res.change_points == 1
+
+
+def test_ar1_surrogates_keep_scale_and_autocorrelation() -> None:
+    rng = np.random.default_rng(9)
+    e = rng.normal(0, 1, 2000)
+    x = np.empty_like(e)
+    x[0] = e[0]
+    for i in range(1, len(e)):
+        x[i] = 0.6 * x[i - 1] + e[i]
+    sur = an._ar1_surrogates(x, 0.6, 20, rng)
+    assert sur.shape == (20, 2000)
+    assert np.std(sur) == pytest.approx(np.std(x), rel=0.1)
+    lag1 = np.mean([np.corrcoef(s[:-1], s[1:])[0, 1] for s in sur])
+    assert lag1 == pytest.approx(0.6, abs=0.05)
+
+
+def test_change_points_v2_quiet_on_autocorrelated_noise() -> None:
+    """Many autocorrelated series without a change: BH over series keeps the false
+    change points rare (block permutations of weeks would have too little power to
+    find real ones; AR(1) surrogates keep both)."""
+    rng = np.random.default_rng(10)
+    days, n = 90, 60
+    hours = np.array([END - timedelta(hours=days * 24 - i) for i in range(days * 24)])
+    daily = np.empty((days, n))
+    daily[0] = rng.normal(0, 1, n)
+    for d in range(1, days):
+        daily[d] = 0.7 * daily[d - 1] + rng.normal(0, 1, n)
+    values = np.repeat(daily, 24, axis=0) + rng.normal(0, 0.3, (days * 24, n))
+    values[-10 * 24 :, 0] += 12  # one real change 10 days ago (~3.6 long-run SD)
+    series = [an.corr.Series(f"sensor.s{j}", "mean", None) for j in range(n)]
+    local = np.array([h.hour for h in hours])
+    grid = an.corr.Grid(
+        hours=hours,
+        local_hour=local,
+        local_dow=np.ones(len(hours)),
+        series=series,
+        values=values,
+    )
+    found, stats = an.detect_change_points_v2(grid, an.AnomalyParams(timezone="UTC"))
+    assert stats["tested"] == n
+    ids = [f["entity_id"] for f in found]
+    assert "sensor.s0" in ids
+    assert len(ids) <= 3

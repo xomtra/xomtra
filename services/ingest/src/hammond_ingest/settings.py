@@ -69,6 +69,10 @@ class IngestSettings(BaseSettings):
     changepoint_window_days: int = Field(default=90, ge=28, le=730)
     changepoint_recent_days: int = Field(default=30, ge=7, le=365)
     changepoint_min_shift: float = Field(default=3.0, ge=1.0, le=20.0)
+    # v2 = conformal / permutation p-values and BH over series (ADR 062); v1 = ADR 046
+    # fixed thresholds (anomaly_z, changepoint_min_shift).
+    anomaly_method: Literal["v1", "v2"] = "v2"
+    anomaly_max_q: float = Field(default=0.05, gt=0, le=1)
     # Weekly snapshots of the findings (ADR 048) kept this many weeks.
     findings_weekly_keep_weeks: int = Field(default=104, ge=1, le=520)
 
