@@ -11,6 +11,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-25
+
 ### Added
 
 - Home Assistant add-on (lite edition, in development): one container with Postgres,
@@ -247,7 +249,8 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/xomtra/xomtra/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/xomtra/xomtra/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/xomtra/xomtra/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/xomtra/xomtra/compare/v0.2.0...v0.3.0
