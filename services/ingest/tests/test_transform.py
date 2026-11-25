@@ -1,8 +1,10 @@
+import logging
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from sqlmesh.utils import CompletionStatus
 
 from hacore import bronze
 from hacore import catalog as entity_catalog
@@ -140,3 +142,30 @@ def test_local_lake_has_no_s3_secret() -> None:
     conn = transform.lake_connection(settings)
     assert not conn.secrets
     assert conn.catalogs[LAKE_ALIAS].data_path == "/data/lake/"
+
+
+class FakeContext:
+    def __init__(self, fail: bool) -> None:
+        self.fail = fail
+        self.execution_time: datetime | None = None
+
+    def run(self, *, execution_time: datetime) -> CompletionStatus:
+        self.execution_time = execution_time
+        if not self.fail:
+            return CompletionStatus.SUCCESS
+        error = RuntimeError("Execution failed for node silver.entities")
+        error.__cause__ = ValueError("audit unique_values failed")
+        logging.getLogger("sqlmesh.core.scheduler").info(str(error), exc_info=error)
+        return CompletionStatus.FAILURE
+
+
+def test_run_failure_names_the_model_and_the_cause() -> None:
+    when = datetime(2026, 11, 25, 17, 0, tzinfo=UTC)
+    ctx = FakeContext(fail=True)
+    with pytest.raises(transform.TransformError, match=r"silver\.entities.*audit unique_values"):
+        transform._run(ctx, when)  # type: ignore[arg-type]
+    assert ctx.execution_time == when
+    log = logging.getLogger("sqlmesh.core.scheduler")
+    assert not log.handlers
+    ok = FakeContext(fail=False)
+    assert transform._run(ok, when) is CompletionStatus.SUCCESS  # type: ignore[arg-type]

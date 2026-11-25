@@ -31,6 +31,7 @@ from sqlmesh.core.config import (
     PostgresConnectionConfig,
 )
 from sqlmesh.core.config.connection import DuckDBAttachOptions
+from sqlmesh.utils import CompletionStatus
 
 from hacore.lake import LAKE_ALIAS, LakeSettings
 from hammond_ingest.settings import IngestSettings
@@ -156,15 +157,49 @@ def context(config: Config | None = None) -> Context:
     return Context(paths=[str(PROJECT_DIR)], config=config or config_from_env())
 
 
+class _FailedModels(logging.Handler):
+    """Collects the model errors SQLMesh logs (it returns only a status from ``run``)."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.INFO)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        error = record.exc_info[1] if record.exc_info else None
+        if error is None:
+            return
+        cause = error.__cause__ or error
+        self.messages.append(f"{error}: {type(cause).__name__}: {cause}")
+
+
+def _run(ctx: Context, execution_time: datetime) -> CompletionStatus:
+    log = logging.getLogger("sqlmesh.core.scheduler")
+    handler = _FailedModels()
+    level = log.level
+    log.addHandler(handler)
+    if not log.isEnabledFor(logging.INFO):
+        log.setLevel(logging.INFO)
+    try:
+        completion = ctx.run(execution_time=execution_time)
+    finally:
+        log.removeHandler(handler)
+        log.setLevel(level)
+    if completion.is_failure:
+        detail = "; ".join(handler.messages) or "see log"
+        raise TransformError(f"SQLMesh run failed: {detail}")
+    return completion
+
+
 def apply_and_run(config: Config | None = None) -> TransformResult:
     """Apply model changes to prod (no-op if unchanged), then process due intervals."""
+    # One execution time for plan and run: otherwise an hour boundary between the two
+    # makes the run evaluate a new interval right after the plan's backfill.
+    execution_time = datetime.now(UTC).replace(second=0, microsecond=0)
     ctx = context(config)
     try:
-        plan = ctx.plan(auto_apply=True, no_prompts=True)
+        plan = ctx.plan(auto_apply=True, no_prompts=True, execution_time=execution_time)
         applied = plan.has_changes or bool(plan.missing_intervals)
-        completion = ctx.run()
-        if completion.is_failure:
-            raise TransformError("SQLMesh run failed (see log)")
+        completion = _run(ctx, execution_time)
         return TransformResult(applied=applied, status=completion.value)
     finally:
         ctx.close()
