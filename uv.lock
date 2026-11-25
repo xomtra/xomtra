@@ -1082,6 +1082,7 @@ dependencies = [
     { name = "dagster-postgres" },
     { name = "dagster-webserver" },
     { name = "hacore" },
+    { name = "psycopg2-binary" },
     { name = "pydantic-settings" },
     { name = "sqlmesh" },
 ]
@@ -1092,6 +1093,7 @@ requires-dist = [
     { name = "dagster-postgres", specifier = ">=0.29,<0.30" },
     { name = "dagster-webserver", specifier = ">=1.13,<1.14" },
     { name = "hacore", editable = "packages/hacore" },
+    { name = "psycopg2-binary", specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.10" },
     { name = "sqlmesh", specifier = ">=0.236" },
 ]

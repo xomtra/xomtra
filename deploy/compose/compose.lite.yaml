@@ -1,0 +1,101 @@
+# Lite edition (ADR 050) as an override of compose.yaml: no SeaweedFS and no Dagster.
+# The lake keeps its catalog in Postgres and its data files in the volume lake-data;
+# one `worker` container runs the live stream and the scheduled jobs.
+#
+#   docker compose -f compose.yaml -f compose.lite.yaml up -d
+#
+# Services of the full edition are put into the profile "full" and do not start.
+# init-env.sh still generates the S3 keys of the full edition; they are not used here.
+
+x-lite-env: &lite-env
+  HAMMOND_EDITION: lite
+  HAMMOND_LAKE_DATA_PATH: /lake
+  HAMMOND_STATES_RETENTION_DAYS: ${HAMMOND_STATES_RETENTION_DAYS:-90}
+  HAMMOND_STATISTICS_5MIN_RETENTION_DAYS: ${HAMMOND_STATISTICS_5MIN_RETENTION_DAYS:-90}
+  HAMMOND_STATISTICS_HOUR_RETENTION_DAYS: ${HAMMOND_STATISTICS_HOUR_RETENTION_DAYS:-1825}
+
+services:
+  seaweedfs:
+    profiles: [full]
+  seaweedfs-init:
+    profiles: [full]
+  ingest-stream:
+    profiles: [full]
+  dagster-daemon:
+    profiles: [full]
+  dagster-webserver:
+    profiles: [full]
+
+  ducklake-init:
+    environment: *lite-env
+    volumes:
+      - lake-data:/lake
+    depends_on: !override
+      postgres-init: { condition: service_completed_successfully }
+
+  mcp:
+    environment: *lite-env
+    volumes:
+      - lake-data:/lake:ro
+
+  admin:
+    environment: *lite-env
+    volumes:
+      - lake-data:/lake:ro
+
+  # Live stream + scheduled jobs in one process (hammond-ingest worker).
+  worker:
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/zettabyte-cz/hammond-ingest:0.3.0}
+    command: ["hammond-ingest", "worker"]
+    environment:
+      HAMMOND_LAKE_PG_HOST: postgres
+      HAMMOND_LAKE_PG_DB: ${DUCKLAKE_PG_DB:-ducklake}
+      HAMMOND_LAKE_PG_USER: ${DUCKLAKE_PG_USER:-ducklake}
+      HAMMOND_LAKE_PG_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
+      HAMMOND_OPS_PG_HOST: postgres
+      HAMMOND_OPS_PG_USER: ${OPS_PG_USER:-hammond_ops}
+      HAMMOND_OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
+      HAMMOND_SQLMESH_PG_DB: ${SQLMESH_PG_DB:-sqlmesh}
+      HAMMOND_WORKER_PG_DB: ${WORKER_PG_DB:-ops}
+      HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
+      HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
+      HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
+      HAMMOND_CATALOG_WINDOW_DAYS: ${HAMMOND_CATALOG_WINDOW_DAYS:-30}
+      HAMMOND_LABEL_NO_INGEST: ${HAMMOND_LABEL_NO_INGEST:-hammond_no_ingest}
+      HAMMOND_LABEL_NO_ANALYSIS: ${HAMMOND_LABEL_NO_ANALYSIS:-hammond_no_analysis}
+      HAMMOND_CORRELATION_OUTSIDE_TEMP: ${HAMMOND_CORRELATION_OUTSIDE_TEMP:-}
+      HAMMOND_CORRELATION_WINDOWS_DAYS: ${HAMMOND_CORRELATION_WINDOWS_DAYS:-[365, 30]}
+      HAMMOND_OPEN_METEO_ENABLED: ${HAMMOND_OPEN_METEO_ENABLED:-false}
+      HAMMOND_ANOMALIES_ENABLED: ${HAMMOND_ANOMALIES_ENABLED:-true}
+      HAMMOND_ANOMALY_Z: ${HAMMOND_ANOMALY_Z:-4.0}
+      HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_WORKER_DUCKDB_MEMORY_LIMIT:-512MB}
+      HAMMOND_DUCKDB_THREADS: ${HAMMOND_DUCKDB_THREADS:-2}
+      HAMMOND_DUCKDB_TEMP_DIR: /data/duckdb-tmp
+      HAMMOND_DUCKDB_MAX_TEMP_SIZE: ${HAMMOND_DUCKDB_MAX_TEMP_SIZE:-8GB}
+      <<: *lite-env
+    mem_limit: ${HAMMOND_WORKER_MEM_LIMIT:-1536m}
+    volumes:
+      - lake-data:/lake
+      - ingest-data:/data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    healthcheck:
+      # The stream touches the heartbeat file after every flush (default every 30 s).
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/hammond-stream.heartbeat') < 180 else 1)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    depends_on:
+      ducklake-init: { condition: service_completed_successfully }
+    networks: [backend, egress]
+
+volumes:
+  lake-data:

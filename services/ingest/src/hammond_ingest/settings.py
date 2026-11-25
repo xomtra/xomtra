@@ -75,12 +75,19 @@ class IngestSettings(BaseSettings):
     stream_max_catchup_days: int = Field(default=10, ge=0)
     heartbeat_file: Path | None = Path("/tmp/hammond-stream.heartbeat")  # noqa: S108
 
-    # Postgres database of SQLMesh state (models, intervals); Dagster has its own.
+    # Postgres databases of the ops role: SQLMesh state (models, intervals) and the
+    # worker's runs; Dagster has its own.
     ops_pg_host: str = "postgres"
     ops_pg_port: int = 5432
     ops_pg_user: str = "hammond_ops"
     ops_pg_password: SecretStr = SecretStr("")
     sqlmesh_pg_db: str = "sqlmesh"
+    # Runs and cursors of the built-in worker (lite edition, ``hammond-ingest worker``).
+    worker_pg_db: str = "ops"
+    worker_runs_keep_days: int = Field(default=90, ge=1)
+    # The worker warns and brings the retention forward below this free share of the
+    # lake's disk (local data path only).
+    worker_min_free_ratio: float = Field(default=0.10, ge=0, lt=1)
 
     # Schedules of the Dagster jobs (cron, in ``timezone``).
     timezone: str = "UTC"

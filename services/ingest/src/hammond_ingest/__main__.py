@@ -1,6 +1,9 @@
 """``hammond-ingest`` command line.
 
 hammond-ingest stream                       # live state_changed stream (service)
+hammond-ingest worker                       # stream + scheduled jobs (lite edition)
+hammond-ingest job <name>                   # run one worker job now (and record it)
+hammond-ingest runs                         # recent worker runs
 hammond-ingest sync                         # registries + statistics, then transform
 hammond-ingest backfill --start 10d         # state history from the HA recorder
 hammond-ingest transform                    # SQLMesh plan/run bronze -> silver
@@ -25,16 +28,16 @@ from datetime import UTC, datetime, timedelta
 
 from hacore import lake
 from hacore.stream import StateStream, StreamSettings
-from hammond_ingest import tasks
+from hammond_ingest import tasks, worker
 from hammond_ingest.settings import IngestSettings
 
 logger = logging.getLogger("hammond_ingest")
 
 
-def _stream(settings: IngestSettings) -> int:
+def _make_stream(settings: IngestSettings) -> StateStream:
     url, token = settings.require_ha()
     lake_settings = lake.LakeSettings.from_env()
-    stream = StateStream(
+    return StateStream(
         url,
         token,
         lambda: lake.connect(lake_settings),
@@ -47,6 +50,10 @@ def _stream(settings: IngestSettings) -> int:
         ),
     )
 
+
+def _stream(settings: IngestSettings) -> int:
+    stream = _make_stream(settings)
+
     async def run() -> None:
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGTERM, signal.SIGINT):
@@ -55,6 +62,54 @@ def _stream(settings: IngestSettings) -> int:
 
     asyncio.run(run())
     logger.info("Stream stopped, %d states written", stream.written)
+    return 0
+
+
+def _store(settings: IngestSettings) -> worker.PostgresRunStore:
+    return worker.PostgresRunStore(
+        settings.ops_pg_uri(settings.worker_pg_db), keep_days=settings.worker_runs_keep_days
+    )
+
+
+def _worker(settings: IngestSettings) -> int:
+    stream = _make_stream(settings)
+    store = _store(settings)
+    try:
+        asyncio.run(worker.run_worker(settings, store, stream))
+    finally:
+        store.close()
+    logger.info("Worker stopped, %d states written", stream.written)
+    return 0
+
+
+def _job(settings: IngestSettings, name: str) -> int:
+    store = _store(settings)
+    try:
+        ok = worker.Scheduler(settings, store).run_job(name, "manual")
+    finally:
+        store.close()
+    return 0 if ok else 1
+
+
+def _runs(settings: IngestSettings) -> int:
+    store = _store(settings)
+    try:
+        _print(
+            [
+                {
+                    "run_id": r.run_id,
+                    "job": r.job,
+                    "trigger": r.trigger,
+                    "started_at": r.started_at,
+                    "finished_at": r.finished_at,
+                    "status": r.status,
+                    "error": r.error,
+                }
+                for r in store.recent(30)
+            ]
+        )
+    finally:
+        store.close()
     return 0
 
 
@@ -67,6 +122,10 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0912, PLR0915 - one 
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("stream", help="live state_changed stream with catch-up")
+    sub.add_parser("worker", help="stream and scheduled jobs in one process (lite edition)")
+    p = sub.add_parser("job", help="run one worker job now and record the run")
+    p.add_argument("name", choices=sorted(worker.JOBS))
+    sub.add_parser("runs", help="recent worker runs")
     sub.add_parser("sync", help="registries and statistics, then transform")
     p = sub.add_parser("backfill", help="state history from the HA recorder")
     p.add_argument("--start", required=True, help="ISO date/time or '<n>d' (days ago)")
@@ -96,6 +155,12 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0912, PLR0915 - one 
     match args.command:
         case "stream":
             return _stream(settings)
+        case "worker":
+            return _worker(settings)
+        case "job":
+            return _job(settings, args.name)
+        case "runs":
+            return _runs(settings)
         case "sync":
             _print({"registries": tasks.sync_registries(), "statistics": tasks.sync_statistics()})
             _print(tasks.run_transform())
