@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please **do not** open a public issue. Use GitHub's
-[private vulnerability reporting](https://github.com/xomtra/Xomtra/security/advisories/new)
+[private vulnerability reporting](https://github.com/xomtra/xomtra/security/advisories/new)
 instead. We aim to acknowledge reports within 7 days.
 
 ## Supported versions

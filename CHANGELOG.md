@@ -76,11 +76,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 ### Changed
 
 - The project moved to the organization **xomtra**: repository
-  `github.com/xomtra/Xomtra`, images `ghcr.io/xomtra/hammond-{mcp,ingest,caddy}` and the
+  `github.com/xomtra/xomtra`, images `ghcr.io/xomtra/hammond-{mcp,ingest,caddy}` and the
   add-on images `ghcr.io/xomtra/hammond-addon-{amd64,aarch64}`. Releases up to 0.4.1
   keep the image addresses of their `images.env`; signatures of new releases name the
   new repository
-  (`cosign verify --certificate-identity https://github.com/xomtra/Xomtra/...`).
+  (`cosign verify --certificate-identity https://github.com/xomtra/xomtra/...`).
   Upgrade: take the `*_IMAGE` lines from the release's `images.env` as usual.
 - Anomalies v2 (ADR 066): the scale of a series is at least a quarter of its 99th
   percentile deviation in the baseline. Heavy-tailed series (appliances idling most
@@ -239,9 +239,9 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/xomtra/Xomtra/compare/v0.4.1...HEAD
-[0.4.1]: https://github.com/xomtra/Xomtra/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/xomtra/Xomtra/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/xomtra/Xomtra/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/xomtra/Xomtra/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/xomtra/Xomtra/releases/tag/v0.1.0
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/xomtra/xomtra/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/xomtra/xomtra/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/xomtra/xomtra/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/xomtra/xomtra/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/xomtra/xomtra/releases/tag/v0.1.0

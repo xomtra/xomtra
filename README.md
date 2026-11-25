@@ -60,7 +60,7 @@ images carry a second signature from the release workflow, see
 
 ```bash
 cosign verify ghcr.io/xomtra/hammond-mcp@sha256:<digest> \
-  --certificate-identity-regexp '^https://github.com/xomtra/Xomtra/\.github/workflows/ci\.yml@refs/heads/main$' \
+  --certificate-identity-regexp '^https://github.com/xomtra/xomtra/\.github/workflows/ci\.yml@refs/heads/main$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 

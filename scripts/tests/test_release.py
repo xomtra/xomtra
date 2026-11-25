@@ -42,8 +42,8 @@ Intro with a [link](https://example.org) and `[Unreleased]` mentioned.
 
 - First.
 
-[Unreleased]: https://github.com/xomtra/Xomtra/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/xomtra/Xomtra/releases/tag/v0.1.0
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/xomtra/xomtra/releases/tag/v0.1.0
 """
 
 
@@ -109,9 +109,9 @@ def test_prepare_then_check(tree: Path) -> None:
     released = "## [Unreleased]\n\n## [0.2.0] - 2026-12-01\n\n### Added\n\n- Something new."
     assert released in changelog
     assert changelog.endswith(
-        "[Unreleased]: https://github.com/xomtra/Xomtra/compare/v0.2.0...HEAD\n"
-        "[0.2.0]: https://github.com/xomtra/Xomtra/compare/v0.1.0...v0.2.0\n"
-        "[0.1.0]: https://github.com/xomtra/Xomtra/releases/tag/v0.1.0\n"
+        "[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.2.0...HEAD\n"
+        "[0.2.0]: https://github.com/xomtra/xomtra/compare/v0.1.0...v0.2.0\n"
+        "[0.1.0]: https://github.com/xomtra/xomtra/releases/tag/v0.1.0\n"
     )
     assert "Intro with a [link](https://example.org)" in changelog
     assert release.notes(version) == "### Added\n\n- Something new."
