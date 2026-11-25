@@ -46,7 +46,7 @@ import duckdb
 import numpy as np
 import numpy.typing as npt
 
-from hacore import areas, confidence, weather
+from hacore import actionability, areas, confidence, usefulness, weather
 from hacore import significance as sig
 from hacore.context import EMPTY, Context
 from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, load_no_analysis
@@ -102,6 +102,15 @@ FINDING_COLUMNS = """
     expected DOUBLE,
     p_value DOUBLE,
     explained_by VARCHAR[],
+    strength DOUBLE,
+    evidence DOUBLE,
+    nontriviality DOUBLE,
+    usefulness DOUBLE,
+    action_category VARCHAR,
+    trivial_rule VARCHAR,
+    rules_version VARCHAR,
+    ranking_version VARCHAR,
+    hidden BOOLEAN,
     first_detected_at TIMESTAMPTZ,
     detected_at TIMESTAMPTZ NOT NULL
 """
@@ -113,6 +122,17 @@ ADDED_COLUMNS = (
     ("expected", "DOUBLE"),
     ("p_value", "DOUBLE"),
     ("explained_by", "VARCHAR[]"),
+    # Usefulness (ADR 062 point 9, ADR 068).
+    ("strength", "DOUBLE"),
+    ("evidence", "DOUBLE"),
+    ("nontriviality", "DOUBLE"),
+    ("usefulness", "DOUBLE"),
+    ("action_category", "VARCHAR"),
+    ("trivial_rule", "VARCHAR"),
+    ("rules_version", "VARCHAR"),
+    ("ranking_version", "VARCHAR"),
+    # Hidden by default in get_findings (ADR 068 point 7); NULL in older rows = flagged.
+    ("hidden", "BOOLEAN"),
 )
 # Columns of one finding as produced by an analysis (the rest is set when writing).
 _ROW_DEFAULTS: dict[str, Any] = {
@@ -132,6 +152,15 @@ _ROW_DEFAULTS: dict[str, Any] = {
     "expected": None,
     "p_value": None,
     "explained_by": [],
+    "strength": None,
+    "evidence": None,
+    "nontriviality": None,
+    "usefulness": None,
+    "action_category": None,
+    "trivial_rule": None,
+    "rules_version": None,
+    "ranking_version": None,
+    "hidden": None,
 }
 _ROW_KEYS = frozenset(
     {*_ROW_DEFAULTS, "finding_id", "entity_id", "rank", "period_start", "period_end"}
@@ -162,6 +191,8 @@ MIN_CHANGE_SHARE = 0.05
 MAX_STALE_HOURS = 72
 # Share of hours with the same positive step that makes a mean series a clock.
 CLOCK_SHARE = 0.8
+# A series missing fewer hours has no collection pattern to compare (T6).
+MIN_MISSING_HOURS = 24
 # Standardised residuals are clipped to this many standard deviations.
 Z_CLIP = 4.0
 # Minimum variance (in standardised units) of each series over a pair's common hours.
@@ -183,6 +214,10 @@ class CorrelationParams:
     # Significance method: "v2" calibrated (ADR 062), "v1" n_eff + Bonferroni (ADR 042).
     method: str = "v2"
     seed: int = 0  # of the null sample (v2), so a run is reproducible
+    # Relations flagged indirect or common_factor (ADR 062 point 10, ADR 068): "hide"
+    # them like the other flags, show them "lower" than the unflagged ones, or "show"
+    # them among the unflagged ones. They keep their flags either way.
+    structure_display: str = "hide"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1057,8 +1092,13 @@ def select_findings(
     devices: dict[str, str],
     *,
     context: Context = EMPTY,
+    scorer: usefulness.Scorer = usefulness.EMPTY,
+    missing: npt.NDArray[np.bool_] | None = None,
 ) -> list[dict[str, Any]]:
-    """Significant pairs, unflagged ones first, each part by ``|r|``.
+    """Significant pairs, unflagged ones first, each part by usefulness R0 (ADR 068).
+
+    ``scorer`` adds the usefulness columns and flags trivial relations (T1-T6);
+    ``missing`` (hours x series, aligned with ``series``) finds collection artefacts.
 
     Near-duplicate series form groups (``Pairs.groups``); a relation between two groups
     is reported once, by its strongest pair, with the other members listed in
@@ -1076,6 +1116,8 @@ def select_findings(
     idx = idx[np.argsort(-np.abs(pairs.r[idx]), kind="stable")]
     candidates: list[dict[str, Any]] = []
     seen: set[frozenset[Any]] = set()
+    shown = STRUCTURE_FLAGS if params.structure_display in {"lower", "show"} else frozenset()
+    ranked_with = STRUCTURE_FLAGS if params.structure_display == "show" else frozenset()
     for k in idx:
         ia, ib = int(pairs.leader[k]), int(pairs.follower[k])
         a, b = series[ia], series[ib]
@@ -1105,27 +1147,29 @@ def select_findings(
             else []
         )
         flags = context.explain(a.entity_id, b.entity_id, flags, explained_by)
-        candidates.append(
-            {
-                "finding_id": finding_id(params.window_days, a, b),
-                "entity_id": a.entity_id,
-                "metric": a.metric,
-                "state": a.state,
-                "related_entity_id": b.entity_id,
-                "related_metric": b.metric,
-                "related_state": b.state,
-                "lag_hours": lag,
-                "score": round(r, 4),
-                "q_value": float(pairs.q[k]),
-                "p_value": float(pairs.p[k]) if pairs.p is not None else None,
-                "n_eff": round(float(pairs.n_eff[k])),
-                "flags": flags,
-                "explained_by": explained_by,
-                "entity_group": [] if same_group else _others(members[ga], a.entity_id),
-                "related_group": [] if same_group else _others(members[gb], b.entity_id),
-            }
-        )
-    candidates.sort(key=_tier)  # stable: |r| order kept within a tier
+        f: dict[str, Any] = {
+            "finding_id": finding_id(params.window_days, a, b),
+            "entity_id": a.entity_id,
+            "metric": a.metric,
+            "state": a.state,
+            "related_entity_id": b.entity_id,
+            "related_metric": b.metric,
+            "related_state": b.state,
+            "lag_hours": lag,
+            "score": round(r, 4),
+            "q_value": float(pairs.q[k]),
+            "p_value": float(pairs.p[k]) if pairs.p is not None else None,
+            "n_eff": round(float(pairs.n_eff[k])),
+            "flags": flags,
+            "explained_by": explained_by,
+            "entity_group": [] if same_group else _others(members[ga], a.entity_id),
+            "related_group": [] if same_group else _others(members[gb], b.entity_id),
+        }
+        overlap = _missing_overlap(missing, ia, ib) if missing is not None else None
+        scorer.score(f, FINDING_TYPE, params.max_q, overlap)
+        f["hidden"] = bool(set(f["flags"]) - shown)  # flags after the trivial check
+        candidates.append(f)
+    candidates.sort(key=lambda f: (_tier(f, ranked_with), *usefulness.sort_key(f)))
 
     out = candidates[: params.top]
     for rank, f in enumerate(out, start=1):
@@ -1133,15 +1177,30 @@ def select_findings(
     return out
 
 
-# One quantity twice, two sensors of one device: true, but nothing to learn.
-TRIVIAL_FLAGS = frozenset({"duplicate_suspect", "same_device"})
+# One quantity twice, two sensors of one device, known physics (T1-T6, ADR 068): true,
+# but nothing to learn.
+TRIVIAL_FLAGS = frozenset({"duplicate_suspect", "same_device", usefulness.TRIVIAL})
 
 
-def _tier(f: dict[str, Any]) -> int:
+def _missing_overlap(missing: npt.NDArray[np.bool_], i: int, j: int) -> float | None:
+    """Share of the missing hours of two series they have in common (Jaccard), None
+    when either misses less than a day."""
+    a, b = missing[:, i], missing[:, j]
+    if a.sum() < MIN_MISSING_HOURS or b.sum() < MIN_MISSING_HOURS:
+        return None
+    return float((a & b).sum() / (a | b).sum())
+
+
+# Structure of the significant relations whose display is a setting (ADR 068 point 7).
+STRUCTURE_FLAGS = frozenset({"indirect", "common_factor"})
+STRUCTURE_DISPLAY = ("hide", "lower", "show")
+
+
+def _tier(f: dict[str, Any], ranked_with: frozenset[str] = frozenset()) -> int:
     """Unflagged pairs first, then explained or unstable ones (indirect, same area,
     house context, ...), trivial pairs last. With strong duplicates ranked by |r| among
     the flagged ones, the stored top N held no explained pair at all (homelab, 0.4.0)."""
-    if not f["flags"]:
+    if not set(f["flags"]) - ranked_with:
         return 0
     return 2 if TRIVIAL_FLAGS & set(f["flags"]) else 1
 
@@ -1219,6 +1278,11 @@ def write_findings(
                 "$related_group::VARCHAR[] AS related_group, "
                 "$observed::DOUBLE AS observed, $expected::DOUBLE AS expected, "
                 "$p_value::DOUBLE AS p_value, $explained_by::VARCHAR[] AS explained_by, "
+                "$strength::DOUBLE AS strength, $evidence::DOUBLE AS evidence, "
+                "$nontriviality::DOUBLE AS nontriviality, $usefulness::DOUBLE AS usefulness, "
+                "$action_category AS action_category, $trivial_rule AS trivial_rule, "
+                "$rules_version AS rules_version, $ranking_version AS ranking_version, "
+                "coalesce($hidden::BOOLEAN, len($flags::VARCHAR[]) > 0) AS hidden, "
                 "coalesce($period_start::TIMESTAMPTZ, $ps::TIMESTAMPTZ) AS period_start, "
                 "coalesce($period_end::TIMESTAMPTZ, $pe::TIMESTAMPTZ) AS period_end",
                 [
@@ -1273,9 +1337,11 @@ def run(
     now: datetime | None = None,
     alias: str = LAKE_ALIAS,
     context: Context | None = None,
+    scorer: usefulness.Scorer | None = None,
 ) -> CorrelationResult:
     """Compute correlations for one window and replace its findings. ``context`` (ADR
-    064) defaults to the Home Assistant one from the lake (areas, presence)."""
+    064) and ``scorer`` (ADR 068) default to the Home Assistant ones from the lake
+    (areas, presence; entity families of the actionability rulebook)."""
     now = (now or datetime.now(UTC)).astimezone(UTC)
     result = CorrelationResult(window_days=params.window_days)
     ensure_schema(con, alias)
@@ -1331,7 +1397,18 @@ def run(
     if len(series) >= 2:
         pairs = _pairs(resid, params, result)
         result.pairs_tested = len(pairs.r)
-        findings = select_findings(pairs, series, params, _devices(con, alias), context=ctx)
+        sc = actionability.load_scorer(con, alias) if scorer is None else scorer
+        index = {s: j for j, s in enumerate(grid.series)}
+        missing = np.isnan(grid.values[:, [index[s] for s in series]])
+        findings = select_findings(
+            pairs,
+            series,
+            params,
+            _devices(con, alias),
+            context=ctx,
+            scorer=sc,
+            missing=missing,
+        )
     write_findings(
         con,
         findings,

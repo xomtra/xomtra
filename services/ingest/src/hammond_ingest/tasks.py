@@ -163,6 +163,7 @@ def find_correlations(settings: IngestSettings | None = None) -> list[dict[str, 
                 timezone=s.timezone,
                 labels=s.labels,
                 method=s.correlation_method,
+                structure_display=s.correlation_structure_display,
             )
             out.append(correlations.run(con, params).as_dict())
         _dismiss(con, s)

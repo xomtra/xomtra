@@ -179,8 +179,20 @@ def test_finds_lagged_pair_and_removes_common_driver(plain: duckdb.DuckDBPyConne
     energy = found.get(("sensor.a", "sensor.energy")) or found.get(("sensor.energy", "sensor.a"))
     assert energy is not None
     assert "same_device" in energy["flags"]  # type: ignore[operator]
-    ranks = [f["rank"] for f in findings(plain)]
-    assert ranks == list(range(1, len(ranks) + 1))
+    # usefulness (ADR 068): one device is trivial (T1), ranked after the rest
+    assert "trivial" in energy["flags"]  # type: ignore[operator]
+    assert energy["trivial_rule"] == "T1"
+    assert ab["strength"] > 0.5  # type: ignore[operator]
+    assert ab["evidence"] > 0.3  # type: ignore[operator]
+    assert ab["usefulness"] == pytest.approx(
+        (ab["strength"] * ab["evidence"]) ** 0.5,  # type: ignore[operator]
+        abs=1e-3,
+    )
+    assert str(ab["ranking_version"]).startswith("r0-")
+    ranked = sorted(findings(plain), key=lambda f: f["rank"])  # type: ignore[arg-type,return-value]
+    assert [f["rank"] for f in ranked] == list(range(1, len(ranked) + 1))
+    unflagged = [f["usefulness"] for f in ranked if not f["flags"]]
+    assert unflagged == sorted(unflagged, reverse=True)  # type: ignore[type-var]
 
 
 def test_without_outside_temperature_the_driver_shows(plain: duckdb.DuckDBPyConnection) -> None:
@@ -467,3 +479,33 @@ def test_same_area_is_flagged(plain: duckdb.DuckDBPyConnection) -> None:
     corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
     ab = next(f for f in findings(plain) if set(pair(f)) == {"sensor.a", "sensor.b"})
     assert "same_area" in ab["flags"]  # type: ignore[operator]
+
+
+@pytest.mark.parametrize(
+    ("display", "order", "hidden"),
+    [
+        ("hide", ["sensor.c", "sensor.a"], {"sensor.a": True, "sensor.c": False}),
+        ("lower", ["sensor.c", "sensor.a"], {"sensor.a": False, "sensor.c": False}),
+        ("show", ["sensor.a", "sensor.c"], {"sensor.a": False, "sensor.c": False}),
+    ],
+)
+def test_structure_display(display: str, order: list[str], hidden: dict[str, bool]) -> None:
+    """indirect/common_factor relations are hidden, shown lower or among the rest
+    (ADR 068); they keep their flags in every mode."""
+    series = [corr.Series(f"sensor.{x}", "mean") for x in "abcd"]
+    pairs = corr.Pairs(
+        leader=np.array([0, 2]),
+        follower=np.array([1, 3]),
+        lag=np.array([0, 0]),
+        r=np.array([0.9, 0.5]),  # the flagged pair is the stronger one
+        n_eff=np.array([500.0, 500.0]),
+        q=np.array([1e-6, 1e-4]),
+        flags=[["common_factor"], []],
+        explained_by=[[], []],
+    )
+    out = corr.select_findings(
+        pairs, series, params(structure_display=display), {}, scorer=corr.usefulness.EMPTY
+    )
+    assert [f["entity_id"] for f in out] == order
+    assert {f["entity_id"]: f["hidden"] for f in out} == hidden
+    assert next(f for f in out if f["entity_id"] == "sensor.a")["flags"] == ["common_factor"]

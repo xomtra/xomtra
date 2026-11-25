@@ -268,7 +268,8 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
             Field(
                 description="Also findings flagged as trivial or explained: "
                 "duplicate_suspect, same_device, short (one hour), weather, level_shift, "
-                "common_factor, indirect, same_area, house_context, unstable, dismissed"
+                "common_factor, indirect, same_area, house_context, unstable, trivial "
+                "(expected relation, see trivial_rule), dismissed"
             ),
         ] = False,
         new_since: Annotated[
@@ -277,10 +278,13 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
         ] = None,
         limit: Annotated[int, Field(ge=1, le=200)] = 20,
     ) -> dict[str, Any]:
-        """Findings of the daily analysis with entity names, strongest first within each
-        type and window. Trivial or explained findings are hidden unless include_flagged;
-        counts show how many exist. score: correlation r, or robust z (anomaly), or shift
-        in robust deviations (change_point); observed/expected in the entity's unit.
+        """Findings of the daily analysis with entity names, most useful first within
+        each type and window (usefulness = sqrt(strength * evidence), ADR 068;
+        action_category = what a finding is good for: fault, savings, automation,
+        behaviour, none, unclassified). Trivial or explained findings are hidden unless
+        include_flagged; counts show how many exist. score: correlation r, or robust z
+        (anomaly), or shift in robust deviations (change_point); observed/expected in
+        the entity's unit.
         confidence: per correlation window, level 'low' when the installation has few
         series or few entities with an area: the correlations are then hypotheses."""
         since = parse_time(new_since) if new_since else None

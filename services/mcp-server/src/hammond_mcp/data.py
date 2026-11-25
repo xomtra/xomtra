@@ -107,8 +107,14 @@ VIEWS: dict[str, View] = {
             "house_context (explained by the residents' presence), "
             "dismissed (an admin chose not to see it), "
             "unstable (does not replicate in "
-            "both halves of the window); p_value = calibrated p-value of the pair; "
-            "rank 1 = strongest within type and window.",
+            "both halves of the window), trivial (expected relation, code in trivial_rule: "
+            "T1 one device, T2 one quantity twice, T3 helper and source, T4 one quantity "
+            "twice in one area, T5 known physics, T6 collection artefact); p_value = "
+            "calibrated p-value of the pair; usefulness = R0 = sqrt(strength * evidence) "
+            "in [0, 1] (strength of the effect, evidence from q_value); action_category = "
+            "fault, savings, automation, behaviour, none or unclassified (public "
+            "rulebook, rules_version); rank 1 = most useful within type and window "
+            "(unflagged first; ranking_version).",
             ("entity_group", "related_group", "explained_by"),
         ),
         View(
@@ -525,7 +531,8 @@ class DataAccess:
             "f.finding_type, f.window_days, f.rank, f.entity_id, f.metric, f.state, "
             "f.related_entity_id, f.related_metric, f.related_state, f.lag_hours, f.score, "
             "f.q_value, f.p_value, f.n_eff, f.observed, f.expected, f.flags, f.explained_by, "
-            "f.entity_group, "
+            "f.entity_group, f.usefulness, f.action_category, f.trivial_rule, "
+            "coalesce(f.hidden, len(coalesce(f.flags, [])) > 0) AS hidden, "
             "f.related_group, f.period_start, f.period_end, f.first_detected_at, "
             "f.detected_at, f.finding_id"
         )
@@ -544,7 +551,7 @@ class DataAccess:
     def _compact(row: Row) -> Row:
         """Drop empty values: a finding of one type leaves the other types' columns
         empty, and the caller reads fewer tokens."""
-        return {k: v for k, v in row.items() if v not in (None, [])}
+        return {k: v for k, v in row.items() if v not in (None, []) and k != "hidden"}
 
     def get_findings(
         self,
@@ -578,7 +585,7 @@ class DataAccess:
         if new_since:
             where.append("f.first_detected_at >= ?")
             params.append(new_since)
-        flagged = "len(coalesce(f.flags, [])) > 0"
+        flagged = "coalesce(f.hidden, len(coalesce(f.flags, [])) > 0)"
         base = f"FROM catalog_finding AS f WHERE {' AND '.join(where)}"
         order = (
             "ORDER BY CASE finding_type WHEN 'anomaly' THEN 0 WHEN 'change_point' THEN 1 "
@@ -599,7 +606,8 @@ class DataAccess:
                     params,
                 ).fetchall()
                 methods = cur.execute(
-                    f"SELECT DISTINCT f.finding_type, f.window_days, f.method {base} ORDER BY 1, 2",
+                    "SELECT DISTINCT f.finding_type, f.window_days, f.method, "
+                    f"f.ranking_version {base} ORDER BY 1, 2",
                     params,
                 ).fetchall()
                 rows = self._rows(cur.execute(sql, params))
@@ -612,7 +620,10 @@ class DataAccess:
                     },
                     "flagged_hidden": not include_flagged,
                     "methods": [
-                        {"finding_type": t, "window_days": w, "method": m} for t, w, m in methods
+                        self._compact(
+                            {"finding_type": t, "window_days": w, "method": m, "ranking": r}
+                        )
+                        for t, w, m, r in methods
                     ],
                     "confidence": self._run_confidence(),
                 }
@@ -691,7 +702,8 @@ class DataAccess:
 
 
 def _is_trivial(row: Row) -> bool:
-    return bool(row.get("flags"))
+    hidden = row.get("hidden")
+    return bool(row.get("flags")) if hidden is None else bool(hidden)
 
 
 def _summarise(rows: list[Row], week: date, previous: date | None, tz: ZoneInfo, top: int) -> Row:
@@ -706,9 +718,16 @@ def _summarise(rows: list[Row], week: date, previous: date | None, tz: ZoneInfo,
         return ps is not None and start <= datetime.fromisoformat(ps) < end
 
     def strongest(items: list[Row]) -> list[Row]:
-        ranked = sorted(items, key=lambda r: -abs(float(r.get("score") or 0)))
+        ranked = sorted(
+            items,
+            key=lambda r: (-float(r.get("usefulness") or 0), -abs(float(r.get("score") or 0))),
+        )
         return [
-            {k: v for k, v in r.items() if v not in (None, []) and k != "week_start"}
+            {
+                k: v
+                for k, v in r.items()
+                if v not in (None, []) and k not in {"week_start", "hidden"}
+            }
             for r in ranked[:top]
         ]
 

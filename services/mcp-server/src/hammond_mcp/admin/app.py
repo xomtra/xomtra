@@ -666,7 +666,19 @@ class AdminApp:
             await asyncio.to_thread(run_confidence, self.data) if self.data is not None else []
         )
         body += f"<h2>Current findings</h2><p class=muted>{len(rows)} (max 300)</p>" + table(
-            ["type", "entity", "related", "window", "score", "q", "flags", "period start", ""],
+            [
+                "type",
+                "entity",
+                "related",
+                "window",
+                "score",
+                "q",
+                "usefulness",
+                "action",
+                "flags",
+                "period start",
+                "",
+            ],
             [
                 [
                     r["finding_type"],
@@ -675,14 +687,16 @@ class AdminApp:
                     r["window_days"],
                     r["score"],
                     r["q_value"],
+                    r.get("usefulness"),
+                    r.get("action_category"),
                     r["flags"],
                     r["period_start"],
                     form(r),
                 ]
                 for r in rows
             ],
-            {3, 4, 5},
-            trusted_html={8},
+            {3, 4, 5, 6},
+            trusted_html={10},
         )
         body += "<h2>Dismissed</h2>" + table(
             ["type", "entity", "related", "reason", "until", "by", "when", ""],
