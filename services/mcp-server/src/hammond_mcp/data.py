@@ -107,8 +107,14 @@ VIEWS: dict[str, View] = {
             "house_context (explained by the residents' presence), "
             "dismissed (an admin chose not to see it), "
             "unstable (does not replicate in "
-            "both halves of the window); p_value = calibrated p-value of the pair; "
-            "rank 1 = strongest within type and window.",
+            "both halves of the window), trivial (expected relation, code in trivial_rule: "
+            "T1 one device, T2 one quantity twice, T3 helper and source, T4 one quantity "
+            "twice in one area, T5 known physics, T6 collection artefact); p_value = "
+            "calibrated p-value of the pair; usefulness = R0 = sqrt(strength * evidence) "
+            "in [0, 1] (strength of the effect, evidence from q_value); action_category = "
+            "fault, savings, automation, behaviour, none or unclassified (public "
+            "rulebook, rules_version); rank 1 = most useful within type and window "
+            "(unflagged first; ranking_version).",
             ("entity_group", "related_group", "explained_by"),
         ),
         View(
@@ -525,7 +531,7 @@ class DataAccess:
             "f.finding_type, f.window_days, f.rank, f.entity_id, f.metric, f.state, "
             "f.related_entity_id, f.related_metric, f.related_state, f.lag_hours, f.score, "
             "f.q_value, f.p_value, f.n_eff, f.observed, f.expected, f.flags, f.explained_by, "
-            "f.entity_group, "
+            "f.entity_group, f.usefulness, f.action_category, f.trivial_rule, "
             "f.related_group, f.period_start, f.period_end, f.first_detected_at, "
             "f.detected_at, f.finding_id"
         )
@@ -599,7 +605,8 @@ class DataAccess:
                     params,
                 ).fetchall()
                 methods = cur.execute(
-                    f"SELECT DISTINCT f.finding_type, f.window_days, f.method {base} ORDER BY 1, 2",
+                    "SELECT DISTINCT f.finding_type, f.window_days, f.method, "
+                    f"f.ranking_version {base} ORDER BY 1, 2",
                     params,
                 ).fetchall()
                 rows = self._rows(cur.execute(sql, params))
@@ -612,7 +619,10 @@ class DataAccess:
                     },
                     "flagged_hidden": not include_flagged,
                     "methods": [
-                        {"finding_type": t, "window_days": w, "method": m} for t, w, m in methods
+                        self._compact(
+                            {"finding_type": t, "window_days": w, "method": m, "ranking": r}
+                        )
+                        for t, w, m, r in methods
                     ],
                     "confidence": self._run_confidence(),
                 }

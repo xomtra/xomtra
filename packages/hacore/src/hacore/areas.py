@@ -50,7 +50,8 @@ def tokens(text: str) -> tuple[str, ...]:
     return tuple(t for t in re.split(r"[^a-z0-9]+", plain.lower()) if t)
 
 
-def _contains(words: tuple[str, ...], phrase: tuple[str, ...]) -> bool:
+def contains(words: tuple[str, ...], phrase: tuple[str, ...]) -> bool:
+    """Whether ``phrase`` appears as consecutive whole words in ``words``."""
     n = len(phrase)
     return n > 0 and any(words[i : i + n] == phrase for i in range(len(words) - n + 1))
 
@@ -64,7 +65,7 @@ def match_area(text: str, areas: Iterable[AreaInfo]) -> str | None:
     for area in areas:
         for phrase in {tokens(area.area_id), *(tokens(n) for n in area.names)}:
             # Very short names ("wc", "1") would match by accident.
-            if len("".join(phrase)) >= MIN_NAME_CHARS and _contains(words, phrase):
+            if len("".join(phrase)) >= MIN_NAME_CHARS and contains(words, phrase):
                 best[area.area_id] = max(best.get(area.area_id, 0), len(phrase))
     if not best:
         return None

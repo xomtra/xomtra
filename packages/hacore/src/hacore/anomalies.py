@@ -44,6 +44,7 @@ import duckdb
 import numpy as np
 import numpy.typing as npt
 
+from hacore import actionability, usefulness
 from hacore import correlations as corr
 from hacore import significance as sig
 from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, load_no_analysis
@@ -902,6 +903,19 @@ def detect_change_points_v2(
 # ---- common ------------------------------------------------------------------------
 
 
+def rescore(
+    findings: list[dict[str, Any]], scorer: usefulness.Scorer, finding_type: str, q_target: float
+) -> list[dict[str, Any]]:
+    """Usefulness of the kept findings and their order by R0, flagged ones last (ADR
+    068). The detectors keep their top N by q and effect, which R0 only reorders."""
+    for f in findings:
+        scorer.score(f, finding_type, q_target)
+    findings.sort(key=lambda f: (bool(f["flags"]), *usefulness.sort_key(f)))
+    for rank, f in enumerate(findings, start=1):
+        f["rank"] = rank
+    return findings
+
+
 def _rank(findings: list[dict[str, Any]], top: int, key: Any) -> list[dict[str, Any]]:
     findings.sort(key=key)
     findings.sort(key=lambda f: bool(f["flags"]))  # stable: flagged ones last
@@ -968,8 +982,10 @@ def run(
     *,
     now: datetime | None = None,
     alias: str = LAKE_ALIAS,
+    scorer: usefulness.Scorer | None = None,
 ) -> AnomalyResult:
-    """Detect anomalies and change points and replace their findings."""
+    """Detect anomalies and change points and replace their findings. ``scorer`` (ADR
+    068) defaults to the Home Assistant one from the lake."""
     now = (now or datetime.now(UTC)).astimezone(UTC)
     result = AnomalyResult()
     corr.ensure_schema(con, alias)
@@ -1004,6 +1020,10 @@ def run(
             )
             result.significance = {ANOMALY: an_stats, CHANGE_POINT: cp_stats}
             logger.info("Anomalies significance: %s", result.significance)
+    if anomalies or change_points:
+        sc = actionability.load_scorer(con, alias) if scorer is None else scorer
+        anomalies = rescore(anomalies, sc, ANOMALY, params.max_q)
+        change_points = rescore(change_points, sc, CHANGE_POINT, params.max_q)
     method, cp_method = _methods(params)
     corr.write_findings(
         con,

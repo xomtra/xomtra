@@ -267,7 +267,8 @@ def current_findings(
         where.append("len(coalesce(flags, [])) = 0")
     sql = (
         "SELECT finding_type, entity_id, related_entity_id, window_days, "  # noqa: S608
-        "round(score, 3) AS score, q_value, flags, period_start FROM lake.catalog.finding "
+        "round(score, 3) AS score, q_value, usefulness, action_category, flags, period_start "
+        "FROM lake.catalog.finding "
         f"WHERE {' AND '.join(where)} ORDER BY finding_type, window_days DESC, rank LIMIT $limit"
     )
     with data.trusted_cursor() as cur:

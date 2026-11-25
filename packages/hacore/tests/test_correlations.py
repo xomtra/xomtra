@@ -179,8 +179,20 @@ def test_finds_lagged_pair_and_removes_common_driver(plain: duckdb.DuckDBPyConne
     energy = found.get(("sensor.a", "sensor.energy")) or found.get(("sensor.energy", "sensor.a"))
     assert energy is not None
     assert "same_device" in energy["flags"]  # type: ignore[operator]
-    ranks = [f["rank"] for f in findings(plain)]
-    assert ranks == list(range(1, len(ranks) + 1))
+    # usefulness (ADR 068): one device is trivial (T1), ranked after the rest
+    assert "trivial" in energy["flags"]  # type: ignore[operator]
+    assert energy["trivial_rule"] == "T1"
+    assert ab["strength"] > 0.5  # type: ignore[operator]
+    assert ab["evidence"] > 0.3  # type: ignore[operator]
+    assert ab["usefulness"] == pytest.approx(
+        (ab["strength"] * ab["evidence"]) ** 0.5,  # type: ignore[operator]
+        abs=1e-3,
+    )
+    assert str(ab["ranking_version"]).startswith("r0-")
+    ranked = sorted(findings(plain), key=lambda f: f["rank"])  # type: ignore[arg-type,return-value]
+    assert [f["rank"] for f in ranked] == list(range(1, len(ranked) + 1))
+    unflagged = [f["usefulness"] for f in ranked if not f["flags"]]
+    assert unflagged == sorted(unflagged, reverse=True)  # type: ignore[type-var]
 
 
 def test_without_outside_temperature_the_driver_shows(plain: duckdb.DuckDBPyConnection) -> None:

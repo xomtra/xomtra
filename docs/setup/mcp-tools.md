@@ -210,6 +210,35 @@ the hours are not unusual for the new one).
 sudo docker compose exec dagster-daemon hammond-ingest anomalies
 ```
 
+## Usefulness and ranking
+
+A real and direct finding can still be trivial or of no use. Every finding gets
+(ADR 062 point 9, ADR 068):
+
+| Column | Meaning |
+|---|---|
+| `strength` | 0–1, the effect above its minimum: correlation (\|r\| − 0.3) / 0.7, anomaly (\|z\| − 3) / 7, change point (shift − 2) / 6 |
+| `evidence` | 0–1 from `q_value` only: log(q* / q) / log(q* / q_min), q* = the target FDR of the type, q_min a constant of the method |
+| `nontriviality` | 1 − the share of metadata a pair shares (area, device class, integration, device); 1 for one entity |
+| `trivial_rule` | correlations only: T1 one device, T2 one quantity twice (lag 0, \|r\| ≥ 0.95), T3 a helper (template, derivative, utility meter …) and an entity of its family, T4 one device class twice in one area, T5 known physics of the rulebook (PV ↔ sun, battery ↔ grid, heat pump ↔ outside temperature), T6 one integration with the same outages |
+| `action_category` | fault, savings, automation, behaviour, none, or unclassified, from the rulebook |
+| `usefulness` | R0 = √(strength · evidence) |
+| `rules_version`, `ranking_version` | version of the rulebook and of the ranking (`r0-<rules_version>`) |
+
+A trivial relation gets the flag `trivial`: it is kept, ranked last and hidden by
+`get_findings` by default. Within each type and window the findings are ranked
+unflagged first, then by `usefulness`; ties go to the higher priority of the rule, then
+fault > savings > automation > behaviour. R0 stays the ranking until a model trained
+on rated findings passes its gate (methodology 8.7); then `ranking_version` changes.
+
+The rulebook is public: `packages/hacore/src/hacore/rules/actionability.toml`. It sorts
+an entity into the first family that fits it (domain, device class, unit, platform,
+words of its id and name in English, Czech, German or Dutch) and gives each family and
+finding type a category and a priority 1–3. Entities that fit no family are `other`
+and their findings `unclassified`; the share of classified findings is the rulebook's
+coverage. Every family has examples checked in CI; a change of the file changes its
+version.
+
 ## Weekly summary
 
 The Dagster job `findings_weekly` (Monday 07:00 in `HAMMOND_TIMEZONE`) copies the
