@@ -41,7 +41,7 @@ IMAGES = ("hammond-mcp", "hammond-ingest", "hammond-caddy")
 ADDON_CONFIG = "addon/hammond/config.yaml"
 REGISTRY = "ghcr.io/xomtra"
 CHANGELOG = "CHANGELOG.md"
-REPO_URL = "https://github.com/xomtra/xomtra"
+REPO_URL = "https://github.com/xomtra/Xomtra"
 
 _SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta|rc)\.([1-9]\d*))?$")
 _PEP440_PRE = {"alpha": "a", "beta": "b", "rc": "rc"}

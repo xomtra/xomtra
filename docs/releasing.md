@@ -68,7 +68,7 @@ Every pull request with a user-visible change adds a line under `[Unreleased]` i
 ## Installing a release
 
 ```bash
-git clone --branch v0.2.0 --depth 1 https://github.com/xomtra/xomtra.git
+git clone --branch v0.2.0 --depth 1 https://github.com/xomtra/Xomtra.git
 cd HAmmond/deploy/compose
 cp .env.example .env && chmod 600 .env
 # fill in .env, then replace the three *_IMAGE lines with the ones from
@@ -79,7 +79,7 @@ Verify the release signature of each image (cosign v3) before the first start:
 
 ```bash
 cosign verify ghcr.io/xomtra/hammond-mcp@sha256:<digest> \
-  --certificate-identity https://github.com/xomtra/xomtra/.github/workflows/release.yml@refs/tags/v0.2.0 \
+  --certificate-identity https://github.com/xomtra/Xomtra/.github/workflows/release.yml@refs/tags/v0.2.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
