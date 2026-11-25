@@ -53,6 +53,7 @@ NAV = (
     ("/catalog", "Catalog"),
     ("/drift", "Drift"),
     ("/retention", "Retention"),
+    ("/analysis", "Analysis settings"),
     ("/audit", "Audit"),
     ("/tokens", "Tokens"),
     ("/dagster/", "Dagster"),
