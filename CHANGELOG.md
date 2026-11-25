@@ -43,6 +43,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   times; findings between autocorrelated but unrelated series disappear. Set
   `HAMMOND_CORRELATION_METHOD=v1` for the previous method. The next run replaces the
   findings of each window.
+- Anomalies and change points v2 (ADR 062, `HAMMOND_ANOMALY_METHOD=v2`, default):
+  conformal p-values of anomaly episodes against the installation's own baseline weeks
+  and permutation p-values of change points (AR(1) surrogates), each with the
+  Benjamini–Hochberg FDR over all series (`HAMMOND_ANOMALY_MAX_Q`, 0.05) instead of
+  fixed thresholds per series. With many series far fewer false anomalies; in a very
+  small installation only strong ones pass. Findings carry `p_value` and `q_value`.
+  Set `HAMMOND_ANOMALY_METHOD=v1` for the previous method.
 
 ## [0.3.0] - 2026-11-24
 

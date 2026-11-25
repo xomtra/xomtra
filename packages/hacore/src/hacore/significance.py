@@ -112,6 +112,7 @@ class Null:
     threshold: float
     xi: float
     sigma: float
+    tail_share: float = 1.0 - TAIL_QUANTILE  # share of the null above ``threshold``
 
     @property
     def size(self) -> int:
@@ -124,7 +125,7 @@ class Null:
             return np.ones_like(stat)
         exceed = n - np.searchsorted(self.values, stat, side="left")
         empirical = (1.0 + exceed) / (1.0 + n)
-        tail_share = 1.0 - TAIL_QUANTILE
+        tail_share = self.tail_share
         y = np.maximum(stat - self.threshold, 0.0)
         if abs(self.xi) < 1e-6:
             surv = np.exp(-y / self.sigma)
@@ -204,6 +205,20 @@ def circular_null(
     threshold = float(np.quantile(values, TAIL_QUANTILE))
     xi, sigma = fit_gpd(values[values > threshold] - threshold)
     return Null(values, threshold, xi, sigma)
+
+
+def reference_null(values: FloatArray) -> Null:
+    """Null from a reference sample of a statistic that is often 0 (no episode at all):
+    empirical, with a generalised Pareto tail fitted to the top 10 % of the positive
+    values."""
+    values = np.sort(np.asarray(values, dtype=np.float64))
+    pos = values[values > 0]
+    if len(pos) < 2 * MIN_EXCEEDANCES:
+        return Null(values, math.inf, 0.0, 1.0, 0.0)
+    threshold = float(np.quantile(pos, TAIL_QUANTILE))
+    above = pos[pos > threshold]
+    xi, sigma = fit_gpd(above - threshold)
+    return Null(values, threshold, xi, sigma, len(above) / len(values))
 
 
 def lagged_r(z: FloatArray, a: IntArray, b: IntArray, lag: IntArray) -> FloatArray:

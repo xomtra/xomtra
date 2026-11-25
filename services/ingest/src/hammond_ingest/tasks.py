@@ -185,6 +185,8 @@ def find_anomalies(settings: IngestSettings | None = None) -> dict[str, Any]:
         outside_temp=s.correlation_outside_temp or None,
         timezone=s.timezone,
         labels=s.labels,
+        method=s.anomaly_method,
+        max_q=s.anomaly_max_q,
     )
     with open_lake() as con:
         return anomalies.run(con, params).as_dict()

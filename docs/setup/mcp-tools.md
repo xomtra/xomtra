@@ -157,6 +157,31 @@ After the correlations, `catalog_daily` looks at every series of the same hourly
   80 % of the days after lie beyond the median before. `period_start` = first day of
   the new level, `observed`/`expected` = median after/before, `n_eff` = days after.
 
+Significance (ADR 062, `HAMMOND_ANOMALY_METHOD=v2`, the default). The rules above
+propose candidates (episodes with a peak `|z| >= 3`; the strongest shift of each
+series); whether they are reported depends on calibrated p-values and the
+Benjamini–Hochberg FDR over all candidates of a type (`HAMMOND_ANOMALY_MAX_Q`, 0.05),
+not on a fixed threshold per series:
+
+- anomalies: the strength of an episode is its peak `|z|` times the square root of its
+  hours. Every baseline week is scored against the other baseline weeks; the strongest
+  episode of each series and day (0 if none) forms the reference, pooled over series.
+  `p_value` is the share of the reference at least as strong (generalised Pareto tail
+  beyond it). Days after a detected change point of the series are left out of its
+  reference. Discrete series (at most 10 distinct values) are scaled by Qn instead of
+  MAD, which is 0 whenever most values are equal;
+- change points: the largest difference of the mean daily level before and after a
+  split, in long-run deviations of the series. Its null comes from 200 surrogates of
+  the series without a change (AR(1) innovations of the days, permuted and filtered
+  back), pooled over series with a generalised Pareto tail. A change is reported with
+  `q <= 0.05`, a shift of at least 2 long-run deviations (`score`) and 80 % of the
+  days after beyond the median before.
+
+In a small installation the reference is small and the smallest possible p-value is
+larger, so only strong anomalies pass. The run logs the histogram of p and q (no
+entity names). `v1` keeps the fixed thresholds of 0.2.0 (`HAMMOND_ANOMALY_Z`,
+`HAMMOND_CHANGEPOINT_MIN_SHIFT`).
+
 Flags (the finding is kept but ranked last and hidden by `get_findings` by default):
 `short` (an anomaly of one hour), `weather` (the outside temperature, when configured,
 was itself unusual: mean `|z| >= 3` over the episode, or a shift of 3 at the same day),
