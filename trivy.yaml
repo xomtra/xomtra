@@ -1,0 +1,2 @@
+# Read by Trivy from the working directory (CI runs it in the repository root).
+ignorefile: .trivyignore.yaml

@@ -19,6 +19,8 @@ from hacore.testing import VALID_TOKEN, FakeHA
         ("http://ha.local:8123", "ws://ha.local:8123/api/websocket"),
         ("https://ha.example/", "wss://ha.example/api/websocket"),
         ("wss://ha.example/api/websocket", "wss://ha.example/api/websocket"),
+        ("http://supervisor/core", "ws://supervisor/core/websocket"),
+        ("ws://supervisor/core/websocket", "ws://supervisor/core/websocket"),
     ],
 )
 def test_websocket_url(base: str, expected: str) -> None:

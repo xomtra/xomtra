@@ -4,6 +4,8 @@ Quick start (phase 1c.1): [local access](local-access.md) – LAN only, generate
 personal tokens for Claude Desktop, Claude Code and other MCP clients, sign-in to the
 admin GUI with a [Home Assistant account](ha-login.md).
 
+Home Assistant add-on (lite edition, in development): [home-assistant-addon.md](home-assistant-addon.md).
+
 Order for the public setup "Claude connector authenticated by Entra ID" (homelab):
 
 1. [Host VM](homelab-vm.md) – Debian 13 VM on Proxmox in the DMZ VLAN, Docker.

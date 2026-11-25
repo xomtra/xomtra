@@ -13,6 +13,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Added
 
+- Home Assistant add-on (lite edition, in development): one container with Postgres,
+  the worker and the MCP server for the LAN, supervised by s6-overlay; internal secrets
+  and the Postgres cluster are generated on the first start in `/data`; Home Assistant
+  is reached through the Supervisor. Built, scanned and started in CI (job `addon`).
+  `HAMMOND_HA_URL=http://supervisor/core` uses the Supervisor's WebSocket endpoint.
 - Admin GUI page *Analysis settings* (ADR 060): thresholds of correlations, anomalies
   and change points can be changed without a restart, with a preview of their effect on
   the current findings and a history of changes. A stored value wins over the ingest's

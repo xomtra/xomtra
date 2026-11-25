@@ -1,0 +1,9 @@
+#!/bin/sh
+# MCP server for the LAN with personal access tokens (ADR 056, 059).
+. /usr/local/bin/hammond-env
+cd /data/home
+export HOME=/data/home FASTMCP_HOME=/data/home/fastmcp \
+  HAMMOND_HOST=0.0.0.0 HAMMOND_PORT=8000 HAMMOND_AUTH_MODE=ha \
+  HAMMOND_AUDIT_PG_USER=hammond_audit HAMMOND_AUDIT_PG_PASSWORD=$AUDIT_PG_PASSWORD \
+  HAMMOND_DUCKDB_MEMORY_LIMIT=768MB
+exec s6-setuidgid hammond hammond-mcp

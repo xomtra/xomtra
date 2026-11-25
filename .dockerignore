@@ -3,6 +3,8 @@
 !uv.lock
 !packages/**
 !services/**
+!addon/hammond/rootfs/**
+!deploy/compose/postgres/ensure-databases.sh
 **/__pycache__
 **/tests
 **/.pytest_cache

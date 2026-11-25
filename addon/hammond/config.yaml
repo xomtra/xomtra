@@ -1,0 +1,38 @@
+# Home Assistant add-on (lite edition, ADR 050, 063). Everything runs in one container:
+# Postgres (DuckLake catalog, audit, tokens), the worker (live stream + scheduled jobs)
+# and the MCP server for the LAN (local access, ADR 056).
+name: HAmmond
+version: "0.4.1"
+slug: hammond
+description: History and analyses of your Home Assistant for Claude (MCP server)
+url: https://github.com/zettabyte-cz/hammond
+arch:
+  - amd64
+  - aarch64
+image: ghcr.io/zettabyte-cz/hammond-addon-{arch}
+init: false
+startup: application
+boot: auto
+homeassistant_api: true
+ports:
+  8000/tcp: 8000
+ports_description:
+  8000/tcp: MCP endpoint in the LAN (personal access tokens)
+# Postgres must not be copied while it writes; the lake (Parquet files, tens of GB)
+# stays out of Home Assistant backups.
+backup: cold
+backup_exclude:
+  - lake/*
+  - duckdb-tmp/*
+options:
+  log_level: info
+  states_retention_days: 90
+  statistics_5min_retention_days: 90
+  statistics_hour_retention_days: 1825
+  mcp_url: ""
+schema:
+  log_level: list(debug|info|warning|error)
+  states_retention_days: int(1,3650)
+  statistics_5min_retention_days: int(1,3650)
+  statistics_hour_retention_days: int(1,3650)
+  mcp_url: url?
