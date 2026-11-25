@@ -152,5 +152,33 @@ SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'db', :'ops') \gexec
 SELECT format('GRANT USAGE ON SCHEMA analysis TO %I, %I', :'adm', :'ops') \gexec
 SELECT format('GRANT SELECT, INSERT ON analysis.setting_change TO %I', :'adm') \gexec
 SELECT format('GRANT EXECUTE ON FUNCTION analysis.current_settings() TO %I, %I', :'adm', :'ops') \gexec
+
+-- Dismissed findings (ADR 060 point 6): a pair of entities (correlation) or an entity
+-- (anomaly, change point) the user does not want to see again, optionally until a date.
+-- The admin GUI dismisses and undoes (no DELETE: history stays); the ingest flags the
+-- matching findings `dismissed` after every run through analysis.active_dismissals().
+CREATE TABLE IF NOT EXISTS analysis.finding_dismissal (
+  id                bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  finding_type      text NOT NULL,
+  entity_id         text NOT NULL,
+  related_entity_id text,
+  reason            text,
+  until             timestamptz,
+  dismissed_at      timestamptz NOT NULL DEFAULT now(),
+  dismissed_by      text,
+  revoked_at        timestamptz,
+  revoked_by        text
+);
+CREATE OR REPLACE FUNCTION analysis.active_dismissals()
+RETURNS TABLE (finding_type text, entity_id text, related_entity_id text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $f$
+  SELECT DISTINCT d.finding_type, d.entity_id, d.related_entity_id
+  FROM analysis.finding_dismissal d
+  WHERE d.revoked_at IS NULL AND (d.until IS NULL OR d.until > now())
+$f$;
+REVOKE ALL ON FUNCTION analysis.active_dismissals() FROM PUBLIC;
+SELECT format('GRANT SELECT, INSERT ON analysis.finding_dismissal TO %I', :'adm') \gexec
+SELECT format('GRANT UPDATE (revoked_at, revoked_by) ON analysis.finding_dismissal TO %I', :'adm') \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION analysis.active_dismissals() TO %I, %I', :'adm', :'ops') \gexec
 SQL
 echo "Postgres roles and databases are in place."

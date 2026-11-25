@@ -19,6 +19,17 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   environment variable. New schema `analysis` in the audit database (created by
   `ensure-databases`), new ingest variable `HAMMOND_ANALYSIS_SETTINGS_DB` (default
   `audit`).
+- Admin GUI page *Findings* (ADR 060 point 6): a finding can be dismissed (the pair of
+  entities of a correlation, the entity of an anomaly or change point), for good or
+  until a date, and undone. The ingest flags matching findings `dismissed` after every
+  run; `get_findings` and the weekly summary hide them like the other flags.
+- Low-power indicator (ADR 067): every correlation run records its confidence in
+  `catalog.analysis_run`: `low` with fewer than 30 analysed series or less than 80 % of
+  the analysed entities in an HA area. `get_findings` returns it per window
+  (`confidence`, no entity names); the admin page *Findings* shows it with the analysed
+  entities that have no area. The thresholds are not tightened: on the synthetic
+  households a stricter q or |r| did not lower the false discovery rate, complete areas
+  did.
 - Validation on public data (ADR 065, Gate 1c point 6): `hacore.public` fetches the IDEAL
   hourly readings with HTTP range requests (member list pinned, CRC-32 checked) and
   measures the cross-household null of correlations and anomalies

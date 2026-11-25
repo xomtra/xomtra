@@ -6,8 +6,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from hacore import catalog, correlations
+from hacore import catalog, confidence, correlations
 from hacore import findings as findings_mod
+from hacore.context import Context
 from hacore.lake import connect_local, install_extensions
 from hammond_mcp.data import DataAccess
 
@@ -144,6 +145,18 @@ def _seed(catalog_path: str, data_path: str) -> None:
             period_end=NOW,
             method="test",
             now=NOW,
+        )
+        # Confidence of the 30-day correlation run (ADR 067): a small installation.
+        correlations.write_run(
+            con,
+            finding_type="correlation",
+            window_days=30,
+            now=NOW,
+            result=correlations.CorrelationResult(window_days=30, series_used=4, findings=3),
+            conf=confidence.assess(
+                ["sensor.temp", "sensor.energy", "binary_sensor.door", "person.jana"],
+                Context(groups={"sensor.temp": "living"}),
+            ),
         )
         week = datetime.combine(
             findings_mod.last_week_start(NOW, TZ), datetime.min.time(), ZoneInfo(TZ)

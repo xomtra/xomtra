@@ -113,3 +113,60 @@ async def test_analysis_page_without_store() -> None:
     async with client_for(app) as c:
         resp = await c.get("/admin/analysis")
     assert "not configured" in resp.text
+
+
+async def test_findings_dismiss_and_undo() -> None:
+    store, audit = MemorySettingsStore(), MemoryAuditSink()
+    async with client_for(dev_app(None, store, audit)) as client:
+        assert (await client.get("/admin/findings")).status_code == 200
+        bad = await client.post(
+            "/admin/findings/dismiss",
+            data={"type": "correlation", "entity": "sensor.a", "days": "30"},
+            headers={"origin": BASE},
+        )
+        assert bad.status_code == 400  # a correlation needs the pair
+        ok = await client.post(
+            "/admin/findings/dismiss",
+            data={
+                "type": "anomaly",
+                "entity": "sensor.a",
+                "related": "ignored",
+                "days": "30",
+                "reason": "known",
+            },
+            headers={"origin": BASE},
+        )
+        assert ok.status_code == 303
+        (d,) = store.dismissed
+        assert (d.finding_type, d.entity_id, d.related_entity_id, d.reason) == (
+            "anomaly",
+            "sensor.a",
+            None,
+            "known",
+        )
+        assert d.until is not None
+        assert d.active()
+        page = (await client.get("/admin/findings")).text
+        assert "Undo" in page
+        undo = await client.post(
+            "/admin/findings/undo", data={"id": str(d.id)}, headers={"origin": BASE}
+        )
+        assert undo.status_code == 303
+        assert not store.dismissed[0].active()
+        assert "undone by" in (await client.get("/admin/findings")).text
+    tools = [r.tool for r in audit.records]
+    assert "admin:finding_dismiss" in tools
+    assert "admin:finding_undismiss" in tools
+
+
+async def test_findings_page_lists_current_findings(data: DataAccess) -> None:
+    store = MemorySettingsStore()
+    async with client_for(dev_app(data, store, MemoryAuditSink())) as client:
+        page = (await client.get("/admin/findings?type=correlation")).text
+        assert "binary_sensor.door" in page
+        assert "same_device" not in page  # flagged ones only on request
+        assert "Confidence of the correlations" in page
+        assert "Low power" in page
+        assert "3 analysed entities without an area" in page
+        flagged = (await client.get("/admin/findings?type=correlation&flagged=1")).text
+        assert "same_device" in flagged

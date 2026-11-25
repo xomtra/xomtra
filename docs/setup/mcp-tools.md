@@ -104,6 +104,15 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    (presence) that `hacore.areas` builds from the HA registries (`hacore.context`).
    The run logs the histogram of p- and q-values (no entity names) for the
    calibration of `q`.
+   Every run records its **confidence** (ADR 067), returned by `get_findings` per
+   window: `low` with fewer than 30 analysed series or less than 80 % of the analysed
+   entities in an area. The thresholds stay the same (false correlations of a small or
+   poorly described home are strong ones with a cause the analysis cannot see, a
+   stricter threshold does not remove them); a low-power run's correlations are
+   hypotheses, and assigning areas in Home Assistant raises the confidence.
+   - `dismissed` (ADR 060): an admin dismissed the pair (correlation) or the entity
+     (anomaly, change point) on the admin page *Findings*; every type of finding can
+     carry it, from the next run on, until undone.
 
 Stored are at most `HAMMOND_CORRELATION_TOP` (100) findings per window: unflagged ones
 first, then explained or unstable ones (`indirect`, `common_factor`, `same_area`,

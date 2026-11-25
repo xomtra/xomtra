@@ -110,3 +110,52 @@ def snapshot_week(
     )
     logger.info("Weekly findings snapshot: %s", result.as_dict())
     return result
+
+
+# ---- dismissed findings (ADR 060 point 6) --------------------------------------------
+
+DISMISSED = "dismissed"
+
+
+@dataclass(frozen=True, slots=True)
+class Dismissal:
+    """A finding a user does not want to see again: a pair of entities (correlation,
+    in either order) or an entity (anomaly, change point), across runs."""
+
+    finding_type: str
+    entity_id: str
+    related_entity_id: str | None = None
+
+    def matches(self, finding_type: str, entity_id: str, related: str | None) -> bool:
+        if finding_type != self.finding_type:
+            return False
+        if self.related_entity_id is None:
+            return entity_id == self.entity_id
+        return {entity_id, related} == {self.entity_id, self.related_entity_id}
+
+
+def apply_dismissals(
+    con: duckdb.DuckDBPyConnection, dismissals: list[Dismissal], alias: str = LAKE_ALIAS
+) -> int:
+    """Flag the current findings that match a dismissal ``dismissed`` (hidden like the
+    other flags unless asked for); returns how many were flagged now."""
+    if not dismissals:
+        return 0
+    t = f"{alias}.{corr.SCHEMA}.{corr.FINDING}"
+    rows = con.execute(
+        f"SELECT finding_id, finding_type, entity_id, related_entity_id FROM {t} "
+        "WHERE NOT list_contains(coalesce(flags, []), $d)",
+        {"d": DISMISSED},
+    ).fetchall()
+    ids = [
+        (fid, ftype)
+        for fid, ftype, entity, related in rows
+        if any(d.matches(ftype, entity, related) for d in dismissals)
+    ]
+    if ids:
+        con.executemany(
+            f"UPDATE {t} SET flags = list_append(coalesce(flags, []), $d) "
+            "WHERE finding_id = $id AND finding_type = $type",
+            [{"d": DISMISSED, "id": fid, "type": ftype} for fid, ftype in ids],
+        )
+    return len(ids)

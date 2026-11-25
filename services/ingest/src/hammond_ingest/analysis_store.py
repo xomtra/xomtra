@@ -12,15 +12,15 @@ import logging
 from typing import Any
 
 from hacore.analysis_settings import BY_KEY, Value, parse_stored
+from hacore.findings import Dismissal
 from hammond_ingest.settings import IngestSettings
 
 logger = logging.getLogger(__name__)
 
 
-def load_overrides(s: IngestSettings) -> dict[str, Value]:
-    """Valid stored values by key; {} when there are none or the store is unavailable."""
+def _query(s: IngestSettings, sql: str, what: str) -> list[tuple[Any, ...]] | None:
     if not s.analysis_settings_db or not s.ops_pg_password.get_secret_value():
-        return {}
+        return None
     import psycopg2  # noqa: PLC0415 - only needed with a database
 
     try:
@@ -28,15 +28,36 @@ def load_overrides(s: IngestSettings) -> dict[str, Value]:
             psycopg2.connect(s.ops_pg_uri(s.analysis_settings_db), connect_timeout=5) as conn,
             conn.cursor() as cur,
         ):
-            cur.execute("SELECT key, value FROM analysis.current_settings()")
-            rows: list[tuple[str, Any]] = cur.fetchall()
+            cur.execute(sql)
+            return list(cur.fetchall())
     except psycopg2.Error as err:
-        logger.warning("Stored analysis settings not read, using the environment: %s", err)
+        logger.warning("%s not read: %s", what, err)
+        return None
+
+
+def load_overrides(s: IngestSettings) -> dict[str, Value]:
+    """Valid stored values by key; {} when there are none or the store is unavailable."""
+    rows = _query(
+        s,
+        "SELECT key, value FROM analysis.current_settings()",
+        "Stored analysis settings (using the environment)",
+    )
+    if not rows:
         return {}
     values, problems = parse_stored(rows)
     for problem in problems:
         logger.warning("Stored analysis setting %s", problem)
     return values
+
+
+def load_dismissals(s: IngestSettings) -> list[Dismissal]:
+    """Active dismissed findings (ADR 060 point 6); [] if the store is unavailable."""
+    rows = _query(
+        s,
+        "SELECT finding_type, entity_id, related_entity_id FROM analysis.active_dismissals()",
+        "Dismissed findings",
+    )
+    return [Dismissal(str(t), str(e), None if r is None else str(r)) for t, e, r in rows or []]
 
 
 def with_overrides(s: IngestSettings, overrides: dict[str, Value] | None = None) -> IngestSettings:

@@ -46,7 +46,7 @@ import duckdb
 import numpy as np
 import numpy.typing as npt
 
-from hacore import areas, weather
+from hacore import areas, confidence, weather
 from hacore import significance as sig
 from hacore.context import EMPTY, Context
 from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, load_no_analysis
@@ -58,6 +58,23 @@ type FloatArray = npt.NDArray[np.float64]
 
 SCHEMA = "catalog"
 FINDING = "finding"
+# Last run of every analysis type and window: size and confidence (ADR 067). Aggregate
+# only, except the entities without a group, which the admin GUI lists.
+RUN = "analysis_run"
+RUN_COLUMNS = """
+    finding_type VARCHAR NOT NULL,
+    window_days INTEGER NOT NULL,
+    run_at TIMESTAMPTZ NOT NULL,
+    series INTEGER,
+    pairs_tested BIGINT,
+    findings INTEGER,
+    confidence VARCHAR,
+    reasons VARCHAR[],
+    entities INTEGER,
+    group_coverage DOUBLE,
+    drivers INTEGER,
+    ungrouped VARCHAR[]
+"""
 FINDING_TYPE = "correlation"
 
 FINDING_COLUMNS = """
@@ -202,6 +219,8 @@ class CorrelationResult:
     period_end: datetime | None = None
     notes: list[str] = field(default_factory=list)
     significance: dict[str, Any] = field(default_factory=dict)
+    # Low-power indicator (ADR 067), without entity names.
+    confidence: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -217,12 +236,14 @@ class CorrelationResult:
             "period_end": self.period_end.isoformat() if self.period_end else None,
             "notes": self.notes,
             "significance": self.significance,
+            "confidence": self.confidence,
         }
 
 
 def ensure_schema(con: duckdb.DuckDBPyConnection, alias: str = LAKE_ALIAS) -> None:
     con.execute(f"CREATE SCHEMA IF NOT EXISTS {alias}.{SCHEMA}")
     con.execute(f"CREATE TABLE IF NOT EXISTS {alias}.{SCHEMA}.{FINDING} ({FINDING_COLUMNS})")
+    con.execute(f"CREATE TABLE IF NOT EXISTS {alias}.{SCHEMA}.{RUN} ({RUN_COLUMNS})")
     # Columns added after the first release of the table (1b.1 follow-up, 1b.2).
     for column, type_ in ADDED_COLUMNS:
         con.execute(
@@ -1304,16 +1325,13 @@ def run(
     result.period_start = _to_dt(grid.hours[0])
     result.period_end = _to_dt(grid.hours[-1]) + timedelta(hours=1)
     findings: list[dict[str, Any]] = []
+    ctx = areas.load_context(con, alias) if context is None else context
+    conf = confidence.assess([s.entity_id for s in series], ctx, exclude=params.outside_temp)
+    result.confidence = conf.as_dict()
     if len(series) >= 2:
         pairs = _pairs(resid, params, result)
         result.pairs_tested = len(pairs.r)
-        findings = select_findings(
-            pairs,
-            series,
-            params,
-            _devices(con, alias),
-            context=areas.load_context(con, alias) if context is None else context,
-        )
+        findings = select_findings(pairs, series, params, _devices(con, alias), context=ctx)
     write_findings(
         con,
         findings,
@@ -1325,8 +1343,59 @@ def run(
         alias=alias,
     )
     result.findings = len(findings)
+    write_run(
+        con,
+        finding_type=FINDING_TYPE,
+        window_days=params.window_days,
+        now=now,
+        result=result,
+        conf=conf,
+        alias=alias,
+    )
     logger.info("Correlations: %s", result.as_dict())
     return result
+
+
+def write_run(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    finding_type: str,
+    window_days: int,
+    now: datetime,
+    result: CorrelationResult,
+    conf: confidence.Confidence,
+    alias: str = LAKE_ALIAS,
+) -> None:
+    """Replace the run record of ``finding_type`` and ``window_days`` (ADR 067)."""
+    t = f"{alias}.{SCHEMA}.{RUN}"
+    con.execute("BEGIN TRANSACTION")
+    try:
+        con.execute(
+            f"DELETE FROM {t} WHERE finding_type = $type AND window_days = $window",
+            {"type": finding_type, "window": window_days},
+        )
+        con.execute(
+            f"INSERT INTO {t} VALUES ($type, $window, $now, $series, $pairs, $findings, "
+            "$level, $reasons, $entities, $coverage, $drivers, $ungrouped)",
+            {
+                "type": finding_type,
+                "window": window_days,
+                "now": now,
+                "series": result.series_used,
+                "pairs": result.pairs_tested,
+                "findings": result.findings,
+                "level": conf.level,
+                "reasons": conf.reasons,
+                "entities": conf.entities,
+                "coverage": conf.group_coverage,
+                "drivers": conf.drivers,
+                "ungrouped": conf.ungrouped,
+            },
+        )
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
 
 
 def fill_from_archive(
