@@ -20,6 +20,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   read the new `compose.yaml` with the old `.env` and failed on the missing `XOMTRA_*`
   variables. It now stops and removes the old containers and networks by their compose
   labels.
+- Home Assistant add-on: Postgres logs errors without the failed statement. DuckLake
+  retries a commit when another writer took its snapshot id, and the statement filled
+  the add-on log with Home Assistant data.
 
 ## [0.5.0] - 2026-11-25
 
