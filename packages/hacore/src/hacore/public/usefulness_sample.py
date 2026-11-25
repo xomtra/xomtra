@@ -11,8 +11,9 @@ names are mapped to device classes so that the rulebook can sort them into famil
 The frame is stratified by finding type x trivial x action category; every cell gets
 at least ``MIN_PER_CELL`` findings where it has them, the rest of ``total`` is spread
 in proportion to the cells' sizes; inside a cell the draw alternates over the strength
-terciles. ``weight`` = cell size / drawn, for estimates over the whole frame. The human
-sample is ``HUMAN_PER_SET`` findings of the drawn ones from validation and from test.
+terciles. The human sample is ``HUMAN_PER_SET`` findings drawn so from validation and
+from test each (at least ``MIN_HUMAN_PER_CELL`` per cell); the rest of ``total`` comes
+from calibration. ``weight`` = cell size / drawn inside the finding's set.
 
     python -m hacore.public.usefulness_sample --dataset ideal --data <dir> --out sample.csv
 
@@ -50,6 +51,7 @@ MAX_WINDOWS = 4
 TOTAL = 1000
 MIN_PER_CELL = 20
 HUMAN_PER_SET = 100
+MIN_HUMAN_PER_CELL = 5
 # Action categories of the strata: none and unclassified form one cell.
 CATEGORY_CELLS = ("fault", "savings", "automation", "behaviour", "none")
 
@@ -244,6 +246,38 @@ def allocate(sizes: dict[str, int], total: int, min_per_cell: int) -> dict[str, 
     return take
 
 
+def _draw(
+    rows: list[dict[str, Any]], total: int, min_per_cell: int, rng: np.random.Generator
+) -> list[dict[str, Any]]:
+    """Stratified draw of ``total`` rows; ``weight`` = cell size / drawn in that cell."""
+    cells: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        cells[row["cell"]].append(row)
+    take = allocate({c: len(r) for c, r in cells.items()}, total, min_per_cell)
+    picked: list[dict[str, Any]] = []
+    for c in sorted(cells):
+        members = cells[c]
+        k = take[c]
+        if not k:
+            continue
+        strength = np.array([float(r["strength"] or 0) for r in members])
+        cuts = np.quantile(strength, [1 / 3, 2 / 3]) if len(members) >= 3 else np.array([])
+        terciles = [
+            [
+                members[i]
+                for i in rng.permutation(np.flatnonzero(np.searchsorted(cuts, strength) == t))
+            ]
+            for t in range(len(cuts) + 1)
+        ]
+        chosen: list[dict[str, Any]] = []
+        while len(chosen) < k:
+            for t in terciles:
+                if t and len(chosen) < k:
+                    chosen.append(t.pop())
+        picked += [{**r, "weight": round(len(members) / k, 4)} for r in chosen]
+    return picked
+
+
 def stratified_sample(
     frame: list[dict[str, Any]],
     *,
@@ -252,34 +286,25 @@ def stratified_sample(
     human_per_set: int = HUMAN_PER_SET,
     seed: int = SEED,
 ) -> list[dict[str, Any]]:
+    """The human sample (``human_per_set`` from validation and from test, stratified in
+    each set) and the rest of ``total`` from calibration (stratified), all for AI rating.
+
+    The sets are drawn separately: validation and test houses have one window each, so a
+    draw over the whole frame would hold far fewer than ``human_per_set`` of them.
+    ``weight`` refers to the frame of the finding's set (calibration, validation, test).
+    """
     rng = np.random.default_rng(seed)
-    cells: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    by_split: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in frame:
-        cells[row["cell"]].append(row)
-    take = allocate({c: len(r) for c, r in cells.items()}, total, min_per_cell)
+        by_split[row["split"]].append(row)
     picked: list[dict[str, Any]] = []
-    for c in sorted(cells):
-        rows = cells[c]
-        k = take[c]
-        if not k:
-            continue
-        strength = np.array([float(r["strength"] or 0) for r in rows])
-        cuts = np.quantile(strength, [1 / 3, 2 / 3]) if len(rows) >= 3 else np.array([])
-        terciles = [
-            [rows[i] for i in rng.permutation(np.flatnonzero(np.searchsorted(cuts, strength) == t))]
-            for t in range(len(cuts) + 1)
-        ]
-        chosen: list[dict[str, Any]] = []
-        while len(chosen) < k:
-            for t in terciles:
-                if t and len(chosen) < k:
-                    chosen.append(t.pop())
-        for r in chosen:
-            picked.append({**r, "weight": round(len(rows) / k, 4), "human": False})
     for split in ("validation", "test"):
-        idx = [i for i, r in enumerate(picked) if r["split"] == split]
-        for i in rng.permutation(idx)[:human_per_set]:
-            picked[int(i)]["human"] = True
+        human = _draw(by_split[split], human_per_set, MIN_HUMAN_PER_CELL, rng)
+        picked += [{**r, "human": True} for r in human]
+    rest = max(0, total - len(picked))
+    picked += [
+        {**r, "human": False} for r in _draw(by_split["calibration"], rest, min_per_cell, rng)
+    ]
     return sorted(picked, key=lambda r: r["sample_id"])
 
 
