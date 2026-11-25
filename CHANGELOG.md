@@ -20,6 +20,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   instead of Dagster, with runs in the new Postgres database `ops`; `hammond-ingest job`
   and `hammond-ingest runs`. `deploy/compose/compose.lite.yaml` runs the lite edition
   (no SeaweedFS, no Dagster, lake data in a local volume).
+- Synthetic households with known truth for evaluating the analyses
+  (`hacore.synthetic`, `python -m hacore.synthetic.evaluate`, ADR 062): archetypes,
+  hidden drivers, planted relations, defects and inserted events. See
+  docs/analysis-evaluation.md.
 
 ## [0.3.0] - 2026-11-24
 
