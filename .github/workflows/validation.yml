@@ -1,0 +1,91 @@
+name: Validation
+
+# Nightly validation of the analyses (ADR 062 point 8, ADR 065, Gate 1c point 6):
+# run time and memory on amd64 and arm64, and the cross-household null on the IDEAL
+# public dataset. Only aggregate metrics are printed (job summary and log); nothing
+# from the datasets is stored or uploaded.
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/validation.yml
+      - packages/hacore/src/hacore/public/**
+      - packages/hacore/src/hacore/synthetic/benchmark.py
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Mixed households per configuration
+        default: "20"
+
+permissions: {}
+
+concurrency:
+  group: validation
+  cancel-in-progress: false
+
+env:
+  UV_VERSION: "0.13.9"
+
+jobs:
+  benchmark:
+    name: benchmark (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-26.04, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked
+      - name: 1000 series x 90 days
+        run: |
+          uv run python -m hacore.synthetic.benchmark --series 1000 --days 90 | tee bench-90.json
+          { echo "### Benchmark ${{ matrix.runner }}, 1000 series x 90 days"; echo '```json'; cat bench-90.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: 1000 series x 365 days
+        run: |
+          uv run python -m hacore.synthetic.benchmark --series 1000 --days 365 | tee bench-365.json
+          { echo "### Benchmark ${{ matrix.runner }}, 1000 series x 365 days"; echo '```json'; cat bench-365.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  cross-household:
+    name: cross-household null (IDEAL)
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Fetch IDEAL hourly readings (HTTP ranges, member list checked)
+        run: |
+          uv run python -m hacore.public.fetch ideal "$RUNNER_TEMP/ideal" | tee fetch.json
+          { echo "### IDEAL fetch"; echo '```json'; cat fetch.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Cross-household null
+        env:
+          RUNS: ${{ inputs.runs || '20' }}
+        run: |
+          hash=$(python3 -c 'import json; print(json.load(open("fetch.json"))["member_list_sha256"])')
+          for channels in 3 1; do
+            uv run python -m hacore.public.crosshouse --dataset ideal --data "$RUNNER_TEMP/ideal" \
+              --dataset-hash "$hash" --runs "$RUNS" --days 90 --channels "$channels" --seed 0 \
+              | tee "crosshouse-$channels.json"
+            { echo "### Cross-household null, $channels channel(s) per house"; echo '```json'; cat "crosshouse-$channels.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          done

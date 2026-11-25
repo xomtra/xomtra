@@ -86,3 +86,39 @@ default every household draws its own.
   (archetype `minimalist`) is reported as a known limit of the data, not counted
   against the gate.
 - Planted direct relations must not be flagged (`direct_overflagged`).
+
+## Public datasets: cross-household null (layer 2, `hacore.public`)
+
+Real data have no known truth, but series of *different* homes cannot be related.
+`hacore.public.crosshouse` builds mixed households from the homes of a public dataset:
+a few channels per home, every home shifted by whole weeks onto one calendar, with real
+start dates at least 28 days apart (no shared weather or dates, same day of the week).
+Every correlation finding between homes is false.
+
+- **IDEAL** (Edinburgh DataShare, CC BY 4.0, 255 UK homes): the hourly readings
+  (`auxiliarydata/hourly_readings`, about 160 MB of a 6.4 GB archive) are fetched with
+  HTTP range requests (`python -m hacore.public.fetch ideal <dir>`). The hash of the
+  archive's member list (names, sizes, CRC-32) is pinned in `datasets.json`, and every
+  member's CRC-32 is checked. Room sensors carry their room, which becomes the area of
+  the channel, so `same_area` applies inside a home and must never appear between homes.
+- **REFIT** (University of Strathclyde, CC BY 4.0): the download is behind a browser
+  challenge, so it is run by hand (`--dataset refit --archive <7z>`).
+
+Reported, summed over the runs: `fdr_all`, `fdr_gate` (without `same_area` /
+`house_context`), `fdr_default_view` (unflagged findings only), `fdr_strict` (= fdr_all:
+a pair between homes is unrelated by any reading), the number of null pairs tested,
+`cross_per_1000_pairs`, `context_share` and `cross_context` (must be 0). With one
+channel per home (`--channels 1`) every pair is null: `null_runs_with_findings` estimates
+the familywise error rate. Anomalies: findings per 100 series-weeks without planted
+events, then the recall of planted episodes of 4, 6 and 8 robust deviations (3-12 hours)
+and the findings that appear elsewhere only after planting.
+
+```sh
+uv run python -m hacore.public.fetch ideal /tmp/ideal
+uv run python -m hacore.public.crosshouse --dataset ideal --data /tmp/ideal --runs 20 --channels 3
+```
+
+The output starts with a manifest (code version, commit, dataset hash, houses, parameters,
+seeds, the command that reproduces it). The nightly workflow `validation.yml` runs it,
+together with the benchmark (`python -m hacore.synthetic.benchmark`, 1000 series x 90 and
+365 days on amd64 and arm64), and prints only aggregate metrics.

@@ -170,7 +170,9 @@ not on a fixed threshold per series:
 
 - anomalies: the strength of an episode is its peak `|z|` (at most 50, `HAMMOND_ANOMALY_Z_CAP`) times the square
   root of its hours. The scale is never below the sensor's resolution (median step
-  between its distinct values); with the cap, a nearly constant sensor whose rare jumps
+  between its distinct values) nor below a quarter of the series' 99th percentile
+  deviation in the baseline (ADR 066: an appliance that idles most hours is not scaled
+  by its idle noise, so its ordinary use is not an anomaly); with the cap, a nearly constant sensor whose rare jumps
   reach a z of millions cannot own the tail of the pooled reference. Every baseline week is scored against the other baseline weeks; the strongest
   episode of each series and day (0 if none) forms the reference, pooled over series.
   `p_value` is the share of the reference at least as strong (generalised Pareto tail

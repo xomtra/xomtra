@@ -1,0 +1,24 @@
+{
+  "ideal": {
+    "title": "IDEAL Household Energy Dataset, auxiliary data (hourly readings)",
+    "publisher": "University of Edinburgh, Edinburgh DataShare",
+    "doi": "10.7488/ds/2836",
+    "license": "CC BY 4.0",
+    "citation": "Pullinger, M. et al. (2021). The IDEAL household energy dataset, electricity, gas, contextual sensor data and survey data for 255 UK homes. Scientific Data 8, 146.",
+    "url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/2d181564-6f25-4312-b11d-c1b44ad97105/content",
+    "file": "auxiliarydata.zip",
+    "members": "^auxiliarydata/hourly_readings/home\\d+_.+\\.csv\\.gz$",
+    "member_list_sha256": "b2de500699c5550635a68393c91bef3bf3dfc20de7e83972ea40e9a7f438536f"
+  },
+  "refit": {
+    "title": "REFIT Electrical Load Measurements (cleaned)",
+    "publisher": "University of Strathclyde",
+    "doi": "10.15129/9ab14b0e-19ac-4279-938f-27f643078cec",
+    "license": "CC BY 4.0",
+    "citation": "Murray, D., Stankovic, L., Stankovic, V. (2017). An electrical load measurements dataset of United Kingdom households from a two-year longitudinal study. Scientific Data 4, 160122.",
+    "url": "https://pureportal.strath.ac.uk/files/62090184/CLEAN_REFIT_081116.7z",
+    "file": "CLEAN_REFIT_081116.7z",
+    "sha256": null,
+    "note": "Behind a browser challenge: download by hand, unpack and run crosshouse --dataset refit --archive <file>."
+  }
+}

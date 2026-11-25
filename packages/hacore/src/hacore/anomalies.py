@@ -77,6 +77,9 @@ Z_CAP = 50.0
 EPISODE_GAP = 1
 # Episodes kept per series (the strongest ones).
 MAX_EPISODES_PER_SERIES = 3
+# Tail floor of the scale (v2): the series' own 99th percentile residual counts as z 4.
+TAIL_QUANTILE = 0.99
+TAIL_Z = 4.0
 # Change points: days on both sides of a split and consistency of the days after.
 MIN_BEFORE_DAYS = 14
 MIN_AFTER_DAYS = 7
@@ -514,6 +517,31 @@ def _resolution(values: FloatArray, baseline: npt.NDArray[np.bool_]) -> FloatArr
     return out
 
 
+def _tail_floor(
+    values: FloatArray, baseline: npt.NDArray[np.bool_], exp: Expectation
+) -> FloatArray:
+    """``TAIL_QUANTILE`` of the absolute baseline residuals over ``TAIL_Z``: an hour as
+    far out as the series' own rare hours gets at most ``TAIL_Z``. It only acts on
+    heavy-tailed series (an appliance idling most hours, whose robust deviation is the
+    idle noise); for a normal series it is about 0.6 deviations, under the scale."""
+    resid = np.abs(values[baseline] - exp.expected[baseline])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN series
+        out = np.nanquantile(resid, TAIL_QUANTILE, axis=0) / TAIL_Z
+    return np.nan_to_num(np.asarray(out, dtype=np.float64))
+
+
+def scale_floor(
+    values: FloatArray, baseline: npt.NDArray[np.bool_], exp: Expectation
+) -> FloatArray:
+    """Lower bound of the scale of every series: the Qn of discrete series, the
+    resolution and the tail floor, whichever is largest."""
+    return np.fmax(
+        np.fmax(_discrete_floor(values, baseline, exp), _resolution(values, baseline)),
+        _tail_floor(values, baseline, exp),
+    )
+
+
 def _strongest_episodes(
     z: FloatArray, threshold: float, limit: int, *, cap: float = Z_CAP
 ) -> list[tuple[int, int, float, int]]:
@@ -585,7 +613,8 @@ def detect_anomalies_v2(
     p-value of a recent episode is its exceedance probability in that sample, with a
     generalised Pareto tail beyond it; Benjamini-Hochberg over all candidate episodes;
     an episode is reported with ``q <= max_q`` and a peak ``|z| >= min_effect_z``.
-    The scale is at least the series' resolution and the statistic caps |z| at
+    The scale is at least the series' resolution and its tail floor (heavy-tailed
+    series, ADR 066), and the statistic caps |z| at
     ``Z_CAP``: nearly constant series must not own the tail of the pooled reference.
     """
     shifts = shifts or {}
@@ -607,7 +636,7 @@ def detect_anomalies_v2(
         if s.entity_id != params.outside_temp and known_base[j] >= MIN_BASELINE_HOURS
     ]
     exp = expectation(values, how, grid.local_hour, baseline, grid.series)
-    floor = np.fmax(_discrete_floor(values, baseline, exp), _resolution(values, baseline))
+    floor = scale_floor(values, baseline, exp)
     z = _z(values, exp, floor)
     reference = _reference(
         values,
@@ -622,6 +651,14 @@ def detect_anomalies_v2(
     )
     null = sig.reference_null(np.array(reference))
     stats["reference_size"] = null.size
+    if reference:
+        ref = np.array(reference)
+        stats["reference_quantiles"] = {
+            "p50": round(float(np.percentile(ref, 50)), 2),
+            "p90": round(float(np.percentile(ref, 90)), 2),
+            "p99": round(float(np.percentile(ref, 99)), 2),
+            "zero_share": round(float((ref == 0).mean()), 3),
+        }
     temp_z = _driver_z(grid, z, params.outside_temp)
     hours = [corr._to_dt(h) for h in grid.hours]
     cands: list[dict[str, Any]] = []
@@ -910,7 +947,8 @@ def _methods(params: AnomalyParams) -> tuple[str, str]:
         )
     return (
         f"hour-of-week median and robust deviation (Qn for discrete series, at least the "
-        f"sensor's resolution) over {params.baseline_days} d before the last "
+        "sensor's resolution and the series' 99th percentile residual / 4) over "
+        f"{params.baseline_days} d before the last "
         f"{params.recent_days} d; conformal p of the episode (min(peak |z|, {params.z_cap:g}) x "
         "sqrt(hours)) against leave-one-week-out baseline "
         f"episodes, BH over episodes q <= {params.max_q:g}, peak |z| >= "
