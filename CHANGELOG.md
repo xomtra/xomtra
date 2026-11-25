@@ -23,6 +23,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   Ingress proxy's address and serves its links under `X-Ingress-Path`;
   `HAMMOND_DAGSTER_UI=false` hides the Dagster link. The add-on shows the GUI in the
   sidebar for HA administrators.
+- Home Assistant add-on repository (`repository.yaml`): the add-on images
+  `hammond-addon-amd64` and `hammond-addon-aarch64` are built natively, signed and
+  published with every commit of `main` and promoted with every release;
+  `scripts/release.py` keeps the add-on version in step.
 - Admin GUI page *Analysis settings* (ADR 060): thresholds of correlations, anomalies
   and change points can be changed without a restart, with a preview of their effect on
   the current findings and a history of changes. A stored value wins over the ingest's

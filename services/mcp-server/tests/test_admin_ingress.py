@@ -8,7 +8,7 @@ from typing import Any
 import httpx2
 from pydantic import SecretStr
 
-from hammond_mcp.admin.app import AdminApp
+from hammond_mcp.admin.app import AdminApp, _same_address
 from hammond_mcp.admin.config import AdminSettings
 from hammond_mcp.audit import MemoryAuditSink
 from hammond_mcp.tokens import MemoryTokenStore, token_hash
@@ -162,3 +162,12 @@ async def test_remote_user_headers_are_ignored_without_ingress() -> None:
         resp = await client.get("/admin/tokens", headers=HA)
     assert resp.status_code == 303
     assert resp.headers["location"] == "/admin/login"
+
+
+def test_peer_address_comparison() -> None:
+    assert _same_address("172.30.32.2", "172.30.32.2")
+    assert _same_address("::ffff:172.30.32.2", "172.30.32.2")
+    assert not _same_address("172.30.32.20", "172.30.32.2")
+    assert not _same_address("::ffff:172.30.32.9", "172.30.32.2")
+    assert not _same_address("172.30.32.2", "not-an-address")
+    assert _same_address("testclient", "testclient")

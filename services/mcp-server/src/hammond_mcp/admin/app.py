@@ -15,6 +15,7 @@ HA Ingress instead: Home Assistant signs the user in, see :class:`RequestView`.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
 import re
@@ -74,6 +75,20 @@ DISMISS_DAYS = (0, 30, 90, 365)
 INGRESS_PATH = re.compile(r"/api/hassio_ingress/[A-Za-z0-9_-]{1,128}")
 ADMIN_GROUP = "system-admin"
 MCP_PORT = 8000  # the add-on's MCP port (config.yaml), when no mcp_url is set
+
+
+def _same_address(peer: str, expected: str) -> bool:
+    """Compares IP addresses, also an IPv4-mapped IPv6 peer (``::ffff:a.b.c.d``)."""
+    try:
+        address = ipaddress.ip_address(peer)
+    except ValueError:
+        return peer == expected
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    try:
+        return address == ipaddress.ip_address(expected)
+    except ValueError:
+        return False
 
 
 def _url_host(hostname: str) -> str:
@@ -1218,7 +1233,7 @@ class RequestView:
                 view.current.reset(token)
             return
         client = scope.get("client")
-        if not client or client[0] != self.proxy:
+        if not client or not _same_address(client[0], self.proxy):
             await Response("Only Home Assistant Ingress", status_code=403)(scope, receive, send)
             return
         ingress_path = Headers(scope=scope).get("x-ingress-path", "")

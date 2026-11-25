@@ -31,7 +31,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       REGISTRY: ghcr.io/zettabyte-cz
-      IMAGES: hammond-mcp hammond-ingest hammond-caddy
+      IMAGES: hammond-mcp hammond-ingest hammond-caddy hammond-addon-amd64 hammond-addon-aarch64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -122,6 +122,8 @@ jobs:
             echo "# Images of HAmmond $VERSION"
             echo "# Put these lines into deploy/compose/.env (docs/releasing.md)."
             while read -r image digest; do
+              # The add-on images are pulled by the Supervisor, not by compose.
+              case "$image" in hammond-addon-*) continue ;; esac
               var=$(tr 'a-z-' 'A-Z_' <<<"$image")_IMAGE
               echo "$var=$REGISTRY/$image:$VERSION@$digest"
             done < digests.txt
@@ -153,6 +155,9 @@ jobs:
             echo "  --certificate-identity https://github.com/$GH_REPO/.github/workflows/release.yml@refs/tags/$TAG \\"
             echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             echo '```'
+            echo
+            echo "Home Assistant add-on: add \`https://github.com/$GH_REPO\` to the repositories"
+            echo "of the add-on store; it installs \`hammond-addon-{amd64,aarch64}:$VERSION\`."
             echo
             echo "Claude Desktop extension for the local access mode: \`hammond-$VERSION.mcpb\`"
             echo "(also offered with the server address filled in by the admin GUI)."

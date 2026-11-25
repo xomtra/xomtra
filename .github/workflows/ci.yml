@@ -436,8 +436,8 @@ jobs:
           load: true
           push: false
           tags: hammond-addon:ci
-          cache-from: type=gha,scope=hammond-addon
-          cache-to: type=gha,mode=max,scope=hammond-addon
+          cache-from: type=gha,scope=hammond-addon-amd64
+          cache-to: type=gha,mode=max,scope=hammond-addon-amd64
       - name: Scan image
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" image \
@@ -449,21 +449,39 @@ jobs:
   # rebuild: release.yml promotes these images to the version tags (ADR 045).
   publish:
     name: publish (${{ matrix.image }})
-    needs: [build, trivy, contract]
+    needs: [build, trivy, contract, addon]
     if: github.event_name == 'push'
-    runs-on: ubuntu-26.04
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
           - image: hammond-mcp
             context: .
             file: services/mcp-server/Dockerfile
+            runner: ubuntu-26.04
+            platform: linux/amd64
           - image: hammond-ingest
             context: .
             file: services/ingest/Dockerfile
+            runner: ubuntu-26.04
+            platform: linux/amd64
           - image: hammond-caddy
             context: deploy/caddy
             file: deploy/caddy/Dockerfile
+            runner: ubuntu-26.04
+            platform: linux/amd64
+          # Home Assistant add-on, one image per architecture ({arch} in config.yaml),
+          # each built natively on its own runner.
+          - image: hammond-addon-amd64
+            context: .
+            file: addon/hammond/Dockerfile
+            runner: ubuntu-26.04
+            platform: linux/amd64
+          - image: hammond-addon-aarch64
+            context: .
+            file: addon/hammond/Dockerfile
+            runner: ubuntu-26.04-arm
+            platform: linux/arm64
     permissions:
       contents: read
       packages: write # push to GHCR
@@ -496,6 +514,7 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           push: true
+          platforms: ${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}
