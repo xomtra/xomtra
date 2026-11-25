@@ -47,7 +47,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Preregistration of the usefulness evaluation (`docs/evaluation/usefulness-prereg.md`)
   and its metrics in `hacore.public.ratings`: Krippendorff's α (ordinal), weighted κ,
   NDCG@10, precision@10, cluster bootstrap over households and the simulation that
-  fixes the human sample at 200 findings.
+  fixes the human sample at 200 findings. `hacore.public.usefulness_sample` draws the
+  stratified sample of findings on public data (manual job `usefulness-sample` of the
+  validation workflow, CSV artifact kept 30 days, CC BY citation).
+- Rulebook 1.0.1: a gas or smoke detector (`binary_sensor`) is air quality, a gas meter
+  energy (both were air quality).
 - Validation on public data (ADR 065, Gate 1c point 6): `hacore.public` fetches the IDEAL
   hourly readings with HTTP range requests (member list pinned, CRC-32 checked) and
   measures the cross-household null of correlations and anomalies

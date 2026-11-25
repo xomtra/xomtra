@@ -17,7 +17,7 @@
 #    families is expected and kept out of the ranking.
 # 4. Every family has `examples`, checked in CI (each must land in its family).
 
-version = "1.0.0"
+version = "1.0.1"
 
 # Helpers computed from other entities (T3: a helper and its source are trivial).
 derived_platforms = [
@@ -85,6 +85,22 @@ examples = [
 ]
 
 [[family]]
+name = "air_quality"
+match = [
+  { device_class = [
+    "carbon_dioxide", "carbon_monoxide", "volatile_organic_compounds",
+    "volatile_organic_compounds_parts", "pm1", "pm25", "pm10", "aqi", "nitrogen_dioxide",
+    "ozone",
+  ] },
+  # a gas or smoke detector; a gas meter (sensor) is energy
+  { domain = ["binary_sensor"], device_class = ["gas", "smoke"] },
+]
+examples = [
+  { entity_id = "sensor.office_co2", device_class = "carbon_dioxide", unit = "ppm" },
+  { entity_id = "binary_sensor.boiler_room_gas", device_class = "gas" },
+]
+
+[[family]]
 name = "heat_pump"
 match = [
   { domain = ["climate", "water_heater"] },
@@ -127,17 +143,6 @@ examples = [
 ]
 
 [[family]]
-name = "air_quality"
-match = [
-  { device_class = [
-    "carbon_dioxide", "carbon_monoxide", "volatile_organic_compounds",
-    "volatile_organic_compounds_parts", "pm1", "pm25", "pm10", "aqi", "nitrogen_dioxide",
-    "ozone", "smoke", "gas",
-  ] },
-]
-examples = [{ entity_id = "sensor.office_co2", device_class = "carbon_dioxide", unit = "ppm" }]
-
-[[family]]
 name = "power"
 match = [{ device_class = ["power", "current", "apparent_power", "reactive_power"] }, { unit = ["W", "kW"] }]
 examples = [{ entity_id = "sensor.fridge_power", device_class = "power", unit = "W" }]
@@ -148,6 +153,7 @@ match = [{ device_class = ["energy", "gas", "water"] }, { unit = ["kWh", "Wh", "
 examples = [
   { entity_id = "sensor.house_energy", device_class = "energy", unit = "kWh" },
   { entity_id = "sensor.water_meter", device_class = "water", unit = "m³" },
+  { entity_id = "sensor.gas_meter", device_class = "gas", unit = "m³" },
 ]
 
 [[family]]
