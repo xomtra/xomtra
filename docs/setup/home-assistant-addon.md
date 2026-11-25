@@ -84,3 +84,5 @@ The smoke test starts the image like the Supervisor (a `/data` directory with
 `options.json`, `SUPERVISOR_TOKEN`, a network like hassio), waits for the MCP server and
 the admin GUI, checks that only the Ingress proxy's address may open the admin GUI, that
 the secrets and the Postgres cluster are in `/data` and that a restart keeps them.
+At the end it reports the memory of the idle add-on per process and fails above 2 GiB
+(with an empty lake this is the floor; a real installation adds the lake's caches).
