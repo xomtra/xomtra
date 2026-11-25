@@ -74,4 +74,31 @@ until curl -fsS http://127.0.0.1:18000/healthz >/dev/null 2>&1; do
   sleep 2
 done
 test "$before" = "$(docker exec "$NAME" md5sum /data/secrets.env)"
+
+# Memory at rest (target <= 2 GiB, plan 1c.2 PR 9): every service has started and
+# answered once; the lake is empty here, so this is the floor, not a measurement with
+# a real installation.
+until docker exec "$NAME" python3 -c 'import urllib.request as u; u.urlopen("http://127.0.0.1:8100/healthz", timeout=5)' 2>/dev/null; do sleep 2; done
+test "$(ingress_get 172.30.32.2)" = 200
+sleep "${SETTLE_SECONDS:-60}"
+docker exec "$NAME" python3 -c '
+import os
+rows = []
+for pid in filter(str.isdigit, os.listdir("/proc")):
+    try:
+        cmd = open(f"/proc/{pid}/cmdline", "rb").read().replace(b"\0", b" ").decode()[:70]
+        rss = next(int(l.split()[1]) for l in open(f"/proc/{pid}/status") if l.startswith("VmRSS"))
+    except (OSError, StopIteration):
+        continue
+    rows.append((rss, cmd))
+for rss, cmd in sorted(rows, reverse=True)[:12]:
+    print(f"{rss / 1024:8.1f} MiB  {cmd}")'
+used=$(docker stats --no-stream --format '{{.MemUsage}}' "$NAME" | cut -d/ -f1 | tr -d ' ')
+bytes=$(python3 -c '
+import re, sys
+n, unit = re.fullmatch(r"([0-9.]+)([KMG]i?B|B)", sys.argv[1]).groups()
+scale = {"B": 1, "KiB": 2**10, "MiB": 2**20, "GiB": 2**30, "kB": 1e3, "MB": 1e6, "GB": 1e9}
+print(int(float(n) * scale[unit]))' "$used")
+echo "Memory at rest: $used (limit 2 GiB)"
+test "$bytes" -le $((2 * 1024 * 1024 * 1024)) || { echo "Memory at rest above 2 GiB" >&2; exit 1; }
 echo "Add-on smoke test passed"
