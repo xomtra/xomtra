@@ -345,9 +345,17 @@ def test_trivial_pairs_last_and_one_row_per_pair(plain: duckdb.DuckDBPyConnectio
         if pair(f) in {("sensor.a", "sensor.a_percent"), ("sensor.a_percent", "sensor.a")}
     )
     assert "duplicate_suspect" in dup["flags"]  # type: ignore[operator]
-    flagged = [bool(f["flags"]) for f in found]
-    assert flagged == sorted(flagged)  # unflagged first
+    tiers = [corr._tier(f) for f in found]
+    assert tiers == sorted(tiers)  # unflagged first, trivial last
     assert not found[0]["flags"]
+
+
+def test_tier_puts_explained_before_trivial() -> None:
+    assert corr._tier({"flags": []}) == 0
+    assert corr._tier({"flags": ["indirect"]}) == 1
+    assert corr._tier({"flags": ["house_context", "unstable"]}) == 1
+    assert corr._tier({"flags": ["duplicate_suspect"]}) == 2
+    assert corr._tier({"flags": ["same_area", "same_device"]}) == 2
 
 
 def test_near_duplicates_grouped(plain: duckdb.DuckDBPyConnection) -> None:

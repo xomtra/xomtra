@@ -69,6 +69,10 @@ PRIOR_VALUES = 8
 SCALE_FLOOR = 0.5
 # ... and for shares of time at least this (3 minutes of an hour).
 SHARE_SCALE_FLOOR = 0.05
+# v2: |z| above this counts as this in the episode statistic. A nearly constant series
+# has a scale near 0 and z in the millions; a few such series would own the tail of
+# the pooled reference and nothing else could pass (homelab, 0.4.0).
+Z_CAP = 50.0
 # Anomalous hours separated by at most this many normal hours form one episode.
 EPISODE_GAP = 1
 # Episodes kept per series (the strongest ones).
@@ -489,8 +493,24 @@ def _z(values: FloatArray, exp: Expectation, floor: FloatArray) -> FloatArray:
 
 
 def _episode_stat(peak: float, count: int) -> float:
-    """Strength of an episode: peak |z| times the square root of its hours."""
-    return abs(peak) * float(np.sqrt(count))
+    """Strength of an episode: peak |z| (at most ``Z_CAP``) times the square root of
+    its hours."""
+    return min(abs(peak), Z_CAP) * float(np.sqrt(count))
+
+
+def _resolution(values: FloatArray, baseline: npt.NDArray[np.bool_]) -> FloatArray:
+    """Median gap between neighbouring distinct baseline values of every series: a
+    deviation smaller than the step the sensor reports in is not measurable, so the
+    scale never goes below it."""
+    out = np.zeros(values.shape[1])
+    base = values[baseline]
+    for j in range(values.shape[1]):
+        col = base[:, j]
+        gaps = np.diff(np.unique(col[~np.isnan(col)]))
+        gaps = gaps[gaps > 0]
+        if len(gaps):
+            out[j] = float(np.median(gaps))
+    return out
 
 
 def _strongest_episodes(
@@ -560,6 +580,8 @@ def detect_anomalies_v2(
     p-value of a recent episode is its exceedance probability in that sample, with a
     generalised Pareto tail beyond it; Benjamini-Hochberg over all candidate episodes;
     an episode is reported with ``q <= max_q`` and a peak ``|z| >= min_effect_z``.
+    The scale is at least the series' resolution and the statistic caps |z| at
+    ``Z_CAP``: nearly constant series must not own the tail of the pooled reference.
     """
     shifts = shifts or {}
     t_len = len(grid.hours)
@@ -580,7 +602,7 @@ def detect_anomalies_v2(
         if s.entity_id != params.outside_temp and known_base[j] >= MIN_BASELINE_HOURS
     ]
     exp = expectation(values, how, grid.local_hour, baseline, grid.series)
-    floor = _discrete_floor(values, baseline, exp)
+    floor = np.fmax(_discrete_floor(values, baseline, exp), _resolution(values, baseline))
     z = _z(values, exp, floor)
     reference = _reference(
         values,
@@ -882,9 +904,10 @@ def _methods(params: AnomalyParams) -> tuple[str, str]:
             "change, observed/expected = median after/before, n_eff = days after",
         )
     return (
-        f"hour-of-week median and robust deviation (Qn for discrete series) over "
-        f"{params.baseline_days} d before the last {params.recent_days} d; conformal p of "
-        "the episode (peak |z| x sqrt(hours)) against leave-one-week-out baseline "
+        f"hour-of-week median and robust deviation (Qn for discrete series, at least the "
+        f"sensor's resolution) over {params.baseline_days} d before the last "
+        f"{params.recent_days} d; conformal p of the episode (min(peak |z|, {Z_CAP:g}) x "
+        "sqrt(hours)) against leave-one-week-out baseline "
         f"episodes, BH over episodes q <= {params.max_q:g}, peak |z| >= "
         f"{params.min_effect_z:g}; score = peak z, n_eff = anomalous hours (v2, ADR 062)",
         f"shift of the daily level in the last {params.changepoint_recent_days} d; p from "
