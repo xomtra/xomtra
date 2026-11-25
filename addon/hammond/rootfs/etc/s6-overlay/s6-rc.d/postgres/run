@@ -1,0 +1,5 @@
+#!/bin/sh
+# Postgres listens on the loopback only: nothing outside the add-on reaches it.
+exec s6-setuidgid postgres postgres -D /data/postgres \
+  -c listen_addresses=127.0.0.1 -c shared_buffers=64MB -c max_connections=40 \
+  -c log_destination=stderr -c logging_collector=off

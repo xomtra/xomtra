@@ -45,7 +45,9 @@ def websocket_url(base_url: str) -> str:
     """Derive the WebSocket endpoint from a Home Assistant base URL.
 
     ``https://ha.example:8123`` -> ``wss://ha.example:8123/api/websocket``.
-    A URL that already points to ``/api/websocket`` is returned unchanged.
+    A URL that already points to ``/api/websocket`` is returned unchanged. Inside a Home
+    Assistant add-on the Supervisor proxies Core at ``http://supervisor/core``, whose
+    WebSocket endpoint is ``/core/websocket``.
     """
     url = base_url.rstrip("/")
     if url.startswith("https://"):
@@ -54,7 +56,9 @@ def websocket_url(base_url: str) -> str:
         url = "ws://" + url.removeprefix("http://")
     elif not url.startswith(("ws://", "wss://")):
         raise ValueError(f"Unsupported URL scheme: {base_url!r}")
-    if not url.endswith("/api/websocket"):
+    if url.endswith("://supervisor/core"):
+        return url + "/websocket"
+    if not url.endswith(("/api/websocket", "://supervisor/core/websocket")):
         url += "/api/websocket"
     return url
 

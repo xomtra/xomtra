@@ -1,0 +1,36 @@
+#!/bin/sh
+# First start: generate the internal secrets (they never leave /data) and the Postgres
+# cluster. Later starts: add secrets introduced by newer versions, keep the others.
+set -eu
+umask 077
+SECRETS=/data/secrets.env
+touch "$SECRETS"
+for key in POSTGRES_PASSWORD DUCKLAKE_PG_PASSWORD OPS_PG_PASSWORD AUDIT_PG_PASSWORD \
+           AUDIT_ADMIN_PG_PASSWORD HAMMOND_JWT_SIGNING_KEY HAMMOND_ADMIN_SESSION_KEY; do
+  if ! grep -q "^$key=" "$SECRETS"; then
+    printf '%s=%s\n' "$key" "$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40)" >>"$SECRETS"
+  fi
+done
+chmod 600 "$SECRETS"
+
+# Postgres and the services run as their own users: they may pass through /data, but
+# only into their own directories (secrets.env and options.json stay root's).
+chmod 0711 /data
+mkdir -p /data/lake /data/duckdb-tmp /data/home
+chown hammond:hammond /data/lake /data/duckdb-tmp /data/home
+
+PGDATA=/data/postgres
+if [ ! -s "$PGDATA/PG_VERSION" ]; then
+  echo "Creating the Postgres cluster in $PGDATA"
+  mkdir -p "$PGDATA"
+  chown postgres:postgres "$PGDATA"
+  . "$SECRETS"
+  pwfile=$(mktemp)
+  printf '%s\n' "$POSTGRES_PASSWORD" >"$pwfile"
+  chown postgres "$pwfile"
+  s6-setuidgid postgres initdb -D "$PGDATA" -U postgres --pwfile="$pwfile" \
+    --auth-local=scram-sha-256 --auth-host=scram-sha-256 --encoding=UTF8 --locale=C.UTF-8
+  rm -f "$pwfile"
+fi
+mkdir -p /run/postgresql
+chown postgres:postgres /run/postgresql
