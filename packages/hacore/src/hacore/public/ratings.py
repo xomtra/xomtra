@@ -247,7 +247,7 @@ def simulate_pool_power(
                     for _ in range(raters)
                 ]
             )
-            gains = 2.0 ** (np.round(np.median(ratings, axis=1)) - 1) - 1
+            gains: FloatArray = np.asarray(2.0 ** (np.round(np.median(ratings, axis=1)) - 1) - 1)
             ideal = float((np.sort(gains[pool])[::-1][:K] * discounts).sum())
             if ideal == 0:
                 continue
