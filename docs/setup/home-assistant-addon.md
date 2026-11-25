@@ -1,8 +1,8 @@
 # Home Assistant add-on (lite edition)
 
 Status: **in development** (phase 1c.2, PR 9). The add-on image is built and started in
-CI on every pull request; published images, the add-on repository and the admin GUI in
-the Home Assistant sidebar (Ingress) follow in the next steps.
+CI on every pull request; published images and the add-on repository follow in the next
+steps.
 
 ## What runs inside
 
@@ -15,12 +15,28 @@ One container, supervised by [s6-overlay](https://github.com/just-containers/s6-
 | `init-databases` | roles and databases (the same script as compose) and the DuckLake catalog |
 | `worker` | live stream from Home Assistant and the scheduled jobs (ADR 050) |
 | `mcp` | MCP server for the LAN on port 8000 with personal tokens (ADR 056, 059) |
+| `admin` | admin GUI in the Home Assistant sidebar (Ingress, port 8100 inside the hassio network only, ADR 070) |
 
 Postgres runs as user `postgres`, the HAmmond services as user `hammond`; s6 itself
 starts as root, as in other add-ons.
 
 Home Assistant is reached through the Supervisor (`http://supervisor/core`) with the
 add-on's own token (`homeassistant_api: true`), so no long-lived access token is needed.
+
+## Admin GUI (Ingress)
+
+The admin GUI opens as **HAmmond** in the Home Assistant sidebar, for Home Assistant
+administrators only (`panel_admin`). There is no separate sign-in: Home Assistant signs
+the user in and its Ingress proxy (the Supervisor, `172.30.32.2`) passes the user in the
+`X-Remote-User-*` headers. The GUI therefore accepts connections only from that address
+(`HAMMOND_AUTH_MODE=ingress`) and refuses everything else; when the Supervisor also sends
+the user's groups, it checks the administrator group itself. Every page view is in the
+audit with the Home Assistant user. Port 8100 is not published outside the add-on.
+
+Pages: overview, catalog, drift, retention, findings, analysis settings, audit, personal
+tokens and connecting clients (with the Claude Desktop extension). The Dagster UI of the
+full edition does not exist here. Without the `mcp_url` option, the connect page assumes
+`http://<the host you opened Home Assistant on>:8000/mcp`.
 
 ## Data
 
@@ -54,5 +70,6 @@ addon/hammond/smoke-test.sh hammond-addon:dev
 ```
 
 The smoke test starts the image like the Supervisor (a `/data` directory with
-`options.json`, `SUPERVISOR_TOKEN`), waits for the MCP server, checks that the secrets
-and the Postgres cluster are in `/data` and that a restart keeps them.
+`options.json`, `SUPERVISOR_TOKEN`, a network like hassio), waits for the MCP server and
+the admin GUI, checks that only the Ingress proxy's address may open the admin GUI, that
+the secrets and the Postgres cluster are in `/data` and that a restart keeps them.

@@ -7,6 +7,9 @@ personal tokens of MCP clients and offers the Claude Desktop extension (ADR 056/
 ``/admin/auth/check`` answers Caddy's ``forward_auth`` for the Dagster UI under
 ``/admin/dagster/``. Every page view, sign-in
 and refused sign-in is written to the audit table.
+
+In the Home Assistant add-on (``HAMMOND_AUTH_MODE=ingress``, ADR 070) the GUI sits behind
+HA Ingress instead: Home Assistant signs the user in, see :class:`RequestView`.
 """
 
 from __future__ import annotations
@@ -14,18 +17,21 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
 from starlette.applications import Starlette
+from starlette.datastructures import Headers
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from hacore.analysis_settings import BY_KEY, SPECS, Spec, Value
-from hammond_mcp.admin import status
+from hammond_mcp.admin import status, view
 from hammond_mcp.admin.analysis import (
     FINDING_TYPES,
     PREVIEW_KEYS,
@@ -41,6 +47,7 @@ from hammond_mcp.admin.config import PREFIX, AdminSettings
 from hammond_mcp.admin.html import CSS, cards, e, page, table
 from hammond_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
 from hammond_mcp.admin.session import Signer
+from hammond_mcp.admin.view import View, prefix
 from hammond_mcp.audit import AuditError, AuditRecord, AuditSink, LogAuditSink
 from hammond_mcp.data import DataAccess
 from hammond_mcp.desktop import FILENAME as MCPB_FILENAME
@@ -63,6 +70,15 @@ HEADERS = {
 TOKEN_ROLES = ("HAmmond.Reader", "HAmmond.Admin")
 TOKEN_DAYS = (30, 90, 365, 0)
 DISMISS_DAYS = (0, 30, 90, 365)
+# X-Ingress-Path as Home Assistant sets it: /api/hassio_ingress/<token>
+INGRESS_PATH = re.compile(r"/api/hassio_ingress/[A-Za-z0-9_-]{1,128}")
+ADMIN_GROUP = "system-admin"
+MCP_PORT = 8000  # the add-on's MCP port (config.yaml), when no mcp_url is set
+
+
+def _url_host(hostname: str) -> str:
+    return f"[{hostname}]" if ":" in hostname else hostname
+
 
 type Handler = Callable[[Request, dict[str, Any]], Awaitable[Response]]
 
@@ -111,8 +127,15 @@ class AdminApp:
         if analysis is None and dsn:
             analysis = PostgresSettingsStore(dsn)
         self.analysis = analysis
+        self.ingress = settings.auth_mode == "ingress"
         self.headers = dict(HEADERS)
-        if ha_login is not None:
+        if self.ingress:
+            # Home Assistant shows the GUI in an iframe of its own origin.
+            self.headers["Content-Security-Policy"] = (
+                "default-src 'self'; frame-ancestors 'self'; form-action 'self'"
+            )
+            self.headers["X-Frame-Options"] = "SAMEORIGIN"
+        elif ha_login is not None:
             origin = urlparse(ha_login.ha_auth_url)
             self.headers["Content-Security-Policy"] = (
                 "default-src 'self'; frame-ancestors 'none'; form-action 'self' "
@@ -124,17 +147,46 @@ class AdminApp:
     def user(self, request: Request) -> dict[str, Any] | None:
         if self.settings.auth_mode == "none":
             return {"sub": "dev", "name": "Developer", "roles": [self.settings.admin_role]}
+        if self.ingress:
+            return self._ingress_user(request)
         data = self.sessions.loads(request.cookies.get(SESSION_COOKIE))
         if data is None or self.settings.admin_role not in data.get("roles", []):
             return None
         return data
+
+    def _ingress_user(self, request: Request) -> dict[str, Any] | None:
+        """The HA user that the Supervisor's Ingress proxy names (ADR 070).
+
+        Only requests from the proxy reach this (see :class:`RequestView`), and the
+        Supervisor drops these headers from the browser's request before it sets them.
+        The add-on panel is for HA administrators only (``panel_admin``); when the
+        Supervisor also sends the user's groups, the admin group is checked here too.
+        """
+        headers = request.headers
+        user_id = headers.get("x-remote-user-id", "").strip()
+        if not user_id:
+            return None
+        groups = headers.get("x-remote-user-groups")
+        if groups is not None and ADMIN_GROUP not in {g.strip() for g in groups.split(",")}:
+            return None
+        username = headers.get("x-remote-user-name", "").strip() or user_id
+        allowed = {a.casefold() for a in self.settings.ha_allowed_users}
+        if allowed and user_id.casefold() not in allowed and username.casefold() not in allowed:
+            return None
+        return {
+            "sub": user_id,
+            "name": headers.get("x-remote-user-display-name", "").strip() or username,
+            "username": username,
+            "roles": [self.settings.admin_role],
+            "idp": "ha-ingress",
+        }
 
     def _cookie(self, resp: Response, name: str, value: str, max_age: int) -> None:
         resp.set_cookie(
             name,
             value,
             max_age=max_age,
-            path=PREFIX,
+            path=prefix(),
             secure=self.secure,
             httponly=True,
             samesite="lax",
@@ -171,8 +223,10 @@ class AdminApp:
 
         async def endpoint(request: Request) -> Response:
             user = self.user(request)
+            if user is None and self.ingress:
+                return self._ingress_refused()
             if user is None:
-                return RedirectResponse(f"{PREFIX}/login", status_code=303)
+                return RedirectResponse(f"{prefix()}/login", status_code=303)
             if request.method == "POST" and not self._same_origin(request):
                 return Response("Cross-site request refused", status_code=403)
             if audit:
@@ -190,19 +244,34 @@ class AdminApp:
 
     def _same_origin(self, request: Request) -> bool:
         origin = request.headers.get("origin")
+        if not origin:
+            return True
+        if self.ingress:
+            # Home Assistant's own host, as its Ingress proxy passes it on
+            host = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+            return bool(host) and urlparse(origin).netloc == host
         expected = urlparse(str(self.settings.base_url or request.base_url))
-        return not origin or urlparse(origin).netloc == expected.netloc
+        return urlparse(origin).netloc == expected.netloc
+
+    def _ingress_refused(self) -> Response:
+        body = (
+            "<p class=bad>Home Assistant did not name an administrator for this request. "
+            "Open HAmmond from the Home Assistant sidebar as an administrator.</p>"
+        )
+        return HTMLResponse(page("Access refused", body, None), 403, headers=self.headers)
 
     # ---- auth routes ---------------------------------------------------------------
 
     async def login(self, request: Request) -> Response:
+        if self.ingress:
+            return RedirectResponse(f"{prefix()}/", status_code=303)
         if self.ha_login is not None:
             tx = LoginTransaction.new()
             resp = RedirectResponse(self.ha_login.authorize_url(tx.state), status_code=303)
             self._cookie(resp, TX_COOKIE, self.transactions.dumps({"state": tx.state}, 600), 600)
             return resp
         if self.oidc is None:
-            return RedirectResponse(f"{PREFIX}/", status_code=303)
+            return RedirectResponse(f"{prefix()}/", status_code=303)
         tx = LoginTransaction.new()
         resp = RedirectResponse(self.oidc.authorize_url(tx), status_code=303)
         value = self.transactions.dumps(
@@ -212,8 +281,8 @@ class AdminApp:
         return resp
 
     async def callback(self, request: Request) -> Response:
-        if self.oidc is None and self.ha_login is None:
-            return RedirectResponse(f"{PREFIX}/", status_code=303)
+        if self.ingress or (self.oidc is None and self.ha_login is None):
+            return RedirectResponse(f"{prefix()}/", status_code=303)
         tx_data = self.transactions.loads(request.cookies.get(TX_COOKIE))
         state, code = request.query_params.get("state"), request.query_params.get("code")
         if tx_data is None or not state or state != tx_data.get("state") or not code:
@@ -271,27 +340,29 @@ class AdminApp:
     async def _start_session(self, user: dict[str, Any]) -> Response:
         await self._audit("login", user)
         hours = self.settings.admin_session_hours
-        resp = RedirectResponse(f"{PREFIX}/", status_code=303)
+        resp = RedirectResponse(f"{prefix()}/", status_code=303)
         self._cookie(resp, SESSION_COOKIE, self.sessions.dumps(user, hours * 3600), hours * 3600)
-        resp.delete_cookie(TX_COOKIE, path=PREFIX)
+        resp.delete_cookie(TX_COOKIE, path=prefix())
         return resp
 
     def _login_failed(self, message: str, status_code: int = 400) -> Response:
-        body = f"<p class=bad>{e(message)}</p><p><a href='{PREFIX}/login'>Sign in again</a></p>"
+        body = f"<p class=bad>{e(message)}</p><p><a href='{prefix()}/login'>Sign in again</a></p>"
         return HTMLResponse(page("Sign-in failed", body, None), status_code, headers=self.headers)
 
     async def logout(self, request: Request) -> Response:
         if not self._same_origin(request):
             return Response("Cross-site request refused", status_code=403)
-        resp = RedirectResponse(f"{PREFIX}/login", status_code=303)
-        resp.delete_cookie(SESSION_COOKIE, path=PREFIX)
+        if self.ingress:
+            return RedirectResponse(f"{prefix()}/", status_code=303)
+        resp = RedirectResponse(f"{prefix()}/login", status_code=303)
+        resp.delete_cookie(SESSION_COOKIE, path=prefix())
         return resp
 
     async def check(self, request: Request) -> Response:
         """Caddy forward_auth for the Dagster UI: 200 with the user, else to sign-in."""
         user = self.user(request)
         if user is None:
-            return RedirectResponse(f"{PREFIX}/login", status_code=302)
+            return RedirectResponse(f"{prefix()}/login", status_code=302)
         return Response(status_code=200, headers={"X-Hammond-User": str(user.get("username"))})
 
     # ---- pages ---------------------------------------------------------------------
@@ -499,7 +570,7 @@ class AdminApp:
         if stored is not None:
             buttons += " <button name=action value=reset>Reset</button>"
         form = (
-            f"<form class=filters method=post action='{PREFIX}/analysis'>"
+            f"<form class=filters method=post action='{prefix()}/analysis'>"
             f"<input type=hidden name=key value='{e(spec.key)}'>{field}"
             "<input name=reason size=18 maxlength=200 placeholder='reason (optional)'>"
             f"{buttons}</form>"
@@ -606,7 +677,7 @@ class AdminApp:
                 note="<p class=bad>Not saved: the settings store or audit is unavailable.</p>",
                 status_code=503,
             )
-        return RedirectResponse(f"{PREFIX}/analysis", status_code=303)
+        return RedirectResponse(f"{prefix()}/analysis", status_code=303)
 
     # ---- dismissed findings (ADR 060 point 6) ---------------------------------------
 
@@ -654,7 +725,7 @@ class AdminApp:
                 return "dismissed"
             related = r.get("related_entity_id") or ""
             return (
-                f"<form class=filters method=post action='{PREFIX}/findings/dismiss'>"
+                f"<form class=filters method=post action='{prefix()}/findings/dismiss'>"
                 f"<input type=hidden name=type value='{e(r['finding_type'])}'>"
                 f"<input type=hidden name=entity value='{e(r['entity_id'])}'>"
                 f"<input type=hidden name=related value='{e(related)}'>"
@@ -710,7 +781,7 @@ class AdminApp:
                     d.dismissed_by,
                     d.dismissed_at,
                     (
-                        f"<form method=post action='{PREFIX}/findings/undo'>"
+                        f"<form method=post action='{prefix()}/findings/undo'>"
                         f"<input type=hidden name=id value='{d.id}'><button>Undo</button></form>"
                     )
                     if d.active()
@@ -810,7 +881,7 @@ class AdminApp:
                 note="<p class=bad>Not saved: the settings store or audit is unavailable.</p>",
                 status_code=503,
             )
-        return RedirectResponse(f"{PREFIX}/findings", status_code=303)
+        return RedirectResponse(f"{prefix()}/findings", status_code=303)
 
     async def finding_undo(self, request: Request, user: dict[str, Any]) -> Response:
         try:
@@ -837,7 +908,7 @@ class AdminApp:
                 note="<p class=bad>The settings store or audit is unavailable.</p>",
                 status_code=503,
             )
-        return RedirectResponse(f"{PREFIX}/findings", status_code=303)
+        return RedirectResponse(f"{prefix()}/findings", status_code=303)
 
     # ---- personal tokens and client setup (local access, ADR 056/059) ---------------
 
@@ -869,7 +940,7 @@ class AdminApp:
             for d in TOKEN_DAYS
         )
         form = (
-            f"<form class=filters method=post action='{PREFIX}/tokens/issue'>"
+            f"<form class=filters method=post action='{prefix()}/tokens/issue'>"
             f"<input name=owner required maxlength=100 value='{e(user.get('username') or '')}'"
             " placeholder='for whom'>"
             "<input name=description required maxlength=200 placeholder='device or app, "
@@ -881,7 +952,7 @@ class AdminApp:
         rows = []
         for t in items:
             action = (
-                f"<form method=post action='{PREFIX}/tokens/revoke'>"
+                f"<form method=post action='{prefix()}/tokens/revoke'>"
                 f"<input type=hidden name=id value='{e(t.id)}'><button>Revoke</button></form>"
                 if t.active()
                 else ("revoked" if t.revoked_at else "expired")
@@ -907,7 +978,7 @@ class AdminApp:
                 rows,
                 trusted_html={7},
             )
-            + f"<p><a href='{PREFIX}/connect'>How to connect Claude and other MCP clients</a></p>"
+            + f"<p><a href='{prefix()}/connect'>How to connect Claude and other MCP clients</a></p>"
         )
         return HTMLResponse(page("Tokens", body, user.get("username")))
 
@@ -965,7 +1036,7 @@ class AdminApp:
             "<strong>Copy it now, it is not shown again.</strong></p>"
             f"<p><input class=token readonly size=80 value='{e(token)}'></p>"
             + self._connect_help(token)
-            + f"<p><a href='{PREFIX}/tokens'>Back to tokens</a></p>"
+            + f"<p><a href='{prefix()}/tokens'>Back to tokens</a></p>"
         )
         return HTMLResponse(page("New token", body, user.get("username")))
 
@@ -992,13 +1063,20 @@ class AdminApp:
                 ),
                 503,
             )
-        return RedirectResponse(f"{PREFIX}/tokens", status_code=303)
+        return RedirectResponse(f"{prefix()}/tokens", status_code=303)
+
+    def _endpoint(self) -> str:
+        """MCP endpoint for clients: the setting, else (Ingress) the HA host on :8000."""
+        if self.settings.mcp_url is None and (guess := view.current.get().endpoint):
+            return guess
+        return self.settings.endpoint
 
     def _connect_help(self, token: str | None = None) -> str:
-        url = self.settings.endpoint
+        url = self._endpoint()
         tok = token or "hmd_..."
         origin = urlparse(url)
         ca = f"{origin.scheme}://{origin.netloc}/hammond-ca.crt"
+        tls = origin.scheme == "https"
         server = json.dumps(
             {
                 "mcpServers": {
@@ -1013,18 +1091,26 @@ class AdminApp:
         )
         return (
             "<h2>Claude Desktop</h2><ol>"
-            f"<li>Download <a href='{PREFIX}/connect/{MCPB_FILENAME}'>{MCPB_FILENAME}</a> "
+            f"<li>Download <a href='{prefix()}/connect/{MCPB_FILENAME}'>{MCPB_FILENAME}</a> "
             f"(address <code>{e(url)}</code> is filled in) and open it: Claude Desktop "
             "shows the extension and asks for the token.</li>"
-            "<li>Paste the token. If your browser warned about the certificate of this "
-            f"server, also download <a href='{e(ca)}'>hammond-ca.crt</a> and select it as "
-            "<em>Certificate of the server</em>.</li></ol>"
-            "<h2>Claude Code</h2>"
+            + (
+                "<li>Paste the token. If your browser warned about the certificate of this "
+                f"server, also download <a href='{e(ca)}'>hammond-ca.crt</a> and select it "
+                "as <em>Certificate of the server</em>.</li></ol>"
+                if tls
+                else "<li>Paste the token.</li></ol>"
+            )
+            + "<h2>Claude Code</h2>"
             f"<pre>claude mcp add --transport http hammond {e(url)} \\\n"
             f'  --header "Authorization: Bearer {e(tok)}"</pre>'
-            "<p class=muted>With the server's own certificate, start Claude Code with "
-            "<code>NODE_EXTRA_CA_CERTS=/path/to/hammond-ca.crt</code>.</p>"
-            "<h2>Other MCP clients</h2>"
+            + (
+                "<p class=muted>With the server's own certificate, start Claude Code with "
+                "<code>NODE_EXTRA_CA_CERTS=/path/to/hammond-ca.crt</code>.</p>"
+                if tls
+                else ""
+            )
+            + "<h2>Other MCP clients</h2>"
             "<p>Streamable HTTP endpoint with a bearer token, e.g.:</p>"
             f"<pre>{e(server)}</pre>"
             "<p class=muted>claude.ai on the web and on phones connects through Anthropic's "
@@ -1036,13 +1122,13 @@ class AdminApp:
         if refused is not None:
             return refused
         body = (
-            f"<p>Issue a personal token on <a href='{PREFIX}/tokens'>Tokens</a> first, one "
+            f"<p>Issue a personal token on <a href='{prefix()}/tokens'>Tokens</a> first, one "
             "per person and device.</p>" + self._connect_help()
         )
         return HTMLResponse(page("Connect clients", body, user.get("username")))
 
     async def mcpb(self, request: Request, user: dict[str, Any]) -> Response:
-        data = build_mcpb(self.settings.endpoint)
+        data = build_mcpb(self._endpoint())
         return Response(
             data,
             media_type="application/zip",
@@ -1051,7 +1137,7 @@ class AdminApp:
 
     # ---- app -----------------------------------------------------------------------
 
-    def build(self) -> Starlette:
+    def build(self) -> ASGIApp:
         async def css(_: Request) -> Response:
             return Response(CSS, media_type="text/css", headers={"Cache-Control": "max-age=3600"})
 
@@ -1059,7 +1145,7 @@ class AdminApp:
             return JSONResponse({"status": "ok"})
 
         async def root(_: Request) -> Response:
-            return RedirectResponse(f"{PREFIX}/", status_code=308)
+            return RedirectResponse(f"{prefix()}/", status_code=308)
 
         p = self.protected
         routes = [
@@ -1106,4 +1192,50 @@ class AdminApp:
             Route(f"{PREFIX}/auth/check", self.check),
             Route(f"{PREFIX}/logout", self.logout, methods=["POST"]),
         ]
-        return Starlette(routes=routes)
+        return RequestView(Starlette(routes=routes), self.settings)
+
+
+class RequestView:
+    """Sets the per-request :class:`View`; behind Ingress also guards the entry.
+
+    With ``auth_mode=ingress`` only the Supervisor's proxy may call the GUI (its
+    X-Remote-User-* headers sign the user in), and the app sees its paths without the
+    ``/admin`` prefix, which is put back here so that the routes stay the same.
+    """
+
+    def __init__(self, app: ASGIApp, settings: AdminSettings) -> None:
+        self.app = app
+        self.ingress = settings.auth_mode == "ingress"
+        self.proxy = settings.ingress_proxy
+        self.base = View(dagster=settings.dagster_ui and not self.ingress)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not self.ingress or scope["path"] == "/healthz":
+            token = view.current.set(self.base)
+            try:
+                await self.app(scope, receive, send)
+            finally:
+                view.current.reset(token)
+            return
+        client = scope.get("client")
+        if not client or client[0] != self.proxy:
+            await Response("Only Home Assistant Ingress", status_code=403)(scope, receive, send)
+            return
+        ingress_path = Headers(scope=scope).get("x-ingress-path", "")
+        if not INGRESS_PATH.fullmatch(ingress_path):
+            await Response("Missing X-Ingress-Path", status_code=400)(scope, receive, send)
+            return
+        path = scope["path"] if scope["path"].startswith("/") else "/" + scope["path"]
+        scope = dict(scope)
+        scope["path"] = PREFIX + path
+        scope["raw_path"] = PREFIX.encode() + scope.get("raw_path", path.encode())
+        host = Headers(scope=scope).get("x-forwarded-host", "").split(",")[0].strip()
+        hostname = urlparse(f"//{host}").hostname if host else None
+        endpoint = f"http://{_url_host(hostname)}:{MCP_PORT}/mcp" if hostname else None
+        token = view.current.set(
+            View(prefix=ingress_path, dagster=False, sign_out=False, endpoint=endpoint)
+        )
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            view.current.reset(token)
