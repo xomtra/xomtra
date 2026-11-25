@@ -532,6 +532,7 @@ class DataAccess:
             "f.related_entity_id, f.related_metric, f.related_state, f.lag_hours, f.score, "
             "f.q_value, f.p_value, f.n_eff, f.observed, f.expected, f.flags, f.explained_by, "
             "f.entity_group, f.usefulness, f.action_category, f.trivial_rule, "
+            "coalesce(f.hidden, len(coalesce(f.flags, [])) > 0) AS hidden, "
             "f.related_group, f.period_start, f.period_end, f.first_detected_at, "
             "f.detected_at, f.finding_id"
         )
@@ -550,7 +551,7 @@ class DataAccess:
     def _compact(row: Row) -> Row:
         """Drop empty values: a finding of one type leaves the other types' columns
         empty, and the caller reads fewer tokens."""
-        return {k: v for k, v in row.items() if v not in (None, [])}
+        return {k: v for k, v in row.items() if v not in (None, []) and k != "hidden"}
 
     def get_findings(
         self,
@@ -584,7 +585,7 @@ class DataAccess:
         if new_since:
             where.append("f.first_detected_at >= ?")
             params.append(new_since)
-        flagged = "len(coalesce(f.flags, [])) > 0"
+        flagged = "coalesce(f.hidden, len(coalesce(f.flags, [])) > 0)"
         base = f"FROM catalog_finding AS f WHERE {' AND '.join(where)}"
         order = (
             "ORDER BY CASE finding_type WHEN 'anomaly' THEN 0 WHEN 'change_point' THEN 1 "
@@ -701,7 +702,8 @@ class DataAccess:
 
 
 def _is_trivial(row: Row) -> bool:
-    return bool(row.get("flags"))
+    hidden = row.get("hidden")
+    return bool(row.get("flags")) if hidden is None else bool(hidden)
 
 
 def _summarise(rows: list[Row], week: date, previous: date | None, tz: ZoneInfo, top: int) -> Row:
@@ -716,9 +718,16 @@ def _summarise(rows: list[Row], week: date, previous: date | None, tz: ZoneInfo,
         return ps is not None and start <= datetime.fromisoformat(ps) < end
 
     def strongest(items: list[Row]) -> list[Row]:
-        ranked = sorted(items, key=lambda r: -abs(float(r.get("score") or 0)))
+        ranked = sorted(
+            items,
+            key=lambda r: (-float(r.get("usefulness") or 0), -abs(float(r.get("score") or 0))),
+        )
         return [
-            {k: v for k, v in r.items() if v not in (None, []) and k != "week_start"}
+            {
+                k: v
+                for k, v in r.items()
+                if v not in (None, []) and k not in {"week_start", "hidden"}
+            }
             for r in ranked[:top]
         ]
 

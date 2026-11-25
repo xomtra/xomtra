@@ -39,6 +39,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   `hacore/rules/actionability.toml` (17 entity families). `get_findings` returns
   `usefulness`, `action_category` and `trivial_rule`, and `ranking_version` in
   `methods`; the admin page *Findings* shows them.
+- Analysis setting *Indirect and common-factor relations* (ADR 062 point 10,
+  `HAMMOND_CORRELATION_STRUCTURE_DISPLAY`): `hide` (default), `lower` or `show`. New
+  column `hidden` in `catalog.finding` decides what `get_findings`, the weekly summary
+  and the admin hide by default (older rows: any flag). The weekly summary orders by
+  usefulness.
 - Validation on public data (ADR 065, Gate 1c point 6): `hacore.public` fetches the IDEAL
   hourly readings with HTTP range requests (member list pinned, CRC-32 checked) and
   measures the cross-household null of correlations and anomalies

@@ -479,3 +479,33 @@ def test_same_area_is_flagged(plain: duckdb.DuckDBPyConnection) -> None:
     corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
     ab = next(f for f in findings(plain) if set(pair(f)) == {"sensor.a", "sensor.b"})
     assert "same_area" in ab["flags"]  # type: ignore[operator]
+
+
+@pytest.mark.parametrize(
+    ("display", "order", "hidden"),
+    [
+        ("hide", ["sensor.c", "sensor.a"], {"sensor.a": True, "sensor.c": False}),
+        ("lower", ["sensor.c", "sensor.a"], {"sensor.a": False, "sensor.c": False}),
+        ("show", ["sensor.a", "sensor.c"], {"sensor.a": False, "sensor.c": False}),
+    ],
+)
+def test_structure_display(display: str, order: list[str], hidden: dict[str, bool]) -> None:
+    """indirect/common_factor relations are hidden, shown lower or among the rest
+    (ADR 068); they keep their flags in every mode."""
+    series = [corr.Series(f"sensor.{x}", "mean") for x in "abcd"]
+    pairs = corr.Pairs(
+        leader=np.array([0, 2]),
+        follower=np.array([1, 3]),
+        lag=np.array([0, 0]),
+        r=np.array([0.9, 0.5]),  # the flagged pair is the stronger one
+        n_eff=np.array([500.0, 500.0]),
+        q=np.array([1e-6, 1e-4]),
+        flags=[["common_factor"], []],
+        explained_by=[[], []],
+    )
+    out = corr.select_findings(
+        pairs, series, params(structure_display=display), {}, scorer=corr.usefulness.EMPTY
+    )
+    assert [f["entity_id"] for f in out] == order
+    assert {f["entity_id"]: f["hidden"] for f in out} == hidden
+    assert next(f for f in out if f["entity_id"] == "sensor.a")["flags"] == ["common_factor"]

@@ -154,7 +154,7 @@ def apply_dismissals(
     ]
     if ids:
         con.executemany(
-            f"UPDATE {t} SET flags = list_append(coalesce(flags, []), $d) "
+            f"UPDATE {t} SET flags = list_append(coalesce(flags, []), $d), hidden = TRUE "
             "WHERE finding_id = $id AND finding_type = $type",
             [{"d": DISMISSED, "id": fid, "type": ftype} for fid, ftype in ids],
         )

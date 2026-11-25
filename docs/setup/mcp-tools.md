@@ -226,7 +226,11 @@ A real and direct finding can still be trivial or of no use. Every finding gets
 | `rules_version`, `ranking_version` | version of the rulebook and of the ranking (`r0-<rules_version>`) |
 
 A trivial relation gets the flag `trivial`: it is kept, ranked last and hidden by
-`get_findings` by default. Within each type and window the findings are ranked
+`get_findings` by default. Relations flagged `indirect` or `common_factor` are hidden
+too, unless the admin setting *Indirect and common-factor relations*
+(`HAMMOND_CORRELATION_STRUCTURE_DISPLAY`) says `lower` (shown after the unflagged
+findings) or `show` (ranked among them). They keep their flags in every mode, so
+evaluations still see them. Within each type and window the findings are ranked
 unflagged first, then by `usefulness`; ties go to the higher priority of the rule, then
 fault > savings > automation > behaviour. R0 stays the ranking until a model trained
 on rated findings passes its gate (methodology 8.7); then `ranking_version` changes.

@@ -110,6 +110,7 @@ FINDING_COLUMNS = """
     trivial_rule VARCHAR,
     rules_version VARCHAR,
     ranking_version VARCHAR,
+    hidden BOOLEAN,
     first_detected_at TIMESTAMPTZ,
     detected_at TIMESTAMPTZ NOT NULL
 """
@@ -130,6 +131,8 @@ ADDED_COLUMNS = (
     ("trivial_rule", "VARCHAR"),
     ("rules_version", "VARCHAR"),
     ("ranking_version", "VARCHAR"),
+    # Hidden by default in get_findings (ADR 068 point 7); NULL in older rows = flagged.
+    ("hidden", "BOOLEAN"),
 )
 # Columns of one finding as produced by an analysis (the rest is set when writing).
 _ROW_DEFAULTS: dict[str, Any] = {
@@ -157,6 +160,7 @@ _ROW_DEFAULTS: dict[str, Any] = {
     "trivial_rule": None,
     "rules_version": None,
     "ranking_version": None,
+    "hidden": None,
 }
 _ROW_KEYS = frozenset(
     {*_ROW_DEFAULTS, "finding_id", "entity_id", "rank", "period_start", "period_end"}
@@ -210,6 +214,10 @@ class CorrelationParams:
     # Significance method: "v2" calibrated (ADR 062), "v1" n_eff + Bonferroni (ADR 042).
     method: str = "v2"
     seed: int = 0  # of the null sample (v2), so a run is reproducible
+    # Relations flagged indirect or common_factor (ADR 062 point 10, ADR 068): "hide"
+    # them like the other flags, show them "lower" than the unflagged ones, or "show"
+    # them among the unflagged ones. They keep their flags either way.
+    structure_display: str = "hide"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1108,6 +1116,8 @@ def select_findings(
     idx = idx[np.argsort(-np.abs(pairs.r[idx]), kind="stable")]
     candidates: list[dict[str, Any]] = []
     seen: set[frozenset[Any]] = set()
+    shown = STRUCTURE_FLAGS if params.structure_display in {"lower", "show"} else frozenset()
+    ranked_with = STRUCTURE_FLAGS if params.structure_display == "show" else frozenset()
     for k in idx:
         ia, ib = int(pairs.leader[k]), int(pairs.follower[k])
         a, b = series[ia], series[ib]
@@ -1137,7 +1147,7 @@ def select_findings(
             else []
         )
         flags = context.explain(a.entity_id, b.entity_id, flags, explained_by)
-        f = {
+        f: dict[str, Any] = {
             "finding_id": finding_id(params.window_days, a, b),
             "entity_id": a.entity_id,
             "metric": a.metric,
@@ -1156,8 +1166,10 @@ def select_findings(
             "related_group": [] if same_group else _others(members[gb], b.entity_id),
         }
         overlap = _missing_overlap(missing, ia, ib) if missing is not None else None
-        candidates.append(scorer.score(f, FINDING_TYPE, params.max_q, overlap))
-    candidates.sort(key=lambda f: (_tier(f), *usefulness.sort_key(f)))
+        scorer.score(f, FINDING_TYPE, params.max_q, overlap)
+        f["hidden"] = bool(set(f["flags"]) - shown)  # flags after the trivial check
+        candidates.append(f)
+    candidates.sort(key=lambda f: (_tier(f, ranked_with), *usefulness.sort_key(f)))
 
     out = candidates[: params.top]
     for rank, f in enumerate(out, start=1):
@@ -1179,11 +1191,16 @@ def _missing_overlap(missing: npt.NDArray[np.bool_], i: int, j: int) -> float | 
     return float((a & b).sum() / (a | b).sum())
 
 
-def _tier(f: dict[str, Any]) -> int:
+# Structure of the significant relations whose display is a setting (ADR 068 point 7).
+STRUCTURE_FLAGS = frozenset({"indirect", "common_factor"})
+STRUCTURE_DISPLAY = ("hide", "lower", "show")
+
+
+def _tier(f: dict[str, Any], ranked_with: frozenset[str] = frozenset()) -> int:
     """Unflagged pairs first, then explained or unstable ones (indirect, same area,
     house context, ...), trivial pairs last. With strong duplicates ranked by |r| among
     the flagged ones, the stored top N held no explained pair at all (homelab, 0.4.0)."""
-    if not f["flags"]:
+    if not set(f["flags"]) - ranked_with:
         return 0
     return 2 if TRIVIAL_FLAGS & set(f["flags"]) else 1
 
@@ -1265,6 +1282,7 @@ def write_findings(
                 "$nontriviality::DOUBLE AS nontriviality, $usefulness::DOUBLE AS usefulness, "
                 "$action_category AS action_category, $trivial_rule AS trivial_rule, "
                 "$rules_version AS rules_version, $ranking_version AS ranking_version, "
+                "coalesce($hidden::BOOLEAN, len($flags::VARCHAR[]) > 0) AS hidden, "
                 "coalesce($period_start::TIMESTAMPTZ, $ps::TIMESTAMPTZ) AS period_start, "
                 "coalesce($period_end::TIMESTAMPTZ, $pe::TIMESTAMPTZ) AS period_end",
                 [

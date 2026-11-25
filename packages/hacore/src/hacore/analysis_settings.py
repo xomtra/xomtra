@@ -139,6 +139,16 @@ SPECS: tuple[Spec, ...] = (
         "v2 = calibrated significance and structural flags (ADR 062); v1 = ADR 042.",
         choices=("v2", "v1"),
     ),
+    Spec(
+        "correlation_structure_display",
+        "choice",
+        "hide",
+        CORR,
+        "Indirect and common-factor relations",
+        "hide = like the other flags; lower = shown after the unflagged findings; "
+        "show = among them (ADR 068).",
+        choices=("hide", "lower", "show"),
+    ),
     Spec("anomalies_enabled", "bool", True, ANOM, "Anomalies and change points"),
     Spec(
         "anomaly_max_q",

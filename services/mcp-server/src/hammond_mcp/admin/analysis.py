@@ -219,6 +219,8 @@ class PostgresSettingsStore:
 # Keys whose effect on the stored findings is a filter: tightening is exact, loosening
 # only a lower bound (weaker candidates are not stored).
 PREVIEW_KEYS = ("correlation_max_q", "correlation_min_r", "anomaly_max_q")
+# Hidden by default (ADR 068 point 7); rows of older releases have no ``hidden``.
+HIDDEN = "coalesce(hidden, len(coalesce(flags, [])) > 0)"
 
 
 def preview(data: DataAccess, key: str, value: Value) -> dict[str, Any] | None:
@@ -233,8 +235,8 @@ def preview(data: DataAccess, key: str, value: Value) -> dict[str, Any] | None:
         where, keep = "finding_type = 'correlation'", "abs(score) >= $v"
     sql = (
         "SELECT count(*) AS now, count(*) FILTER (WHERE "  # noqa: S608 - fixed fragments
-        f"{keep}) AS kept, count(*) FILTER (WHERE {keep} AND len(flags) = 0) AS kept_unflagged, "
-        f"count(*) FILTER (WHERE len(flags) = 0) AS unflagged FROM lake.catalog.finding "
+        f"{keep}) AS kept, count(*) FILTER (WHERE {keep} AND NOT {HIDDEN}) AS kept_unflagged, "
+        f"count(*) FILTER (WHERE NOT {HIDDEN}) AS unflagged FROM lake.catalog.finding "
         f"WHERE {where}"
     )
     with data.trusted_cursor() as cur:
@@ -264,7 +266,7 @@ def current_findings(
         where.append("finding_type = $type")
         params["type"] = finding_type
     if not include_flagged:
-        where.append("len(coalesce(flags, [])) = 0")
+        where.append(f"NOT {HIDDEN}")
     sql = (
         "SELECT finding_type, entity_id, related_entity_id, window_days, "  # noqa: S608
         "round(score, 3) AS score, q_value, usefulness, action_category, flags, period_start "

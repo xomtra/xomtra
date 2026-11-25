@@ -53,6 +53,7 @@ class IngestSettings(BaseSettings):
     correlation_top: int = Field(default=100, ge=1, le=1000)
     # v2 = calibrated significance and structural flags (ADR 062); v1 = ADR 042.
     correlation_method: Literal["v1", "v2"] = "v2"
+    correlation_structure_display: Literal["hide", "lower", "show"] = "hide"
     # Hourly outside temperature history from the Open-Meteo archive (ADR 043) for the
     # hours the outside temperature entity has no data. Sends the HA home coordinates,
     # rounded to ~1 km, to Open-Meteo; off by default.
