@@ -50,7 +50,7 @@ Add the VM to your Proxmox Backup Server job.
 ```bash
 ssh <admin>@<vm-ip>
 sudo apt-get update && sudo apt-get install -y git
-git clone https://github.com/xomtra/hammond.git ~/hammond
+git clone https://github.com/xomtra/xomtra.git ~/hammond
 sudo ADMIN_CIDR=<admin-cidr> ~/hammond/deploy/vm/bootstrap-debian13.sh
 ```
 

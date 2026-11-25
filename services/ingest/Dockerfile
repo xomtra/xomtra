@@ -27,7 +27,7 @@ RUN /app/.venv/bin/python -m hacore.lake install-extensions
 COPY services/ingest/dagster /app/dagster
 
 FROM ${PYTHON_IMAGE} AS runtime
-LABEL org.opencontainers.image.source="https://github.com/xomtra/hammond" \
+LABEL org.opencontainers.image.source="https://github.com/xomtra/xomtra" \
       org.opencontainers.image.description="HAmmond ingest (stream, Dagster, SQLMesh)" \
       org.opencontainers.image.licenses="Apache-2.0"
 RUN apt-get update \
