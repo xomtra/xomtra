@@ -1,7 +1,7 @@
 # Entra ID app registration
 
-HAmmond uses FastMCP's OAuth proxy (`AzureProvider`): Claude talks OAuth 2.1 + dynamic
-client registration to HAmmond, HAmmond signs the user in at Entra ID with one fixed app
+Xomtra uses FastMCP's OAuth proxy (`AzureProvider`): Claude talks OAuth 2.1 + dynamic
+client registration to Xomtra, Xomtra signs the user in at Entra ID with one fixed app
 registration. (Connecting claude.ai directly to Entra does not work today because Entra
 does not support dynamic client registration, tracked as claude.ai MCP issue #506.)
 
@@ -13,12 +13,12 @@ Entra admin center → **Identity → Applications → App registrations → New
 
 | Field | Value |
 | --- | --- |
-| Name | `HAmmond MCP` |
+| Name | `Xomtra MCP` |
 | Supported account types | **Accounts in this organizational directory only** (single tenant) |
 | Redirect URI | platform **Web**, `https://<public-host>/auth/callback` |
 
 Note **Application (client) ID** and **Directory (tenant) ID** from the Overview page
-→ `.env`: `HAMMOND_ENTRA_CLIENT_ID`, `HAMMOND_ENTRA_TENANT_ID`.
+→ `.env`: `XOMTRA_ENTRA_CLIENT_ID`, `XOMTRA_ENTRA_TENANT_ID`.
 
 For local tests you can add a second Web redirect URI `http://localhost:8000/auth/callback`.
 
@@ -35,9 +35,9 @@ FastMCP validates the v2 issuer `https://login.microsoftonline.com/<tenant-id>/v
 
 | Field | Value |
 | --- | --- |
-| Scope name | `mcp.access` (must match `HAMMOND_ENTRA_REQUIRED_SCOPES`) |
+| Scope name | `mcp.access` (must match `XOMTRA_ENTRA_REQUIRED_SCOPES`) |
 | Who can consent | Admins only |
-| Admin consent display name | `Access HAmmond MCP` |
+| Admin consent display name | `Access Xomtra MCP` |
 | State | Enabled |
 
 ## 4. API permissions
@@ -49,7 +49,7 @@ Then **Grant admin consent for <tenant>**.
 ## 5. Client secret
 
 **Certificates & secrets → New client secret**, expiry max. 12 months (put a renewal
-reminder in your calendar). Copy the *Value* → `.env`: `HAMMOND_ENTRA_CLIENT_SECRET`.
+reminder in your calendar). Copy the *Value* → `.env`: `XOMTRA_ENTRA_CLIENT_SECRET`.
 `chmod 600 .env`. Never paste the secret into chats, issues or commits.
 
 ## 6. App roles and assignment
@@ -58,28 +58,28 @@ reminder in your calendar). Copy the *Value* → `.env`: `HAMMOND_ENTRA_CLIENT_S
 
 | Display name | Value | Purpose |
 | --- | --- | --- |
-| HAmmond Admin | `HAmmond.Admin` | administration, all data |
-| HAmmond Reader | `HAmmond.Reader` | read catalog and data views |
+| Xomtra Admin | `Xomtra.Admin` | administration, all data |
+| Xomtra Reader | `Xomtra.Reader` | read catalog and data views |
 
-**Enterprise applications → HAmmond MCP → Properties → Assignment required? = Yes**
+**Enterprise applications → Xomtra MCP → Properties → Assignment required? = Yes**
 (only assigned users can sign in), then **Users and groups → Add user/group** and assign
-yourself the `HAmmond.Admin` role. The `whoami` tool shows the roles from the token.
+yourself the `Xomtra.Admin` role. The `whoami` tool shows the roles from the token.
 What each role may do is described in [Catalog and MCP data tools](mcp-tools.md); a user
 without a role can only call `whoami`.
 
 ## 7. Recommended hardening
 
 - Conditional Access policy for the app: MFA, compliant/known devices or named locations.
-- Sign-in logs of the enterprise app are the second audit trail next to HAmmond's audit.
+- Sign-in logs of the enterprise app are the second audit trail next to Xomtra's audit.
 
 ## `.env` summary
 
 ```dotenv
-HAMMOND_AUTH_MODE=entra
-HAMMOND_BASE_URL=https://<public-host>
-HAMMOND_ENTRA_TENANT_ID=<tenant-id>
-HAMMOND_ENTRA_CLIENT_ID=<client-id>
-HAMMOND_ENTRA_CLIENT_SECRET=<secret value>
-HAMMOND_ENTRA_REQUIRED_SCOPES=mcp.access
-HAMMOND_JWT_SIGNING_KEY=<openssl rand -hex 32>
+XOMTRA_AUTH_MODE=entra
+XOMTRA_BASE_URL=https://<public-host>
+XOMTRA_ENTRA_TENANT_ID=<tenant-id>
+XOMTRA_ENTRA_CLIENT_ID=<client-id>
+XOMTRA_ENTRA_CLIENT_SECRET=<secret value>
+XOMTRA_ENTRA_REQUIRED_SCOPES=mcp.access
+XOMTRA_JWT_SIGNING_KEY=<openssl rand -hex 32>
 ```

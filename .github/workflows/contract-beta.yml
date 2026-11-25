@@ -37,8 +37,8 @@ jobs:
           docker inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' ha
       - name: Contract tests
         env:
-          HAMMOND_CONTRACT_HA_URL: http://127.0.0.1:8123
-          HAMMOND_CONTRACT_HA_CONFIG: ${{ runner.temp }}/ha-config
+          XOMTRA_CONTRACT_HA_URL: http://127.0.0.1:8123
+          XOMTRA_CONTRACT_HA_CONFIG: ${{ runner.temp }}/ha-config
         run: uv run pytest packages/hacore/tests/contract -m contract
       - name: Home Assistant log on failure
         if: failure()

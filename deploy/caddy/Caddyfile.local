@@ -1,10 +1,10 @@
-# HAmmond in the local access mode (ADR 056): the MCP endpoint and the admin GUI are
+# Xomtra in the local access mode (ADR 056): the MCP endpoint and the admin GUI are
 # reachable only in the LAN, nothing is exposed to the internet and no public DNS name,
 # ACME or port forward is needed. TLS uses Caddy's own local CA; clients trust it by
-# importing https://<host>/hammond-ca.crt (or pin it in the Claude Desktop extension).
+# importing https://<host>/xomtra-ca.crt (or pin it in the Claude Desktop extension).
 #
 # Required environment:
-#   HAMMOND_LOCAL_HOST  name or IP address clients use, e.g. hammond.lan or 192.168.1.20
+#   XOMTRA_LOCAL_HOST  name or IP address clients use, e.g. xomtra.lan or 192.168.1.20
 #   LAN_CIDR            space separated CIDRs allowed to use the MCP endpoint
 #   ADMIN_CIDR          space separated CIDRs allowed to open the admin GUI
 #
@@ -12,7 +12,7 @@
 #   - /mcp: from LAN_CIDR, with a personal token (checked by the MCP server).
 #   - /admin (admin GUI and Dagster UI): from ADMIN_CIDR; the admin app requires a
 #     sign-in with the admin role (Home Assistant or Entra, ADR 041/053).
-#   - /hammond-ca.crt: the root certificate of the local CA (public by nature), from
+#   - /xomtra-ca.crt: the root certificate of the local CA (public by nature), from
 #     LAN_CIDR, so that clients can trust the server.
 {
 	admin off
@@ -22,10 +22,10 @@
 	local_certs
 	skip_install_trust
 	# Clients that connect by IP address send no SNI.
-	default_sni {$HAMMOND_LOCAL_HOST}
+	default_sni {$XOMTRA_LOCAL_HOST}
 	pki {
 		ca local {
-			name "HAmmond local CA"
+			name "Xomtra local CA"
 		}
 	}
 }
@@ -36,7 +36,7 @@
 	respond "{args[1]}" {args[0]}
 }
 
-https://{$HAMMOND_LOCAL_HOST} {
+https://{$XOMTRA_LOCAL_HOST} {
 	tls internal
 
 	header {
@@ -59,7 +59,7 @@ https://{$HAMMOND_LOCAL_HOST} {
 			handle @dagster {
 				forward_auth admin:8100 {
 					uri /admin/auth/check
-					copy_headers X-Hammond-User
+					copy_headers X-Xomtra-User
 				}
 				reverse_proxy dagster-webserver:3000
 			}
@@ -74,11 +74,11 @@ https://{$HAMMOND_LOCAL_HOST} {
 
 	@lan remote_ip {$LAN_CIDR}
 
-	@ca path /hammond-ca.crt
+	@ca path /xomtra-ca.crt
 	handle @ca {
 		handle @lan {
 			header Content-Type "application/x-x509-ca-cert"
-			header Content-Disposition "attachment; filename=hammond-ca.crt"
+			header Content-Disposition "attachment; filename=xomtra-ca.crt"
 			rewrite * /root.crt
 			root * /data/caddy/pki/authorities/local
 			file_server

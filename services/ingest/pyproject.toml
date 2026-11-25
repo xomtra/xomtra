@@ -1,7 +1,7 @@
 [project]
-name = "hammond-ingest"
+name = "xomtra-ingest"
 version = "0.4.1"
-description = "HAmmond ingest: Home Assistant backfill, live state stream, SQLMesh transformations and Dagster jobs"
+description = "Xomtra ingest: Home Assistant backfill, live state stream, SQLMesh transformations and Dagster jobs"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "Apache-2.0"
@@ -17,14 +17,14 @@ dependencies = [
 ]
 
 [project.scripts]
-hammond-ingest = "hammond_ingest.__main__:main"
+xomtra-ingest = "xomtra_ingest.__main__:main"
 
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/hammond_ingest"]
+packages = ["src/xomtra_ingest"]
 
 [tool.uv.sources]
 hacore = { workspace = true }

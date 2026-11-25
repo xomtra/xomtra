@@ -1,6 +1,6 @@
 # Releases
 
-HAmmond is released as one product: every package, service and container image of a
+Xomtra is released as one product: every package, service and container image of a
 release carries the same version (ADR 045).
 
 ## Versions and channels
@@ -11,9 +11,9 @@ release carries the same version (ADR 045).
 - Before 1.0.0 a **minor** release may break things (configuration, schema, API); the
   CHANGELOG lists each such change with an upgrade note. A **patch** release is always a
   drop-in update.
-- Image tags in `ghcr.io/xomtra/hammond-{mcp,ingest,caddy}` and of the Home
-  Assistant add-on `hammond-addon-{amd64,aarch64}` (the Supervisor pulls the tag of the
-  `version` in `addon/hammond/config.yaml`, which `prepare` sets):
+- Image tags in `ghcr.io/xomtra/xomtra-{mcp,ingest,caddy}` and of the Home
+  Assistant add-on `xomtra-addon-{amd64,aarch64}` (the Supervisor pulls the tag of the
+  `version` in `addon/xomtra/config.yaml`, which `prepare` sets):
 
   | Tag | Moves? | Meaning |
   | --- | --- | --- |
@@ -40,7 +40,7 @@ which
 3. adds the release tags to those images (same digests) and signs them again with the
    identity `release.yml@refs/tags/vX.Y.Z`; an existing `X.Y.Z` is never moved;
 4. publishes a GitHub release with the CHANGELOG section, the digests and the asset
-   `hammond-X.Y.Z-images.env` (pinned image references) plus `SHA256SUMS`.
+   `xomtra-X.Y.Z-images.env` (pinned image references) plus `SHA256SUMS`.
 
 ## Cutting a release (maintainer)
 
@@ -50,7 +50,7 @@ uv run python scripts/release.py prepare 0.2.0   # versions, compose defaults, C
 # review CHANGELOG.md (upgrade notes!), commit, open PR "Release 0.2.0", squash-merge
 git switch main && git pull
 # wait until the CI run of the merge commit on main is green (publish jobs included)
-git tag -s v0.2.0 -m "HAmmond 0.2.0"
+git tag -s v0.2.0 -m "Xomtra 0.2.0"
 git push origin v0.2.0
 ```
 
@@ -69,16 +69,16 @@ Every pull request with a user-visible change adds a line under `[Unreleased]` i
 
 ```bash
 git clone --branch v0.2.0 --depth 1 https://github.com/xomtra/xomtra.git
-cd HAmmond/deploy/compose
+cd Xomtra/deploy/compose
 cp .env.example .env && chmod 600 .env
 # fill in .env, then replace the three *_IMAGE lines with the ones from
-# hammond-0.2.0-images.env (release assets) so that the images are pinned by digest
+# xomtra-0.2.0-images.env (release assets) so that the images are pinned by digest
 ```
 
 Verify the release signature of each image (cosign v3) before the first start:
 
 ```bash
-cosign verify ghcr.io/xomtra/hammond-mcp@sha256:<digest> \
+cosign verify ghcr.io/xomtra/xomtra-mcp@sha256:<digest> \
   --certificate-identity https://github.com/xomtra/xomtra/.github/workflows/release.yml@refs/tags/v0.2.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
@@ -93,6 +93,16 @@ cosign verify ghcr.io/xomtra/hammond-mcp@sha256:<digest> \
 4. Verify the signatures, then `docker compose pull && docker compose up -d`.
 5. Roll back by restoring the backup and the previous `*_IMAGE` lines (pinned by
    digest, so the old images are pulled again).
+
+**From 0.4.x (code name HAmmond) to Xomtra** (ADR 071): after step 3, with the new
+`*_IMAGE` lines in `.env` but before starting anything, run
+`sh migrate-from-hammond.sh` in the compose directory instead of step 4. It stops the old
+stack, rewrites `.env` (`XOMTRA_*`, roles, bucket, compose project `xomtra`), copies
+the volumes, renames the Postgres roles, copies the lake bucket, points the DuckLake
+catalog to it and starts the new stack. The old volumes, the old bucket and
+`.env.bak-hammond` stay as the rollback until you remove them. Afterwards: add the Entra
+app roles `Xomtra.Admin`/`Xomtra.Reader` and assign them, rename the Home Assistant
+labels to `xomtra_no_ingest`/`xomtra_no_analysis` and issue new personal tokens.
 
 ## Repository settings (one-time, maintainer)
 

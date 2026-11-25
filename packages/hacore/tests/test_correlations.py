@@ -460,8 +460,8 @@ def test_label_leaves_an_entity_out_of_the_analysis(plain: duckdb.DuckDBPyConnec
     seed(plain)
     plain.execute(
         "INSERT INTO lake.silver.entities VALUES "
-        "('sensor.b', 'dev2', ['hammond_no_analysis']), "
-        "('sensor.outside', NULL, ['hammond_no_analysis'])"
+        "('sensor.b', 'dev2', ['xomtra_no_analysis']), "
+        "('sensor.outside', NULL, ['xomtra_no_analysis'])"
     )
     result = corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
     assert result.series_excluded == 1  # the outside temperature stays a driver

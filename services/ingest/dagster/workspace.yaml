@@ -1,5 +1,5 @@
 load_from:
   - python_module:
-      module_name: hammond_ingest.definitions
+      module_name: xomtra_ingest.definitions
       attribute: defs
-      location_name: hammond
+      location_name: xomtra

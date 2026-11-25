@@ -8,11 +8,11 @@
 # init-env.sh still generates the S3 keys of the full edition; they are not used here.
 
 x-lite-env: &lite-env
-  HAMMOND_EDITION: lite
-  HAMMOND_LAKE_DATA_PATH: /lake
-  HAMMOND_STATES_RETENTION_DAYS: ${HAMMOND_STATES_RETENTION_DAYS:-90}
-  HAMMOND_STATISTICS_5MIN_RETENTION_DAYS: ${HAMMOND_STATISTICS_5MIN_RETENTION_DAYS:-90}
-  HAMMOND_STATISTICS_HOUR_RETENTION_DAYS: ${HAMMOND_STATISTICS_HOUR_RETENTION_DAYS:-1825}
+  XOMTRA_EDITION: lite
+  XOMTRA_LAKE_DATA_PATH: /lake
+  XOMTRA_STATES_RETENTION_DAYS: ${XOMTRA_STATES_RETENTION_DAYS:-90}
+  XOMTRA_STATISTICS_5MIN_RETENTION_DAYS: ${XOMTRA_STATISTICS_5MIN_RETENTION_DAYS:-90}
+  XOMTRA_STATISTICS_HOUR_RETENTION_DAYS: ${XOMTRA_STATISTICS_HOUR_RETENTION_DAYS:-1825}
 
 services:
   seaweedfs:
@@ -43,7 +43,7 @@ services:
     volumes:
       - lake-data:/lake:ro
 
-  # Live stream + scheduled jobs in one process (hammond-ingest worker).
+  # Live stream + scheduled jobs in one process (xomtra-ingest worker).
   worker:
     restart: unless-stopped
     security_opt:
@@ -51,36 +51,36 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
-    image: ${HAMMOND_INGEST_IMAGE:-ghcr.io/xomtra/hammond-ingest:0.4.1}
-    command: ["hammond-ingest", "worker"]
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.4.1}
+    command: ["xomtra-ingest", "worker"]
     environment:
-      HAMMOND_LAKE_PG_HOST: postgres
-      HAMMOND_LAKE_PG_DB: ${DUCKLAKE_PG_DB:-ducklake}
-      HAMMOND_LAKE_PG_USER: ${DUCKLAKE_PG_USER:-ducklake}
-      HAMMOND_LAKE_PG_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
-      HAMMOND_OPS_PG_HOST: postgres
-      HAMMOND_OPS_PG_USER: ${OPS_PG_USER:-hammond_ops}
-      HAMMOND_OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
-      HAMMOND_SQLMESH_PG_DB: ${SQLMESH_PG_DB:-sqlmesh}
-      HAMMOND_WORKER_PG_DB: ${WORKER_PG_DB:-ops}
-      HAMMOND_ANALYSIS_SETTINGS_DB: ${AUDIT_PG_DB:-audit}
-      HAMMOND_HA_URL: ${HAMMOND_HA_URL:-}
-      HAMMOND_HA_TOKEN: ${HAMMOND_HA_TOKEN:-}
-      HAMMOND_TIMEZONE: ${HAMMOND_TIMEZONE:-UTC}
-      HAMMOND_CATALOG_WINDOW_DAYS: ${HAMMOND_CATALOG_WINDOW_DAYS:-30}
-      HAMMOND_LABEL_NO_INGEST: ${HAMMOND_LABEL_NO_INGEST:-hammond_no_ingest}
-      HAMMOND_LABEL_NO_ANALYSIS: ${HAMMOND_LABEL_NO_ANALYSIS:-hammond_no_analysis}
-      HAMMOND_CORRELATION_OUTSIDE_TEMP: ${HAMMOND_CORRELATION_OUTSIDE_TEMP:-}
-      HAMMOND_CORRELATION_WINDOWS_DAYS: ${HAMMOND_CORRELATION_WINDOWS_DAYS:-[365, 30]}
-      HAMMOND_OPEN_METEO_ENABLED: ${HAMMOND_OPEN_METEO_ENABLED:-false}
-      HAMMOND_ANOMALIES_ENABLED: ${HAMMOND_ANOMALIES_ENABLED:-true}
-      HAMMOND_ANOMALY_Z: ${HAMMOND_ANOMALY_Z:-4.0}
-      HAMMOND_DUCKDB_MEMORY_LIMIT: ${HAMMOND_WORKER_DUCKDB_MEMORY_LIMIT:-512MB}
-      HAMMOND_DUCKDB_THREADS: ${HAMMOND_DUCKDB_THREADS:-2}
-      HAMMOND_DUCKDB_TEMP_DIR: /data/duckdb-tmp
-      HAMMOND_DUCKDB_MAX_TEMP_SIZE: ${HAMMOND_DUCKDB_MAX_TEMP_SIZE:-8GB}
+      XOMTRA_LAKE_PG_HOST: postgres
+      XOMTRA_LAKE_PG_DB: ${DUCKLAKE_PG_DB:-ducklake}
+      XOMTRA_LAKE_PG_USER: ${DUCKLAKE_PG_USER:-ducklake}
+      XOMTRA_LAKE_PG_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
+      XOMTRA_OPS_PG_HOST: postgres
+      XOMTRA_OPS_PG_USER: ${OPS_PG_USER:-xomtra_ops}
+      XOMTRA_OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
+      XOMTRA_SQLMESH_PG_DB: ${SQLMESH_PG_DB:-sqlmesh}
+      XOMTRA_WORKER_PG_DB: ${WORKER_PG_DB:-ops}
+      XOMTRA_ANALYSIS_SETTINGS_DB: ${AUDIT_PG_DB:-audit}
+      XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
+      XOMTRA_HA_TOKEN: ${XOMTRA_HA_TOKEN:-}
+      XOMTRA_TIMEZONE: ${XOMTRA_TIMEZONE:-UTC}
+      XOMTRA_CATALOG_WINDOW_DAYS: ${XOMTRA_CATALOG_WINDOW_DAYS:-30}
+      XOMTRA_LABEL_NO_INGEST: ${XOMTRA_LABEL_NO_INGEST:-xomtra_no_ingest}
+      XOMTRA_LABEL_NO_ANALYSIS: ${XOMTRA_LABEL_NO_ANALYSIS:-xomtra_no_analysis}
+      XOMTRA_CORRELATION_OUTSIDE_TEMP: ${XOMTRA_CORRELATION_OUTSIDE_TEMP:-}
+      XOMTRA_CORRELATION_WINDOWS_DAYS: ${XOMTRA_CORRELATION_WINDOWS_DAYS:-[365, 30]}
+      XOMTRA_OPEN_METEO_ENABLED: ${XOMTRA_OPEN_METEO_ENABLED:-false}
+      XOMTRA_ANOMALIES_ENABLED: ${XOMTRA_ANOMALIES_ENABLED:-true}
+      XOMTRA_ANOMALY_Z: ${XOMTRA_ANOMALY_Z:-4.0}
+      XOMTRA_DUCKDB_MEMORY_LIMIT: ${XOMTRA_WORKER_DUCKDB_MEMORY_LIMIT:-512MB}
+      XOMTRA_DUCKDB_THREADS: ${XOMTRA_DUCKDB_THREADS:-2}
+      XOMTRA_DUCKDB_TEMP_DIR: /data/duckdb-tmp
+      XOMTRA_DUCKDB_MAX_TEMP_SIZE: ${XOMTRA_DUCKDB_MAX_TEMP_SIZE:-8GB}
       <<: *lite-env
-    mem_limit: ${HAMMOND_WORKER_MEM_LIMIT:-1536m}
+    mem_limit: ${XOMTRA_WORKER_MEM_LIMIT:-1536m}
     volumes:
       - lake-data:/lake
       - ingest-data:/data
@@ -89,7 +89,7 @@ services:
     cap_drop: [ALL]
     healthcheck:
       # The stream touches the heartbeat file after every flush (default every 30 s).
-      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/hammond-stream.heartbeat') < 180 else 1)"]
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/xomtra-stream.heartbeat') < 180 else 1)"]
       interval: 60s
       timeout: 5s
       retries: 3

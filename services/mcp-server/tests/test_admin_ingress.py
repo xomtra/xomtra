@@ -8,10 +8,10 @@ from typing import Any
 import httpx2
 from pydantic import SecretStr
 
-from hammond_mcp.admin.app import AdminApp, _same_address
-from hammond_mcp.admin.config import AdminSettings
-from hammond_mcp.audit import MemoryAuditSink
-from hammond_mcp.tokens import MemoryTokenStore, token_hash
+from xomtra_mcp.admin.app import AdminApp, _same_address
+from xomtra_mcp.admin.config import AdminSettings
+from xomtra_mcp.audit import MemoryAuditSink
+from xomtra_mcp.tokens import MemoryTokenStore, token_hash
 
 PROXY = "127.0.0.1"  # httpx's ASGITransport calls from here
 INGRESS = "/api/hassio_ingress/AbC-123_xyz"
@@ -119,7 +119,7 @@ async def test_allowed_users_apply_to_ingress() -> None:
 
 async def test_tokens_behind_ingress() -> None:
     app, _, store = make_app()
-    form = {"owner": "Petr", "description": "laptop", "role": "HAmmond.Reader", "days": "90"}
+    form = {"owner": "Petr", "description": "laptop", "role": "Xomtra.Reader", "days": "90"}
     async with client_for(app) as client:
         cross = await client.post(
             "/tokens/issue", data=form, headers={**HA, "origin": "https://evil.example"}
@@ -127,7 +127,7 @@ async def test_tokens_behind_ingress() -> None:
         issued = await client.post(
             "/tokens/issue", data=form, headers={**HA, "origin": f"http://{HA_HOST}"}
         )
-        mcpb = await client.get("/connect/hammond.mcpb", headers=HA)
+        mcpb = await client.get("/connect/xomtra.mcpb", headers=HA)
     assert cross.status_code == 403
     assert issued.status_code == 200
     token = issued.text.split("value='", 1)[1].split("'", 1)[0]
@@ -135,8 +135,8 @@ async def test_tokens_behind_ingress() -> None:
     assert info is not None
     assert info.created_by == "jana"
     endpoint = "http://homeassistant.local:8000/mcp"
-    assert f"claude mcp add --transport http hammond {endpoint}" in issued.text
-    assert "hammond-ca.crt" not in issued.text  # no TLS in the LAN
+    assert f"claude mcp add --transport http xomtra {endpoint}" in issued.text
+    assert "xomtra-ca.crt" not in issued.text  # no TLS in the LAN
     with zipfile.ZipFile(io.BytesIO(mcpb.content)) as archive:
         manifest = json.loads(archive.read("manifest.json"))
     assert manifest["user_config"]["url"]["default"] == endpoint
@@ -153,7 +153,7 @@ async def test_mcp_url_setting_wins_over_the_guess() -> None:
 async def test_remote_user_headers_are_ignored_without_ingress() -> None:
     settings = AdminSettings(
         auth_mode="ha",
-        base_url="https://hammond.lan",  # type: ignore[arg-type]
+        base_url="https://xomtra.lan",  # type: ignore[arg-type]
         ha_url="http://ha",
         admin_session_key=SecretStr("s" * 40),
     )

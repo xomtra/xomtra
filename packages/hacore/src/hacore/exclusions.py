@@ -2,17 +2,17 @@
 
 A label on an entity or on its device decides:
 
-``hammond_no_ingest``    the entity is not stored at all (live stream, catch-up, history
+``xomtra_no_ingest``    the entity is not stored at all (live stream, catch-up, history
                          backfill, statistics); data stored before stays.
-``hammond_no_analysis``  the entity is stored and can be queried, but derived analyses
+``xomtra_no_analysis``  the entity is stored and can be queried, but derived analyses
                          (correlations, anomalies, change points) leave it out.
 
 ``no_ingest`` implies ``no_analysis``. The labels live in Home Assistant, where the
-entities are managed, so HAmmond needs no write path of its own; a label on a device
+entities are managed, so Xomtra needs no write path of its own; a label on a device
 covers its future entities too.
 
 The label ids above are the defaults; deployments can choose their own
-(``HAMMOND_LABEL_NO_INGEST``, ``HAMMOND_LABEL_NO_ANALYSIS``), passed in as ``labels``.
+(``XOMTRA_LABEL_NO_INGEST``, ``XOMTRA_LABEL_NO_ANALYSIS``), passed in as ``labels``.
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ from hacore.client import HAClient
 from hacore.lake import LAKE_ALIAS
 from hacore.registry import REGISTRY_COMMANDS
 
-NO_INGEST = "hammond_no_ingest"
-NO_ANALYSIS = "hammond_no_analysis"
+NO_INGEST = "xomtra_no_ingest"
+NO_ANALYSIS = "xomtra_no_analysis"
 
 
 @dataclass(frozen=True, slots=True)

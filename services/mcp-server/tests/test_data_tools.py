@@ -7,14 +7,14 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 from hacore.lake import connect_local
-from hammond_mcp.audit import AuditError, AuditRecord, MemoryAuditSink
-from hammond_mcp.config import Settings
-from hammond_mcp.data import DataAccess
-from hammond_mcp.server import create_server
+from xomtra_mcp.audit import AuditError, AuditRecord, MemoryAuditSink
+from xomtra_mcp.config import Settings
+from xomtra_mcp.data import DataAccess
+from xomtra_mcp.server import create_server
 
-EXT = os.environ.get("HAMMOND_DUCKDB_EXTENSION_DIR") or None
-ADMIN = ["HAmmond.Admin"]
-READER = ["HAmmond.Reader"]
+EXT = os.environ.get("XOMTRA_DUCKDB_EXTENSION_DIR") or None
+ADMIN = ["Xomtra.Admin"]
+READER = ["Xomtra.Reader"]
 
 
 def server(data: DataAccess, roles: list[str], audit: Any = None) -> Any:
@@ -224,7 +224,7 @@ async def test_list_views(data: DataAccess) -> None:
 
 
 async def test_engine_is_locked_down(data: DataAccess) -> None:
-    from hammond_mcp.policy import Access
+    from xomtra_mcp.policy import Access
 
     access = Access(
         roles=("x",),

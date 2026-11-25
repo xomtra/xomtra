@@ -1,10 +1,10 @@
 [project]
-name = "hammond-workspace"
+name = "xomtra-workspace"
 version = "0.0.0"
-description = "HAmmond development workspace (not published)"
+description = "Xomtra development workspace (not published)"
 requires-python = ">=3.13"
 license = "Apache-2.0"
-dependencies = ["hacore", "hammond-ingest", "hammond-mcp"]
+dependencies = ["hacore", "xomtra-ingest", "xomtra-mcp"]
 
 [dependency-groups]
 dev = [
@@ -28,8 +28,8 @@ members = ["packages/*", "services/*"]
 
 [tool.uv.sources]
 hacore = { workspace = true }
-hammond-ingest = { workspace = true }
-hammond-mcp = { workspace = true }
+xomtra-ingest = { workspace = true }
+xomtra-mcp = { workspace = true }
 
 [tool.ruff]
 line-length = 100
@@ -46,7 +46,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["hacore", "hammond_ingest", "hammond_mcp"]
+known-first-party = ["hacore", "xomtra_ingest", "xomtra_mcp"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101", "S104", "S105", "S106", "S608", "PLR2004", "PLC0415", "ASYNC109", "ASYNC110"]
@@ -54,7 +54,7 @@ known-first-party = ["hacore", "hammond_ingest", "hammond_mcp"]
 # hacore.lake.sql_literal; DuckDB cannot bind identifiers or ATTACH/read_json options.
 "packages/hacore/src/hacore/{bronze,maintenance,catalog,correlations,weather,findings}.py" = ["S608"]
 # Internal view/column names only; values are bound or quoted, user SQL passes the guard.
-"services/mcp-server/src/hammond_mcp/{data.py,admin/status.py,tokens.py}" = ["S608"]
+"services/mcp-server/src/xomtra_mcp/{data.py,admin/status.py,tokens.py}" = ["S608"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -75,8 +75,8 @@ testpaths = [
   "packages/hacore/tests", "services/mcp-server/tests", "services/ingest/tests", "scripts/tests",
 ]
 addopts = "--import-mode=importlib -ra"
-markers = ["contract: needs a real Home Assistant (HAMMOND_CONTRACT_HA_URL)"]
+markers = ["contract: needs a real Home Assistant (XOMTRA_CONTRACT_HA_URL)"]
 
 [tool.coverage.run]
-source = ["hacore", "hammond_ingest", "hammond_mcp"]
+source = ["hacore", "xomtra_ingest", "xomtra_mcp"]
 branch = true

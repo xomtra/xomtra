@@ -5,14 +5,14 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from hammond_ingest import worker
-from hammond_ingest.settings import IngestSettings
+from xomtra_ingest import worker
+from xomtra_ingest.settings import IngestSettings
 
 PRAGUE = ZoneInfo("Europe/Prague")
 
 
 def test_schedules_match_dagster() -> None:
-    from hammond_ingest.definitions import build_definitions
+    from xomtra_ingest.definitions import build_definitions
 
     defs = build_definitions(IngestSettings())
     crons = {s.job.name: s.cron_schedule for s in defs.schedules}

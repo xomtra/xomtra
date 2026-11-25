@@ -63,7 +63,7 @@ def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         text = (REPO / path).read_text(encoding="utf-8")
         text = text.replace(f'version = "{current[1]}"', 'version = "0.1.0"')
         text = text.replace(f'version: "{current[1]}"', 'version: "0.1.0"')
-        text = re.sub(rf"(hammond-[a-z]+):{re.escape(current[1])}\b", r"\1:0.1.0", text)
+        text = re.sub(rf"(xomtra-[a-z]+):{re.escape(current[1])}\b", r"\1:0.1.0", text)
         target.write_text(text, encoding="utf-8")
     (tmp_path / "CHANGELOG.md").write_text(CHANGELOG, encoding="utf-8")
     monkeypatch.setattr(release, "ROOT", tmp_path)
@@ -94,7 +94,7 @@ def test_invalid_version(text: str) -> None:
 
 def test_prepare_then_check(tree: Path) -> None:
     version = release.Version.parse("0.2.0")
-    with pytest.raises(release.ReleaseError, match="hammond-mcp"):
+    with pytest.raises(release.ReleaseError, match="xomtra-mcp"):
         release.check(version)
 
     release.prepare(version, today=dt.date(2026, 12, 1), lock=False)
@@ -102,7 +102,7 @@ def test_prepare_then_check(tree: Path) -> None:
 
     assert 'version = "0.2.0"' in (tree / "services/mcp-server/pyproject.toml").read_text()
     compose = (tree / "deploy/compose/compose.yaml").read_text()
-    assert "hammond-ingest:0.2.0}" in compose
+    assert "xomtra-ingest:0.2.0}" in compose
     assert ":main}" not in compose
     assert 'version: "0.2.0"' in (tree / release.ADDON_CONFIG).read_text()
     changelog = (tree / "CHANGELOG.md").read_text()
@@ -128,7 +128,7 @@ def test_prerelease_keeps_changelog(tree: Path) -> None:
     release.check(version)
     assert (tree / "CHANGELOG.md").read_text() == CHANGELOG
     assert 'version = "0.2.0rc1"' in (tree / "packages/hacore/pyproject.toml").read_text()
-    assert "hammond-caddy:0.2.0-rc.1" in (tree / "deploy/compose/.env.example").read_text()
+    assert "xomtra-caddy:0.2.0-rc.1" in (tree / "deploy/compose/.env.example").read_text()
     assert 'version: "0.2.0-rc.1"' in (tree / release.ADDON_CONFIG).read_text()
     assert release.notes(version) == "### Added\n\n- Something new."
 
@@ -154,7 +154,7 @@ def test_check_needs_the_addon_version(tree: Path) -> None:
     config = tree / release.ADDON_CONFIG
     config.write_text(config.read_text().replace('"0.2.0"', '"0.1.0"'), encoding="utf-8")
     with pytest.raises(
-        release.ReleaseError, match=re.escape("addon/hammond/config.yaml: version '0.1.0'")
+        release.ReleaseError, match=re.escape("addon/xomtra/config.yaml: version '0.1.0'")
     ):
         release.check(version)
 

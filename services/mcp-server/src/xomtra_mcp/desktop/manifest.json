@@ -1,0 +1,66 @@
+{
+  "manifest_version": "0.2",
+  "name": "xomtra",
+  "display_name": "Xomtra",
+  "version": "0.0.0",
+  "description": "History, catalog and findings of your Home Assistant, from your Xomtra server in the LAN.",
+  "long_description": "Connects Claude Desktop to a Xomtra server on your local network. Issue a personal token in the Xomtra admin GUI (Tokens) and enter it here. Read-only: Xomtra never changes anything in Home Assistant.",
+  "author": {
+    "name": "Xomtra contributors",
+    "url": "https://github.com/xomtra/xomtra"
+  },
+  "homepage": "https://github.com/xomtra/xomtra",
+  "documentation": "https://github.com/xomtra/xomtra/blob/main/docs/setup/local-access.md",
+  "license": "Apache-2.0",
+  "keywords": ["home assistant", "smart home", "history", "energy"],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "XOMTRA_URL": "${user_config.url}",
+        "XOMTRA_TOKEN": "${user_config.token}",
+        "XOMTRA_CA_FILE": "${user_config.ca_file}",
+        "XOMTRA_ALLOW_HTTP": "${user_config.allow_http}"
+      }
+    }
+  },
+  "user_config": {
+    "url": {
+      "type": "string",
+      "title": "Xomtra address",
+      "description": "MCP endpoint of your Xomtra server, e.g. https://xomtra.lan/mcp",
+      "required": true,
+      "default": ""
+    },
+    "token": {
+      "type": "string",
+      "title": "Personal token",
+      "description": "Token from the Xomtra admin GUI (Tokens), starts with xmt_",
+      "sensitive": true,
+      "required": true
+    },
+    "ca_file": {
+      "type": "file",
+      "title": "Certificate of the server (optional)",
+      "description": "xomtra-ca.crt from https://<server>/xomtra-ca.crt when the server uses its own local certificate",
+      "required": false,
+      "default": ""
+    },
+    "allow_http": {
+      "type": "boolean",
+      "title": "Allow unencrypted http://",
+      "description": "Only for a server on a trusted network without HTTPS",
+      "required": false,
+      "default": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

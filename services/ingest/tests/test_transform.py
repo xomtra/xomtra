@@ -10,9 +10,9 @@ from hacore import bronze
 from hacore import catalog as entity_catalog
 from hacore.history import StateRow, StatisticRow, iso_to_us
 from hacore.lake import LAKE_ALIAS, LakeSettings, connect_local, install_extensions
-from hammond_ingest import transform
+from xomtra_ingest import transform
 
-EXT = os.environ.get("HAMMOND_DUCKDB_EXTENSION_DIR") or None
+EXT = os.environ.get("XOMTRA_DUCKDB_EXTENSION_DIR") or None
 
 
 def us(dt: datetime) -> int:
@@ -132,7 +132,7 @@ def test_catalog_uri_has_no_quotes() -> None:
     assert uri.startswith("postgres:postgresql://u%27x:p%27%40%3A%2Fw@db:5432/duck%20lake")
     conn = transform.lake_connection(settings)
     assert isinstance(conn.secrets, dict)
-    assert conn.secrets["hammond_s3"]["secret"] == "s''k"
+    assert conn.secrets["xomtra_s3"]["secret"] == "s''k"
 
 
 def test_local_lake_has_no_s3_secret() -> None:

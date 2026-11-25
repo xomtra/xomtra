@@ -141,7 +141,7 @@ async def test_labelled_entities_are_not_stored(
     fake.results["get_states"] = []
     fake.results["config/entity_registry/list"] = [
         {"entity_id": "sensor.a"},
-        {"entity_id": "sensor.secret", "labels": ["hammond_no_ingest"]},
+        {"entity_id": "sensor.secret", "labels": ["xomtra_no_ingest"]},
     ]
     asked: set[str] = set()
 

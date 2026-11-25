@@ -1,4 +1,4 @@
-"""Editions of HAmmond (ADR 050): one code base, two resource profiles.
+"""Editions of Xomtra (ADR 050): one code base, two resource profiles.
 
 ``full``  Docker compose / VM / AWS: object storage (S3, SeaweedFS), Dagster, longer
           retention, a larger DuckDB memory budget.
@@ -7,7 +7,7 @@
           DuckDB budget so that the whole stack stays within 2 GB RAM at rest.
 
 The edition only changes *defaults*; every value can still be set explicitly with its
-own ``HAMMOND_*`` variable. Choose it with ``HAMMOND_EDITION`` (default ``full``, so
+own ``XOMTRA_*`` variable. Choose it with ``XOMTRA_EDITION`` (default ``full``, so
 existing installations keep their behaviour).
 """
 
@@ -18,7 +18,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
-ENV_VAR = "HAMMOND_EDITION"
+ENV_VAR = "XOMTRA_EDITION"
 
 
 class Edition(StrEnum):

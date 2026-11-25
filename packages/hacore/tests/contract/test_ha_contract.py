@@ -1,4 +1,4 @@
-"""What HAmmond relies on in the Home Assistant WebSocket API, as a non-admin user."""
+"""What Xomtra relies on in the Home Assistant WebSocket API, as a non-admin user."""
 
 import asyncio
 from datetime import UTC, datetime, timedelta
@@ -11,7 +11,7 @@ from hacore import HAClient, HACommandError, fetch_registries, ingest
 from hacore.history import StateRow, history_during_period, statistics_during_period
 from hacore.onboarding import OnboardedTokens
 
-SETPOINT = "input_number.hammond_test_setpoint"
+SETPOINT = "input_number.xomtra_test_setpoint"
 SENSOR = "sensor.test_temperature"
 
 

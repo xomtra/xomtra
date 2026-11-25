@@ -10,10 +10,10 @@ from hacore import catalog, confidence, correlations
 from hacore import findings as findings_mod
 from hacore.context import Context
 from hacore.lake import connect_local, install_extensions
-from hammond_mcp.data import DataAccess
+from xomtra_mcp.data import DataAccess
 
 TZ = "Europe/Prague"
-EXT = os.environ.get("HAMMOND_DUCKDB_EXTENSION_DIR") or None
+EXT = os.environ.get("XOMTRA_DUCKDB_EXTENSION_DIR") or None
 NOW = datetime.now(UTC).replace(microsecond=0)
 
 ENTITIES = [

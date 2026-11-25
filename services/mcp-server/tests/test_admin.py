@@ -9,13 +9,13 @@ from joserfc.jwk import RSAKey
 from pydantic import SecretStr
 
 from hacore.testing import VALID_TOKEN, running_fake_ha
-from hammond_mcp.admin import status
-from hammond_mcp.admin.app import SESSION_COOKIE, AdminApp
-from hammond_mcp.admin.config import AdminSettings
-from hammond_mcp.admin.oidc import EntraOIDC
-from hammond_mcp.admin.session import Signer
-from hammond_mcp.audit import MemoryAuditSink
-from hammond_mcp.data import DataAccess
+from xomtra_mcp.admin import status
+from xomtra_mcp.admin.app import SESSION_COOKIE, AdminApp
+from xomtra_mcp.admin.config import AdminSettings
+from xomtra_mcp.admin.oidc import EntraOIDC
+from xomtra_mcp.admin.session import Signer
+from xomtra_mcp.audit import MemoryAuditSink
+from xomtra_mcp.data import DataAccess
 
 TENANT = "00000000-0000-0000-0000-000000000001"
 CLIENT = "00000000-0000-0000-0000-000000000002"
@@ -38,7 +38,7 @@ class FakeEntra:
     """Token and JWKS endpoints of Entra; issues ID tokens with the given roles."""
 
     def __init__(self) -> None:
-        self.roles: list[str] = ["HAmmond.Admin"]
+        self.roles: list[str] = ["Xomtra.Admin"]
         self.nonce = ""
         self.tenant = TENANT
 
@@ -117,7 +117,7 @@ async def test_admin_sign_in_pages_and_audit(data: DataAccess) -> None:
             ("/admin/", "Catalog"),
             ("/admin/catalog?q=teplota", "sensor.temp"),
             ("/admin/drift", "Drift"),
-            ("/admin/retention", "HAMMOND_STATES_RETENTION_DAYS"),
+            ("/admin/retention", "XOMTRA_STATES_RETENTION_DAYS"),
             ("/admin/audit", "not configured"),
         ]:
             resp = await client.get(path)
@@ -126,7 +126,7 @@ async def test_admin_sign_in_pages_and_audit(data: DataAccess) -> None:
             assert "frame-ancestors 'none'" in resp.headers["content-security-policy"]
         check = await client.get("/admin/auth/check")
         assert check.status_code == 200
-        assert check.headers["x-hammond-user"] == "admin@example.org"
+        assert check.headers["x-xomtra-user"] == "admin@example.org"
         out = await client.post("/admin/logout", headers={"origin": BASE})
         assert out.status_code == 303
         assert (await client.get("/admin/")).status_code == 303
@@ -146,7 +146,7 @@ async def test_catalog_escapes_input(data: DataAccess) -> None:
 
 async def test_sign_in_without_admin_role_is_denied() -> None:
     entra, audit = FakeEntra(), MemoryAuditSink()
-    entra.roles = ["HAmmond.Reader"]
+    entra.roles = ["Xomtra.Reader"]
     async with client_for(make_app(entra, None, audit)) as client:
         resp = await sign_in(client, entra)
         assert resp.status_code == 403
@@ -168,7 +168,7 @@ async def test_callback_rejects_bad_state_and_tenant() -> None:
 
 async def test_forged_session_cookie_is_ignored() -> None:
     forged = Signer("another-key" * 4, "session").dumps(
-        {"sub": "x", "roles": ["HAmmond.Admin"]}, 3600
+        {"sub": "x", "roles": ["Xomtra.Admin"]}, 3600
     )
     async with client_for(make_app(FakeEntra(), None, MemoryAuditSink())) as client:
         client.cookies.set(SESSION_COOKIE, forged, path="/admin")
@@ -182,13 +182,13 @@ async def test_logout_refuses_cross_site() -> None:
 
 
 def test_settings_require_entra_and_key() -> None:
-    with pytest.raises(ValueError, match="HAMMOND_ADMIN_SESSION_KEY"):
+    with pytest.raises(ValueError, match="XOMTRA_ADMIN_SESSION_KEY"):
         settings(admin_session_key=None)
     with pytest.raises(ValueError, match="32 characters"):
         settings(admin_session_key=SecretStr("short"))
     s = settings(audit_pg_host="postgres", audit_admin_password=SecretStr("p"))
     assert s.audit_dsn is not None
-    assert "user='hammond_audit_admin'" in s.audit_dsn
+    assert "user='xomtra_audit_admin'" in s.audit_dsn
 
 
 async def test_ha_status() -> None:

@@ -31,7 +31,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       REGISTRY: ghcr.io/xomtra
-      IMAGES: hammond-mcp hammond-ingest hammond-caddy hammond-addon-amd64 hammond-addon-aarch64
+      IMAGES: xomtra-mcp xomtra-ingest xomtra-caddy xomtra-addon-amd64 xomtra-addon-aarch64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -119,21 +119,21 @@ jobs:
           set -euo pipefail
           mkdir dist
           {
-            echo "# Images of HAmmond $VERSION"
+            echo "# Images of Xomtra $VERSION"
             echo "# Put these lines into deploy/compose/.env (docs/releasing.md)."
             while read -r image digest; do
               # The add-on images are pulled by the Supervisor, not by compose.
-              case "$image" in hammond-addon-*) continue ;; esac
+              case "$image" in xomtra-addon-*) continue ;; esac
               var=$(tr 'a-z-' 'A-Z_' <<<"$image")_IMAGE
               echo "$var=$REGISTRY/$image:$VERSION@$digest"
             done < digests.txt
-          } > "dist/hammond-$VERSION-images.env"
+          } > "dist/xomtra-$VERSION-images.env"
           # Claude Desktop extension (ADR 056), built by the code of the released image.
-          mcp_digest=$(awk '$1 == "hammond-mcp" { print $2 }' digests.txt)
+          mcp_digest=$(awk '$1 == "xomtra-mcp" { print $2 }' digests.txt)
           docker run --rm --network none --entrypoint python \
-            "$REGISTRY/hammond-mcp@$mcp_digest" -m hammond_mcp.desktop --version "$VERSION" \
-            > "dist/hammond-$VERSION.mcpb"
-          unzip -l "dist/hammond-$VERSION.mcpb" | grep -q server/index.js
+            "$REGISTRY/xomtra-mcp@$mcp_digest" -m xomtra_mcp.desktop --version "$VERSION" \
+            > "dist/xomtra-$VERSION.mcpb"
+          unzip -l "dist/xomtra-$VERSION.mcpb" | grep -q server/index.js
           {
             python3 scripts/release.py notes "$TAG"
             echo
@@ -145,7 +145,7 @@ jobs:
               echo "| \`$REGISTRY/$image:$VERSION\` | \`$digest\` |"
             done < digests.txt
             echo
-            echo "Pin them with the attached \`hammond-$VERSION-images.env\` and verify"
+            echo "Pin them with the attached \`xomtra-$VERSION-images.env\` and verify"
             echo "the release signature with cosign v3 before deploying:"
             echo
             echo '```bash'
@@ -157,9 +157,9 @@ jobs:
             echo '```'
             echo
             echo "Home Assistant add-on: add \`https://github.com/$GH_REPO\` to the repositories"
-            echo "of the add-on store; it installs \`hammond-addon-{amd64,aarch64}:$VERSION\`."
+            echo "of the add-on store; it installs \`xomtra-addon-{amd64,aarch64}:$VERSION\`."
             echo
-            echo "Claude Desktop extension for the local access mode: \`hammond-$VERSION.mcpb\`"
+            echo "Claude Desktop extension for the local access mode: \`xomtra-$VERSION.mcpb\`"
             echo "(also offered with the server address filled in by the admin GUI)."
             echo
             echo "Upgrade: see [docs/releasing.md](https://github.com/$GH_REPO/blob/$TAG/docs/releasing.md#upgrading-an-installation)."
@@ -172,6 +172,6 @@ jobs:
           flags=(--prerelease --latest=false)
           [ "$PRERELEASE" = true ] || flags=(--latest)
           # Draft first: with immutable releases the assets cannot be added after publishing.
-          gh release create "$TAG" --verify-tag --draft --title "HAmmond $VERSION" \
+          gh release create "$TAG" --verify-tag --draft --title "Xomtra $VERSION" \
             --notes-file notes.md "${flags[@]}" dist/*
           gh release edit "$TAG" --draft=false

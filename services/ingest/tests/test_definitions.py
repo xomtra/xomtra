@@ -3,10 +3,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from dagster import SensorResult, SkipReason, build_sensor_context
 
-from hammond_ingest import tasks
-from hammond_ingest.__main__ import main
-from hammond_ingest.definitions import build_definitions, restate_after_catchup
-from hammond_ingest.settings import IngestSettings
+from xomtra_ingest import tasks
+from xomtra_ingest.__main__ import main
+from xomtra_ingest.definitions import build_definitions, restate_after_catchup
+from xomtra_ingest.settings import IngestSettings
 
 
 def test_definitions_load_with_schedules() -> None:
@@ -52,13 +52,13 @@ def test_parse_time() -> None:
 
 
 def test_settings_defaults_and_uri(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HAMMOND_OPS_PG_PASSWORD", "p@ss/word")
+    monkeypatch.setenv("XOMTRA_OPS_PG_PASSWORD", "p@ss/word")
     s = IngestSettings()
     assert s.states_retention_days == 365
     assert s.statistics_5min_retention_days == 365
     assert s.statistics_hour_retention_days == 1825
     assert s.ops_pg_uri("dagster").endswith(":p%40ss%2Fword@postgres:5432/dagster")
-    with pytest.raises(ValueError, match="HAMMOND_HA_URL"):
+    with pytest.raises(ValueError, match="XOMTRA_HA_URL"):
         IngestSettings(ha_url="").require_ha()
 
 
@@ -85,8 +85,8 @@ def test_correlation_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     s = IngestSettings()
     assert s.correlation_windows_days == [365, 30]
     assert s.correlation_outside_temp == ""
-    monkeypatch.setenv("HAMMOND_CORRELATION_WINDOWS_DAYS", "[30, 90, 30]")
-    monkeypatch.setenv("HAMMOND_CORRELATION_OUTSIDE_TEMP", "sensor.outdoor")
+    monkeypatch.setenv("XOMTRA_CORRELATION_WINDOWS_DAYS", "[30, 90, 30]")
+    monkeypatch.setenv("XOMTRA_CORRELATION_OUTSIDE_TEMP", "sensor.outdoor")
     s = IngestSettings()
     assert s.correlation_windows_days == [90, 30]
     assert s.correlation_outside_temp == "sensor.outdoor"
@@ -104,7 +104,7 @@ def test_cli_correlations(
 
 def test_outside_temperature_off_by_default() -> None:
     assert tasks.sync_outside_temperature(IngestSettings()) == {
-        "skipped": "HAMMOND_OPEN_METEO_ENABLED is off"
+        "skipped": "XOMTRA_OPEN_METEO_ENABLED is off"
     }
     with pytest.raises(ValueError, match="https"):
         IngestSettings(open_meteo_url="http://example.org")
@@ -123,28 +123,28 @@ def test_cli_anomalies_and_weekly(
 
 def test_anomalies_can_be_switched_off() -> None:
     assert tasks.find_anomalies(IngestSettings(anomalies_enabled=False)) == {
-        "skipped": "HAMMOND_ANOMALIES_ENABLED is off"
+        "skipped": "XOMTRA_ANOMALIES_ENABLED is off"
     }
 
 
 def test_label_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    assert IngestSettings().labels.analysis == ["hammond_no_analysis", "hammond_no_ingest"]
-    monkeypatch.setenv("HAMMOND_LABEL_NO_INGEST", " private ")
-    monkeypatch.setenv("HAMMOND_LABEL_NO_ANALYSIS", "skip_analysis")
+    assert IngestSettings().labels.analysis == ["xomtra_no_analysis", "xomtra_no_ingest"]
+    monkeypatch.setenv("XOMTRA_LABEL_NO_INGEST", " private ")
+    monkeypatch.setenv("XOMTRA_LABEL_NO_ANALYSIS", "skip_analysis")
     labels = IngestSettings().labels
     assert (labels.no_ingest, labels.no_analysis) == ("private", "skip_analysis")
-    monkeypatch.setenv("HAMMOND_LABEL_NO_ANALYSIS", "  ")
+    monkeypatch.setenv("XOMTRA_LABEL_NO_ANALYSIS", "  ")
     with pytest.raises(ValueError, match="label"):
         IngestSettings()
 
 
 def test_lite_edition_retention_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HAMMOND_EDITION", "lite")
+    monkeypatch.setenv("XOMTRA_EDITION", "lite")
     s = IngestSettings()
     assert (s.states_retention_days, s.statistics_5min_retention_days) == (90, 90)
     assert s.statistics_hour_retention_days == 5 * 365
-    monkeypatch.setenv("HAMMOND_STATES_RETENTION_DAYS", "30")
+    monkeypatch.setenv("XOMTRA_STATES_RETENTION_DAYS", "30")
     assert IngestSettings().states_retention_days == 30
-    monkeypatch.delenv("HAMMOND_EDITION")
-    monkeypatch.delenv("HAMMOND_STATES_RETENTION_DAYS")
+    monkeypatch.delenv("XOMTRA_EDITION")
+    monkeypatch.delenv("XOMTRA_STATES_RETENTION_DAYS")
     assert IngestSettings().states_retention_days == 365

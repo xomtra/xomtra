@@ -11,7 +11,7 @@ so nothing is lost and nothing is duplicated. A catch-up older than the silver l
 (``restate_threshold``) is recorded in ``bronze.ingest_gaps``; a Dagster sensor then
 restates silver for that range (ADR 031). The gap that can be closed is limited by
 the recorder retention of Home Assistant (``purge_keep_days``, 10 days by default);
-data of longer outages is lost (HAmmond takes data only from the running instance).
+data of longer outages is lost (Xomtra takes data only from the running instance).
 """
 
 from __future__ import annotations

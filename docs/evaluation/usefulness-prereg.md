@@ -16,7 +16,7 @@ summarised here so that this file stands on its own.
 ## 1. Question
 
 Does a ranking model trained on rated findings order the findings of a household
-better than the conservative ranking R0 = √(strength · evidence) that HAmmond uses
+better than the conservative ranking R0 = √(strength · evidence) that Xomtra uses
 today? If not, releases keep R0.
 
 ## 2. Findings rated

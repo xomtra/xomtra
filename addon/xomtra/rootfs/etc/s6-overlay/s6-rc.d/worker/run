@@ -1,0 +1,6 @@
+#!/bin/sh
+# Live stream + scheduled jobs (ADR 050).
+. /usr/local/bin/xomtra-env
+cd /data/home
+export HOME=/data/home XOMTRA_DUCKDB_MEMORY_LIMIT=512MB
+exec s6-setuidgid xomtra xomtra-ingest worker

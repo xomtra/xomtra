@@ -5,8 +5,8 @@
 # know: the access mode, the host name and the Home Assistant connection.
 #
 #   ./init-env.sh            interactive; answers can also come from the environment:
-#   HAMMOND_ACCESS_MODE=local HAMMOND_LOCAL_HOST=hammond.lan ADMIN_CIDR=192.168.1.0/24 \
-#   HAMMOND_HA_URL=http://homeassistant.lan:8123 HAMMOND_HA_TOKEN=... ./init-env.sh
+#   XOMTRA_ACCESS_MODE=local XOMTRA_LOCAL_HOST=xomtra.lan ADMIN_CIDR=192.168.1.0/24 \
+#   XOMTRA_HA_URL=http://homeassistant.lan:8123 XOMTRA_HA_TOKEN=... ./init-env.sh
 #
 #   ./init-env.sh --fill     keep an existing .env, only add missing keys of the current
 #                            template and generate internal secrets that are empty or
@@ -19,8 +19,8 @@ cd "$(dirname "$0")"
 ENV_FILE=${ENV_FILE:-.env}
 TEMPLATE=.env.example
 INTERNAL_SECRETS="POSTGRES_PASSWORD DUCKLAKE_PG_PASSWORD OPS_PG_PASSWORD AUDIT_PG_PASSWORD
-AUDIT_ADMIN_PG_PASSWORD S3_ACCESS_KEY S3_SECRET_KEY HAMMOND_JWT_SIGNING_KEY
-HAMMOND_ADMIN_SESSION_KEY"
+AUDIT_ADMIN_PG_PASSWORD S3_ACCESS_KEY S3_SECRET_KEY XOMTRA_JWT_SIGNING_KEY
+XOMTRA_ADMIN_SESSION_KEY"
 
 secret() { # 40 random characters [A-Za-z0-9]: safe in .env, URLs and libpq strings
   LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40
@@ -87,26 +87,26 @@ chmod 600 "$ENV_FILE"
 fill_secrets
 
 guess_ip=$(hostname -I 2>/dev/null | awk '{ print $1 }')
-ask HAMMOND_ACCESS_MODE "Access mode: local (LAN only) or public (Claude connector)" local
-case $HAMMOND_ACCESS_MODE in local | public) ;; *) echo "local or public" >&2; exit 1 ;; esac
-set_value HAMMOND_ACCESS_MODE "$HAMMOND_ACCESS_MODE"
+ask XOMTRA_ACCESS_MODE "Access mode: local (LAN only) or public (Claude connector)" local
+case $XOMTRA_ACCESS_MODE in local | public) ;; *) echo "local or public" >&2; exit 1 ;; esac
+set_value XOMTRA_ACCESS_MODE "$XOMTRA_ACCESS_MODE"
 
-if [ "$HAMMOND_ACCESS_MODE" = local ]; then
-  ask HAMMOND_LOCAL_HOST "Name or IP address of this server in the LAN" "${guess_ip:-hammond.lan}"
-  set_value HAMMOND_LOCAL_HOST "$HAMMOND_LOCAL_HOST"
-  set_value HAMMOND_BASE_URL "https://$HAMMOND_LOCAL_HOST"
+if [ "$XOMTRA_ACCESS_MODE" = local ]; then
+  ask XOMTRA_LOCAL_HOST "Name or IP address of this server in the LAN" "${guess_ip:-xomtra.lan}"
+  set_value XOMTRA_LOCAL_HOST "$XOMTRA_LOCAL_HOST"
+  set_value XOMTRA_BASE_URL "https://$XOMTRA_LOCAL_HOST"
   default_auth=ha
 else
-  ask HAMMOND_PUBLIC_HOST "Public DNS name of this server" mcp.example.org
-  set_value HAMMOND_PUBLIC_HOST "$HAMMOND_PUBLIC_HOST"
-  set_value HAMMOND_BASE_URL "https://$HAMMOND_PUBLIC_HOST"
+  ask XOMTRA_PUBLIC_HOST "Public DNS name of this server" mcp.example.org
+  set_value XOMTRA_PUBLIC_HOST "$XOMTRA_PUBLIC_HOST"
+  set_value XOMTRA_BASE_URL "https://$XOMTRA_PUBLIC_HOST"
   echo "Public access also needs ACME_EMAIL, CLOUDFLARE_API_TOKEN and CLAUDE_IP_RANGES" \
     "in $ENV_FILE (docs/setup/claude-connector.md)." >&2
   default_auth=ha
 fi
 
-ask HAMMOND_AUTH_MODE "Sign-in: ha (Home Assistant account) or entra" "$default_auth"
-set_value HAMMOND_AUTH_MODE "$HAMMOND_AUTH_MODE"
+ask XOMTRA_AUTH_MODE "Sign-in: ha (Home Assistant account) or entra" "$default_auth"
+set_value XOMTRA_AUTH_MODE "$XOMTRA_AUTH_MODE"
 
 default_admin=""
 case $guess_ip in
@@ -115,12 +115,12 @@ esac
 ask ADMIN_CIDR "Network allowed to open the admin GUI (CIDR)" "${default_admin:-192.168.0.0/16}"
 set_value ADMIN_CIDR "$ADMIN_CIDR"
 
-ask HAMMOND_HA_URL "Home Assistant URL as this server reaches it" http://homeassistant.local:8123
-set_value HAMMOND_HA_URL "$HAMMOND_HA_URL"
-ask HAMMOND_HA_TOKEN "Long-lived token of the HAmmond service user in HA (docs/setup/ingest.md)" ""
-[ -n "$HAMMOND_HA_TOKEN" ] && set_value HAMMOND_HA_TOKEN "$HAMMOND_HA_TOKEN"
+ask XOMTRA_HA_URL "Home Assistant URL as this server reaches it" http://homeassistant.local:8123
+set_value XOMTRA_HA_URL "$XOMTRA_HA_URL"
+ask XOMTRA_HA_TOKEN "Long-lived token of the Xomtra service user in HA (docs/setup/ingest.md)" ""
+[ -n "$XOMTRA_HA_TOKEN" ] && set_value XOMTRA_HA_TOKEN "$XOMTRA_HA_TOKEN"
 
 echo "Wrote $ENV_FILE. Next: docker compose up -d" >&2
-if [ "$HAMMOND_ACCESS_MODE" = local ]; then
-  echo "Then open https://$HAMMOND_LOCAL_HOST/admin/ and issue a token (Tokens)." >&2
+if [ "$XOMTRA_ACCESS_MODE" = local ]; then
+  echo "Then open https://$XOMTRA_LOCAL_HOST/admin/ and issue a token (Tokens)." >&2
 fi

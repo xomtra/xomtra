@@ -1,0 +1,46 @@
+#!/bin/sh
+# Prints the environment of the Xomtra services (sourced by every s6 service):
+# generated secrets from /data/secrets.env and the add-on options from
+# /data/options.json. Run by `. xomtra-env`.
+set -eu
+SECRETS=/data/secrets.env
+OPTIONS=/data/options.json
+
+opt() { # KEY DEFAULT
+  python3 -c 'import json,sys
+try: v = json.load(open(sys.argv[1])).get(sys.argv[2])
+except FileNotFoundError: v = None
+print(sys.argv[3] if v in (None, "") else v)' "$OPTIONS" "$1" "$2"
+}
+
+set -a
+. "$SECRETS"
+PGHOST=127.0.0.1
+XOMTRA_EDITION=lite
+XOMTRA_ACCESS_MODE=local
+XOMTRA_LAKE_DATA_PATH=/data/lake
+XOMTRA_LAKE_PG_HOST=127.0.0.1
+XOMTRA_LAKE_PG_DB=ducklake
+XOMTRA_LAKE_PG_USER=ducklake
+XOMTRA_LAKE_PG_PASSWORD=$DUCKLAKE_PG_PASSWORD
+XOMTRA_OPS_PG_HOST=127.0.0.1
+XOMTRA_OPS_PG_USER=xomtra_ops
+XOMTRA_OPS_PG_PASSWORD=$OPS_PG_PASSWORD
+XOMTRA_SQLMESH_PG_DB=sqlmesh
+XOMTRA_WORKER_PG_DB=ops
+XOMTRA_ANALYSIS_SETTINGS_DB=audit
+XOMTRA_AUDIT_PG_HOST=127.0.0.1
+XOMTRA_AUDIT_PG_DB=audit
+# Home Assistant through the Supervisor proxy, with the add-on's own token.
+XOMTRA_HA_URL=http://supervisor/core
+XOMTRA_HA_TOKEN=${SUPERVISOR_TOKEN:-}
+XOMTRA_TIMEZONE=${TZ:-UTC}
+XOMTRA_LOG_LEVEL=$(opt log_level info | tr '[:lower:]' '[:upper:]')
+XOMTRA_STATES_RETENTION_DAYS=$(opt states_retention_days 90)
+XOMTRA_STATISTICS_5MIN_RETENTION_DAYS=$(opt statistics_5min_retention_days 90)
+XOMTRA_STATISTICS_HOUR_RETENTION_DAYS=$(opt statistics_hour_retention_days 1825)
+XOMTRA_MCP_URL=$(opt mcp_url "")
+XOMTRA_DUCKDB_THREADS=2
+XOMTRA_DUCKDB_TEMP_DIR=/data/duckdb-tmp
+XOMTRA_DUCKDB_MAX_TEMP_SIZE=8GB
+set +a
