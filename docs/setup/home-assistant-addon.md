@@ -1,8 +1,19 @@
 # Home Assistant add-on (lite edition)
 
-Status: **in development** (phase 1c.2, PR 9). The add-on image is built and started in
-CI on every pull request; published images and the add-on repository follow in the next
-steps.
+Status: **in development** (phase 1c.2, PR 9). The add-on image is built, scanned and
+started in CI on every pull request and published with every release.
+
+The add-on needs Home Assistant OS or Supervised (installations with the Supervisor).
+Home Assistant Container and Core have no add-ons; there HAmmond runs next to Home
+Assistant with Docker Compose ([lite or full edition](README.md)).
+
+## Installing
+
+In the add-on store of Home Assistant, add the repository
+`https://github.com/zettabyte-cz/HAmmond` (three-dot menu → Repositories), then install
+**HAmmond**. The Supervisor pulls the signed image
+`ghcr.io/zettabyte-cz/hammond-addon-{amd64,aarch64}` of the version in `config.yaml`;
+images exist for every release after 0.4.1 ([releasing](../releasing.md)).
 
 ## What runs inside
 

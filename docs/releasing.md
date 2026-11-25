@@ -11,7 +11,9 @@ release carries the same version (ADR 045).
 - Before 1.0.0 a **minor** release may break things (configuration, schema, API); the
   CHANGELOG lists each such change with an upgrade note. A **patch** release is always a
   drop-in update.
-- Image tags in `ghcr.io/zettabyte-cz/hammond-{mcp,ingest,caddy}`:
+- Image tags in `ghcr.io/zettabyte-cz/hammond-{mcp,ingest,caddy}` and of the Home
+  Assistant add-on `hammond-addon-{amd64,aarch64}` (the Supervisor pulls the tag of the
+  `version` in `addon/hammond/config.yaml`, which `prepare` sets):
 
   | Tag | Moves? | Meaning |
   | --- | --- | --- |

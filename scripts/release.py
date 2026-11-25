@@ -33,6 +33,8 @@ PYPROJECTS = (
 # Files whose default image references follow the release version.
 IMAGE_REFERENCES = ("deploy/compose/compose.yaml", "deploy/compose/.env.example")
 IMAGES = ("hammond-mcp", "hammond-ingest", "hammond-caddy")
+# Home Assistant add-on: the Supervisor pulls <image>:<version of config.yaml>.
+ADDON_CONFIG = "addon/hammond/config.yaml"
 REGISTRY = "ghcr.io/zettabyte-cz"
 CHANGELOG = "CHANGELOG.md"
 REPO_URL = "https://github.com/zettabyte-cz/HAmmond"
@@ -40,6 +42,7 @@ REPO_URL = "https://github.com/zettabyte-cz/HAmmond"
 _SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta|rc)\.([1-9]\d*))?$")
 _PEP440_PRE = {"alpha": "a", "beta": "b", "rc": "rc"}
 _PYPROJECT_VERSION = re.compile(r'^version = "([^"]+)"$', re.MULTILINE)
+_ADDON_VERSION = re.compile(r'^version: "([^"]+)"$', re.MULTILINE)
 _IMAGE_REF = re.compile(rf"({re.escape(REGISTRY)}/(?:{'|'.join(IMAGES)})):([A-Za-z0-9._-]+)")
 _LINK_DEF = re.compile(r"^\[[^\]]+\]: \S+$\n?", re.MULTILINE)
 _SECTION = re.compile(r"^## \[([^\]]+)\](.*)$", re.MULTILINE)
@@ -177,6 +180,13 @@ def prepare(version: Version, *, today: dt.date | None = None, lock: bool = True
         if new != text:
             _write(path, new)
             changed.append(path)
+    text = _read(ADDON_CONFIG)
+    new, count = _ADDON_VERSION.subn(f'version: "{version.semver}"', text, count=1)
+    if count != 1:
+        raise ReleaseError(f"{ADDON_CONFIG}: no version line")
+    if new != text:
+        _write(ADDON_CONFIG, new)
+        changed.append(ADDON_CONFIG)
     if not version.prerelease:
         _write(CHANGELOG, _move_unreleased(_read(CHANGELOG), version, today or dt.date.today()))
         changed.append(CHANGELOG)
@@ -201,6 +211,10 @@ def check(version: Version) -> None:
         for match in _IMAGE_REF.finditer(_read(path)):
             if match.group(2) != version.semver:
                 problems.append(f"{path}: {match.group(0)} (expected :{version.semver})")
+    addon = _ADDON_VERSION.search(_read(ADDON_CONFIG))
+    if (addon.group(1) if addon else None) != version.semver:
+        found = addon.group(1) if addon else None
+        problems.append(f"{ADDON_CONFIG}: version {found!r}, expected {version.semver!r}")
     try:
         notes(version)
     except ReleaseError as err:
