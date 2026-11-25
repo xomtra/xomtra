@@ -192,3 +192,72 @@ def simulate_alpha_power(
         float(np.mean(widths)),
         passed / simulations,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class PoolPowerResult:
+    households: int
+    model_sd: float
+    difference_mean: float  # mean NDCG@10(model) - NDCG@10(R0) on the human pool
+    passed: float  # share of simulations meeting the non-inferiority condition (b)
+
+
+def simulate_pool_power(
+    households: int,
+    *,
+    model_sd: float,
+    r0_sd: float = 1.0,
+    per_household: int = 50,
+    true_noise: float = 0.55,
+    raters: int = 3,
+    margin: float = -0.05,
+    simulations: int = 200,
+    n_boot: int = 500,
+    seed: int = 0,
+) -> PoolPowerResult:
+    """Power of the human pool condition (prereg section 6 (b), ADR 069).
+
+    Each household has ``per_household`` findings with a latent usefulness (standard
+    normal). R0 and the model rank them by the latent value plus normal noise (``r0_sd``,
+    ``model_sd``; a smaller noise is a better ranking). The pool is the union of the top
+    10 of the model, R0 and a random order; three raters rate the pool as in
+    ``simulate_alpha_power`` and the consensus is their median. NDCG@10 is computed with
+    the ideal DCG of the pool. Condition (b): the mean paired difference over households
+    is >= 0 and the lower bound of its cluster-bootstrap interval is > ``margin``.
+    """
+    rng = np.random.default_rng(seed)
+    cuts = np.array([-0.8, 0.0, 0.8])
+    discounts = 1 / np.log2(np.arange(2, K + 2))
+    means, passed = [], 0
+    for s in range(simulations):
+        diffs = []
+        for _ in range(households):
+            latent = rng.normal(size=per_household)
+
+            def top(noise: float, latent: FloatArray = latent) -> npt.NDArray[np.int64]:
+                score = latent + rng.normal(scale=noise, size=len(latent))
+                return np.argsort(-score)[:K]
+
+            r0, model = top(r0_sd), top(model_sd)
+            pool = np.union1d(np.union1d(r0, model), rng.permutation(per_household)[:K])
+            ratings = np.column_stack(
+                [
+                    np.searchsorted(cuts, latent + rng.normal(scale=true_noise, size=len(latent)))
+                    + 1
+                    for _ in range(raters)
+                ]
+            )
+            gains = 2.0 ** (np.round(np.median(ratings, axis=1)) - 1) - 1
+            ideal = float((np.sort(gains[pool])[::-1][:K] * discounts).sum())
+            if ideal == 0:
+                continue
+            diffs.append(float(((gains[model] - gains[r0]) * discounts).sum()) / ideal)
+        d = np.array(diffs)
+        means.append(float(d.mean()))
+
+        def mean(idx: npt.NDArray[np.int64], d: FloatArray = d) -> float:
+            return float(d[idx].mean())
+
+        point, lo, _ = cluster_bootstrap(list(range(len(d))), mean, n_boot=n_boot, seed=seed + s)
+        passed += int(point >= 0 and lo > margin)
+    return PoolPowerResult(households, model_sd, float(np.mean(means)), passed / simulations)
