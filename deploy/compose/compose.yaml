@@ -69,6 +69,9 @@ services:
   postgres:
     <<: *hardening
     image: postgres:17-trixie@sha256:223efeb196329b55b3b9a13db144956411dbc18e727e59f681c3e0aede6475cf
+    # Errors without their statement: DuckLake retries a commit whose snapshot id another
+    # writer took, and the statement would put Home Assistant data into the log.
+    command: ["postgres", "-c", "log_min_error_statement=panic"]
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       DUCKLAKE_DB: ${DUCKLAKE_PG_DB:-ducklake}
