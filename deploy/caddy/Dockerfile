@@ -18,7 +18,7 @@ RUN set -eu; extra=""; \
     xcaddy build --with "${CADDY_DNS_PLUGIN}" $extra
 
 FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
-LABEL org.opencontainers.image.source="https://github.com/zettabyte-cz/hammond" \
+LABEL org.opencontainers.image.source="https://github.com/xomtra/hammond" \
       org.opencontainers.image.description="HAmmond reverse proxy (Caddy + DNS-01)" \
       org.opencontainers.image.licenses="Apache-2.0"
 # CI starts the image with cap_drop ALL to catch file capabilities on the binary.

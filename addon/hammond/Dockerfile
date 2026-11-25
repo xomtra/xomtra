@@ -37,7 +37,7 @@ RUN uv sync --locked --no-dev --no-editable --all-packages
 RUN /app/.venv/bin/python -m hacore.lake install-extensions
 
 FROM ${PYTHON_IMAGE} AS runtime
-LABEL org.opencontainers.image.source="https://github.com/zettabyte-cz/hammond" \
+LABEL org.opencontainers.image.source="https://github.com/xomtra/hammond" \
       org.opencontainers.image.description="HAmmond Home Assistant add-on (lite edition)" \
       org.opencontainers.image.licenses="Apache-2.0" \
       io.hass.type="addon"

@@ -20,4 +20,4 @@ space. Home Assistant Green (32 GB eMMC) and SD cards are not supported.
 
 ## More
 
-Documentation: https://github.com/zettabyte-cz/HAmmond/blob/main/docs/setup/home-assistant-addon.md
+Documentation: https://github.com/xomtra/HAmmond/blob/main/docs/setup/home-assistant-addon.md

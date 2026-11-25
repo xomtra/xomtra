@@ -40,7 +40,7 @@ the DMZ to the HA host only).
 New values compared to 1a.1 (see `.env.example`):
 
 ```bash
-HAMMOND_INGEST_IMAGE=ghcr.io/zettabyte-cz/hammond-ingest@sha256:...   # verified digest
+HAMMOND_INGEST_IMAGE=ghcr.io/xomtra/hammond-ingest@sha256:...   # verified digest
 OPS_PG_PASSWORD=<openssl rand -hex 32>   # role owning the Dagster + SQLMesh databases
 HAMMOND_STATES_RETENTION_DAYS=365            # state history
 HAMMOND_STATISTICS_5MIN_RETENTION_DAYS=365   # 5-minute statistics

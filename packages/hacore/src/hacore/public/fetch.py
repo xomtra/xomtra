@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 CHUNK = 1 << 20  # bytes fetched at least per request
-USER_AGENT = "hammond-validation (+https://github.com/zettabyte-cz/HAmmond)"
+USER_AGENT = "hammond-validation (+https://github.com/xomtra/HAmmond)"
 
 
 class RangeFile(io.RawIOBase):

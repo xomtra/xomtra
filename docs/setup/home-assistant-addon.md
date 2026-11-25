@@ -10,9 +10,9 @@ Assistant with Docker Compose ([lite or full edition](README.md)).
 ## Installing
 
 In the add-on store of Home Assistant, add the repository
-`https://github.com/zettabyte-cz/HAmmond` (three-dot menu → Repositories), then install
+`https://github.com/xomtra/HAmmond` (three-dot menu → Repositories), then install
 **HAmmond**. The Supervisor pulls the signed image
-`ghcr.io/zettabyte-cz/hammond-addon-{amd64,aarch64}` of the version in `config.yaml`;
+`ghcr.io/xomtra/hammond-addon-{amd64,aarch64}` of the version in `config.yaml`;
 images exist for every release after 0.4.1 ([releasing](../releasing.md)).
 
 ## What runs inside
