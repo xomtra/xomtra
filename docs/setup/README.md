@@ -17,7 +17,7 @@ Order for the public setup "Claude connector authenticated by Entra ID" (homelab
 6. [Catalog and MCP data tools](mcp-tools.md) – catalog, tools, roles and policy, SQL
    limits, audit (phase 1a.3).
 7. [Admin GUI and Dagster UI](admin-gui.md) – from the admin network with Entra role
-   `Xomtra.Admin` (phase 1a.3).
+   `xomtra.Admin` (phase 1a.3).
 
 Instead of Entra ID, the connector and the admin GUI can use
 [Home Assistant accounts](ha-login.md) (`XOMTRA_AUTH_MODE=ha`, ADR 053).

@@ -117,7 +117,7 @@ set_value ADMIN_CIDR "$ADMIN_CIDR"
 
 ask XOMTRA_HA_URL "Home Assistant URL as this server reaches it" http://homeassistant.local:8123
 set_value XOMTRA_HA_URL "$XOMTRA_HA_URL"
-ask XOMTRA_HA_TOKEN "Long-lived token of the Xomtra service user in HA (docs/setup/ingest.md)" ""
+ask XOMTRA_HA_TOKEN "Long-lived token of the xomtra service user in HA (docs/setup/ingest.md)" ""
 [ -n "$XOMTRA_HA_TOKEN" ] && set_value XOMTRA_HA_TOKEN "$XOMTRA_HA_TOKEN"
 
 echo "Wrote $ENV_FILE. Next: docker compose up -d" >&2

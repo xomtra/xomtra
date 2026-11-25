@@ -1,7 +1,7 @@
 # Entra ID app registration
 
-Xomtra uses FastMCP's OAuth proxy (`AzureProvider`): Claude talks OAuth 2.1 + dynamic
-client registration to Xomtra, Xomtra signs the user in at Entra ID with one fixed app
+xomtra uses FastMCP's OAuth proxy (`AzureProvider`): Claude talks OAuth 2.1 + dynamic
+client registration to xomtra, xomtra signs the user in at Entra ID with one fixed app
 registration. (Connecting claude.ai directly to Entra does not work today because Entra
 does not support dynamic client registration, tracked as claude.ai MCP issue #506.)
 
@@ -13,7 +13,7 @@ Entra admin center → **Identity → Applications → App registrations → New
 
 | Field | Value |
 | --- | --- |
-| Name | `Xomtra MCP` |
+| Name | `xomtra MCP` |
 | Supported account types | **Accounts in this organizational directory only** (single tenant) |
 | Redirect URI | platform **Web**, `https://<public-host>/auth/callback` |
 
@@ -37,7 +37,7 @@ FastMCP validates the v2 issuer `https://login.microsoftonline.com/<tenant-id>/v
 | --- | --- |
 | Scope name | `mcp.access` (must match `XOMTRA_ENTRA_REQUIRED_SCOPES`) |
 | Who can consent | Admins only |
-| Admin consent display name | `Access Xomtra MCP` |
+| Admin consent display name | `Access xomtra MCP` |
 | State | Enabled |
 
 ## 4. API permissions
@@ -58,19 +58,19 @@ reminder in your calendar). Copy the *Value* → `.env`: `XOMTRA_ENTRA_CLIENT_SE
 
 | Display name | Value | Purpose |
 | --- | --- | --- |
-| Xomtra Admin | `Xomtra.Admin` | administration, all data |
-| Xomtra Reader | `Xomtra.Reader` | read catalog and data views |
+| xomtra Admin | `xomtra.Admin` | administration, all data |
+| xomtra Reader | `xomtra.Reader` | read catalog and data views |
 
-**Enterprise applications → Xomtra MCP → Properties → Assignment required? = Yes**
+**Enterprise applications → xomtra MCP → Properties → Assignment required? = Yes**
 (only assigned users can sign in), then **Users and groups → Add user/group** and assign
-yourself the `Xomtra.Admin` role. The `whoami` tool shows the roles from the token.
+yourself the `xomtra.Admin` role. The `whoami` tool shows the roles from the token.
 What each role may do is described in [Catalog and MCP data tools](mcp-tools.md); a user
 without a role can only call `whoami`.
 
 ## 7. Recommended hardening
 
 - Conditional Access policy for the app: MFA, compliant/known devices or named locations.
-- Sign-in logs of the enterprise app are the second audit trail next to Xomtra's audit.
+- Sign-in logs of the enterprise app are the second audit trail next to xomtra's audit.
 
 ## `.env` summary
 

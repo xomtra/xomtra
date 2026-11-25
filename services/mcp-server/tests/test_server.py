@@ -75,13 +75,13 @@ def test_identity_from_nested_claims() -> None:
                 "oid": "o1",
                 "name": "Jane",
                 "preferred_username": "jane@example.org",
-                "roles": ["Xomtra.Reader"],
+                "roles": ["xomtra.Reader"],
             }
         },
         ["api://x/mcp.access"],
     )
     assert ident.subject == "o1"
-    assert ident.roles == ("Xomtra.Reader",)
+    assert ident.roles == ("xomtra.Reader",)
     assert ident.username == "jane@example.org"
 
 

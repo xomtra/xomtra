@@ -1,4 +1,4 @@
-"""Editions of Xomtra (ADR 050): one code base, two resource profiles.
+"""Editions of xomtra (ADR 050): one code base, two resource profiles.
 
 ``full``  Docker compose / VM / AWS: object storage (S3, SeaweedFS), Dagster, longer
           retention, a larger DuckDB memory budget.

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Xomtra are documented in this file. The format follows
+All notable changes to xomtra are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see
 [docs/releasing.md](docs/releasing.md)). Before 1.0.0 a minor release may contain
@@ -77,13 +77,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Changed
 
-- **Breaking: HAmmond is now Xomtra (ADR 071).** The project moved to the organization
+- **Breaking: hammond is now xomtra (ADR 071).** The project moved to the organization
   **xomtra** (repository `github.com/xomtra/xomtra`) and every name follows: images
   `ghcr.io/xomtra/xomtra-{mcp,ingest,caddy}` and `xomtra-addon-{amd64,aarch64}`, Python
   packages `xomtra_mcp` and `xomtra_ingest`, commands `xomtra-*`, environment variables
   `XOMTRA_*`, compose project `xomtra` (containers and volumes), lake bucket `xomtra`,
   Postgres roles `xomtra_ops`, `xomtra_audit` and `xomtra_audit_admin`, Entra roles
-  `Xomtra.Admin` and `Xomtra.Reader`, Home Assistant labels `xomtra_no_ingest` and
+  `xomtra.Admin` and `xomtra.Reader`, Home Assistant labels `xomtra_no_ingest` and
   `xomtra_no_analysis`, personal tokens `xmt_…` and the add-on slug `xomtra`. Releases up
   to 0.4.1 keep the image addresses of their `images.env`; signatures of new releases
   name the new repository. Upgrade: put the `*_IMAGE` lines of the release's

@@ -119,7 +119,7 @@ jobs:
           set -euo pipefail
           mkdir dist
           {
-            echo "# Images of Xomtra $VERSION"
+            echo "# Images of xomtra $VERSION"
             echo "# Put these lines into deploy/compose/.env (docs/releasing.md)."
             while read -r image digest; do
               # The add-on images are pulled by the Supervisor, not by compose.
@@ -172,6 +172,6 @@ jobs:
           flags=(--prerelease --latest=false)
           [ "$PRERELEASE" = true ] || flags=(--latest)
           # Draft first: with immutable releases the assets cannot be added after publishing.
-          gh release create "$TAG" --verify-tag --draft --title "Xomtra $VERSION" \
+          gh release create "$TAG" --verify-tag --draft --title "xomtra $VERSION" \
             --notes-file notes.md "${flags[@]}" dist/*
           gh release edit "$TAG" --draft=false

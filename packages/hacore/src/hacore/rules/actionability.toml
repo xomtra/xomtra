@@ -1,4 +1,4 @@
-# Actionability rulebook of Xomtra (ADR 062 point 9, methodology 8.5, ADR 068).
+# Actionability rulebook of xomtra (ADR 062 point 9, methodology 8.5, ADR 068).
 #
 # Public and versioned: every finding stores the version it was scored with
 # (rules_version). Change the version (SemVer) with every change of a family or a rule.

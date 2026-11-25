@@ -2,7 +2,7 @@
 
 Access: Caddy lets ``/admin`` through only from ``ADMIN_CIDR``; the app then requires
 a sign-in (Entra ID, or a Home Assistant account with ``XOMTRA_AUTH_MODE=ha``, ADR 053)
-with the role ``Xomtra.Admin``. In the local access mode it also issues and revokes the
+with the role ``xomtra.Admin``. In the local access mode it also issues and revokes the
 personal tokens of MCP clients and offers the Claude Desktop extension (ADR 056/059).
 ``/admin/auth/check`` answers Caddy's ``forward_auth`` for the Dagster UI under
 ``/admin/dagster/``. Every page view, sign-in
@@ -68,7 +68,7 @@ HEADERS = {
     "Cache-Control": "no-store",
     "X-Frame-Options": "DENY",
 }
-TOKEN_ROLES = ("Xomtra.Reader", "Xomtra.Admin")
+TOKEN_ROLES = ("xomtra.Reader", "xomtra.Admin")
 TOKEN_DAYS = (30, 90, 365, 0)
 DISMISS_DAYS = (0, 30, 90, 365)
 # X-Ingress-Path as Home Assistant sets it: /api/hassio_ingress/<token>
@@ -271,7 +271,7 @@ class AdminApp:
     def _ingress_refused(self) -> Response:
         body = (
             "<p class=bad>Home Assistant did not name an administrator for this request. "
-            "Open Xomtra from the Home Assistant sidebar as an administrator.</p>"
+            "Open xomtra from the Home Assistant sidebar as an administrator.</p>"
         )
         return HTMLResponse(page("Access refused", body, None), 403, headers=self.headers)
 
@@ -347,7 +347,7 @@ class AdminApp:
                 "login", user, decision="denied", outcome="denied", error="missing admin role"
             )
             return self._login_failed(
-                "Only Home Assistant administrators may open the Xomtra admin GUI.",
+                "Only Home Assistant administrators may open the xomtra admin GUI.",
                 status_code=403,
             )
         return await self._start_session(user)
@@ -378,7 +378,7 @@ class AdminApp:
         user = self.user(request)
         if user is None:
             return RedirectResponse(f"{prefix()}/login", status_code=302)
-        return Response(status_code=200, headers={"X-Xomtra-User": str(user.get("username"))})
+        return Response(status_code=200, headers={"X-xomtra-User": str(user.get("username"))})
 
     # ---- pages ---------------------------------------------------------------------
 

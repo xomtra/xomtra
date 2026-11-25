@@ -86,9 +86,9 @@ def page(title: str, body: str, user: str | None) -> str:
     return (
         "<!doctype html><html lang=en><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width, initial-scale=1">'
-        f"<title>{escape(title)} · Xomtra admin</title>"
+        f"<title>{escape(title)} · xomtra admin</title>"
         f'<link rel=stylesheet href="{v.prefix}/static.css"></head><body>'
-        f"<header><strong>Xomtra admin</strong>{links}{logout}</header>"
+        f"<header><strong>xomtra admin</strong>{links}{logout}</header>"
         f"<main><h1>{escape(title)}</h1>{body}</main></body></html>"
     )
 

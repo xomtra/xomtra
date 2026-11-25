@@ -1,6 +1,6 @@
 # xomtra-ingest
 
-Ingest of Home Assistant data into the Xomtra lake (full edition):
+Ingest of Home Assistant data into the xomtra lake (full edition):
 
 * `xomtra-ingest stream` – live `state_changed` stream with catch-up (service);
 * Dagster code location `xomtra_ingest.definitions` – hourly ingest + SQLMesh, daily

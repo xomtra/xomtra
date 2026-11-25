@@ -8,7 +8,7 @@ A label on an entity or on its device decides:
                          (correlations, anomalies, change points) leave it out.
 
 ``no_ingest`` implies ``no_analysis``. The labels live in Home Assistant, where the
-entities are managed, so Xomtra needs no write path of its own; a label on a device
+entities are managed, so xomtra needs no write path of its own; a label on a device
 covers its future entities too.
 
 The label ids above are the defaults; deployments can choose their own

@@ -4,14 +4,14 @@ Status: **in development** (phase 1c.2, PR 9). The add-on image is built, scanne
 started in CI on every pull request and published with every release.
 
 The add-on needs Home Assistant OS or Supervised (installations with the Supervisor).
-Home Assistant Container and Core have no add-ons; there Xomtra runs next to Home
+Home Assistant Container and Core have no add-ons; there xomtra runs next to Home
 Assistant with Docker Compose ([lite or full edition](README.md)).
 
 ## Installing
 
 In the add-on store of Home Assistant, add the repository
 `https://github.com/xomtra/xomtra` (three-dot menu → Repositories), then install
-**Xomtra**. The Supervisor pulls the signed image
+**xomtra**. The Supervisor pulls the signed image
 `ghcr.io/xomtra/xomtra-addon-{amd64,aarch64}` of the version in `config.yaml`;
 images exist for every release after 0.4.1 ([releasing](../releasing.md)).
 
@@ -28,7 +28,7 @@ One container, supervised by [s6-overlay](https://github.com/just-containers/s6-
 | `mcp` | MCP server for the LAN on port 8000 with personal tokens (ADR 056, 059) |
 | `admin` | admin GUI in the Home Assistant sidebar (Ingress, port 8100 inside the hassio network only, ADR 070) |
 
-Postgres runs as user `postgres`, the Xomtra services as user `xomtra`; s6 itself
+Postgres runs as user `postgres`, the xomtra services as user `xomtra`; s6 itself
 starts as root, as in other add-ons.
 
 Home Assistant is reached through the Supervisor (`http://supervisor/core`) with the
@@ -36,7 +36,7 @@ add-on's own token (`homeassistant_api: true`), so no long-lived access token is
 
 ## Admin GUI (Ingress)
 
-The admin GUI opens as **Xomtra** in the Home Assistant sidebar, for Home Assistant
+The admin GUI opens as **xomtra** in the Home Assistant sidebar, for Home Assistant
 administrators only (`panel_admin`). There is no separate sign-in: Home Assistant signs
 the user in and its Ingress proxy (the Supervisor, `172.30.32.2`) passes the user in the
 `X-Remote-User-*` headers. The GUI therefore accepts connections only from that address
@@ -65,7 +65,7 @@ virtual appliance.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `log_level` | `info` | log level of the Xomtra services |
+| `log_level` | `info` | log level of the xomtra services |
 | `states_retention_days` | 90 | days of state history kept in the lake |
 | `statistics_5min_retention_days` | 90 | days of 5-minute statistics |
 | `statistics_hour_retention_days` | 1825 | days of hourly statistics |

@@ -6,4 +6,4 @@ misconfigurations:
       - addon/xomtra/Dockerfile
     statement: >-
       The add-on starts s6-overlay as root (Home Assistant add-on convention); s6 runs
-      Postgres as user postgres and every Xomtra service as user xomtra.
+      Postgres as user postgres and every xomtra service as user xomtra.

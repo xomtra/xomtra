@@ -153,7 +153,7 @@ async def test_tokens_issue_list_revoke_and_mcpb(fake_ha: tuple[FakeHA, str]) ->
             data={
                 "owner": "Petr",
                 "description": "Claude Desktop <laptop>",
-                "role": "Xomtra.Reader",
+                "role": "xomtra.Reader",
                 "days": "90",
             },
             headers=origin,
@@ -166,7 +166,7 @@ async def test_tokens_issue_list_revoke_and_mcpb(fake_ha: tuple[FakeHA, str]) ->
         assert issued.headers["cache-control"] == "no-store"
         info = store.verify(token_hash(token))
         assert info is not None
-        assert (info.owner, info.role, info.created_by) == ("Petr", "Xomtra.Reader", "Jana")
+        assert (info.owner, info.role, info.created_by) == ("Petr", "xomtra.Reader", "Jana")
 
         listing = await client.get("/admin/tokens")
         assert info.id in listing.text
@@ -213,7 +213,7 @@ async def test_tokens_only_in_local_mode(fake_ha: tuple[FakeHA, str]) -> None:
         assert "only in the local access mode" in page.text
         resp = await client.post(
             "/admin/tokens/issue",
-            data={"owner": "x", "description": "y", "role": "Xomtra.Reader", "days": "30"},
+            data={"owner": "x", "description": "y", "role": "xomtra.Reader", "days": "30"},
             headers={"origin": BASE},
         )
         assert "only in the local access mode" in resp.text

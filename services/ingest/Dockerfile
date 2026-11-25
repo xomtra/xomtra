@@ -28,7 +28,7 @@ COPY services/ingest/dagster /app/dagster
 
 FROM ${PYTHON_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/xomtra/xomtra" \
-      org.opencontainers.image.description="Xomtra ingest (stream, Dagster, SQLMesh)" \
+      org.opencontainers.image.description="xomtra ingest (stream, Dagster, SQLMesh)" \
       org.opencontainers.image.licenses="Apache-2.0"
 RUN apt-get update \
  && apt-get -y upgrade \

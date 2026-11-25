@@ -1,7 +1,7 @@
 """Claude Desktop extension (``.mcpb``) for the local access mode (ADR 056).
 
 The extension is a zip with ``manifest.json`` and a dependency-free Node bridge
-(``server/index.js``) that forwards MCP over stdio to the Xomtra endpoint with the
+(``server/index.js``) that forwards MCP over stdio to the xomtra endpoint with the
 personal token. :func:`build_mcpb` fills in the version and, for downloads from the
 admin GUI, the server's endpoint as the default address. The token is never part of
 the file: Claude Desktop asks for it at install and keeps it as a sensitive value.

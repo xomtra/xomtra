@@ -59,22 +59,22 @@ async def fake_ha() -> AsyncIterator[tuple[FakeHA, str]]:
 
 
 def test_role_map_parse() -> None:
-    assert RoleMap.parse("admin=Xomtra.Admin,user=Xomtra.Reader") == RoleMap()
-    assert RoleMap.parse("admin=Xomtra.Admin,user=") == RoleMap(user=None)
+    assert RoleMap.parse("admin=xomtra.Admin,user=xomtra.Reader") == RoleMap()
+    assert RoleMap.parse("admin=xomtra.Admin,user=") == RoleMap(user=None)
     with pytest.raises(ValueError, match="XOMTRA_HA_ROLE_MAP"):
-        RoleMap.parse("system-admin=Xomtra.Admin")
+        RoleMap.parse("system-admin=xomtra.Admin")
 
 
 def test_roles_for() -> None:
     admin, plain = HAUser.from_reply(ADMIN_USER), HAUser.from_reply(PLAIN_USER)
     owner = HAUser("u0", "Owner", is_owner=True, is_admin=False)
-    assert roles_for(admin, RoleMap()) == ["Xomtra.Admin"]
-    assert roles_for(owner, RoleMap()) == ["Xomtra.Admin"]
-    assert roles_for(plain, RoleMap()) == ["Xomtra.Reader"]
+    assert roles_for(admin, RoleMap()) == ["xomtra.Admin"]
+    assert roles_for(owner, RoleMap()) == ["xomtra.Admin"]
+    assert roles_for(plain, RoleMap()) == ["xomtra.Reader"]
     assert roles_for(plain, RoleMap(user=None)) == []
     assert roles_for(plain, RoleMap(), ["jana", "u9"]) == []
-    assert roles_for(admin, RoleMap(), ["JANA"]) == ["Xomtra.Admin"]
-    assert roles_for(plain, RoleMap(), ["u2"]) == ["Xomtra.Reader"]
+    assert roles_for(admin, RoleMap(), ["JANA"]) == ["xomtra.Admin"]
+    assert roles_for(plain, RoleMap(), ["u2"]) == ["xomtra.Reader"]
 
 
 # ---- configuration -------------------------------------------------------------------
@@ -130,7 +130,7 @@ async def test_ha_verifier(fake_ha: tuple[FakeHA, str]) -> None:
     verifier = HomeAssistantTokenVerifier(ha_url=url, role_map=RoleMap())
     token = await verifier.verify_token(VALID_TOKEN)
     assert token is not None
-    assert token.claims["roles"] == ["Xomtra.Admin"]
+    assert token.claims["roles"] == ["xomtra.Admin"]
     ident = identity_from_claims(token.claims, token.scopes)
     assert (ident.subject, ident.username, ident.idp) == ("u1", "Jana", "ha")
     assert await verifier.verify_token("wrong") is None
@@ -185,7 +185,7 @@ def test_memory_store_lifecycle() -> None:
     info, token = store.issue(
         owner="jana",
         description="laptop",
-        role="Xomtra.Reader",
+        role="xomtra.Reader",
         created_by="admin",
         expires_at=expiry(30),
     )
@@ -201,7 +201,7 @@ def test_memory_store_lifecycle() -> None:
     _, old = store.issue(
         owner="x",
         description="y",
-        role="Xomtra.Reader",
+        role="xomtra.Reader",
         created_by=None,
         expires_at=datetime.now(UTC) - timedelta(seconds=1),
     )
@@ -214,7 +214,7 @@ async def test_personal_token_verifier() -> None:
     info, token = store.issue(
         owner="jana",
         description="laptop",
-        role="Xomtra.Reader",
+        role="xomtra.Reader",
         created_by=None,
         expires_at=None,
     )
@@ -224,7 +224,7 @@ async def test_personal_token_verifier() -> None:
     ident = identity_from_claims(access.claims, access.scopes)
     assert ident.subject == f"token:{info.id}"
     assert ident.username == "jana"
-    assert ident.roles == ("Xomtra.Reader",)
+    assert ident.roles == ("xomtra.Reader",)
     assert ident.idp == "token"
     assert await verifier.verify_token("not-a-token") is None
     store.revoke(info.id, None)
@@ -278,7 +278,7 @@ async def test_local_endpoint_requires_a_valid_token() -> None:
     info, token = store.issue(
         owner="jana",
         description="laptop",
-        role="Xomtra.Reader",
+        role="xomtra.Reader",
         created_by=None,
         expires_at=None,
     )
@@ -316,7 +316,7 @@ def running_local_server() -> Iterator[tuple[str, str, MemoryTokenStore]]:
     _, token = store.issue(
         owner="jana",
         description="desktop",
-        role="Xomtra.Reader",
+        role="xomtra.Reader",
         created_by=None,
         expires_at=None,
     )
@@ -385,7 +385,7 @@ def test_desktop_bridge_end_to_end(running_local_server: tuple[str, str, Any]) -
         wait_for=3,
     )
     by_id = {r["id"]: r for r in replies}
-    assert by_id[1]["result"]["serverInfo"]["name"] == "Xomtra"
+    assert by_id[1]["result"]["serverInfo"]["name"] == "xomtra"
     names = {t["name"] for t in by_id[2]["result"]["tools"]}
     assert {"whoami", "server_info"} <= names
     who = by_id[3]["result"]["structuredContent"]

@@ -26,7 +26,7 @@ RUN /app/.venv/bin/python -m hacore.lake install-extensions
 
 FROM ${PYTHON_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/xomtra/xomtra" \
-      org.opencontainers.image.description="Xomtra MCP server" \
+      org.opencontainers.image.description="xomtra MCP server" \
       org.opencontainers.image.licenses="Apache-2.0"
 # Apply Debian security updates on top of the pinned base image and drop pip/ensurepip:
 # the runtime installs nothing, and pip's vendored libraries only add scan findings.

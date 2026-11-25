@@ -13,8 +13,8 @@ from xomtra_mcp.data import DataAccess
 from xomtra_mcp.server import create_server
 
 EXT = os.environ.get("XOMTRA_DUCKDB_EXTENSION_DIR") or None
-ADMIN = ["Xomtra.Admin"]
-READER = ["Xomtra.Reader"]
+ADMIN = ["xomtra.Admin"]
+READER = ["xomtra.Reader"]
 
 
 def server(data: DataAccess, roles: list[str], audit: Any = None) -> Any:

@@ -119,7 +119,7 @@ async def test_allowed_users_apply_to_ingress() -> None:
 
 async def test_tokens_behind_ingress() -> None:
     app, _, store = make_app()
-    form = {"owner": "Petr", "description": "laptop", "role": "Xomtra.Reader", "days": "90"}
+    form = {"owner": "Petr", "description": "laptop", "role": "xomtra.Reader", "days": "90"}
     async with client_for(app) as client:
         cross = await client.post(
             "/tokens/issue", data=form, headers={**HA, "origin": "https://evil.example"}

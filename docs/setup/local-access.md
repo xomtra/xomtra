@@ -1,6 +1,6 @@
 # Local access (LAN only, personal tokens)
 
-The quickest way to try Xomtra (ADR 056): the MCP endpoint and the admin GUI are
+The quickest way to try xomtra (ADR 056): the MCP endpoint and the admin GUI are
 reachable only in your LAN. No public DNS name, certificate authority account, port
 forward or cloud identity is needed. Claude Desktop, Claude Code and other MCP clients
 on a computer in the LAN (or connected by your VPN) use a **personal token** that you
@@ -52,8 +52,8 @@ server) or give it only to the clients that need it (below).
 ## 3. Issue a token
 
 Open `https://<local-host>/admin/`, sign in (Home Assistant administrator) and go to
-**Tokens**: who it is for, a description (device or app), role (`Xomtra.Reader` or
-`Xomtra.Admin`) and expiry. The token (`xmt_…`) is shown **once**, together with ready
+**Tokens**: who it is for, a description (device or app), role (`xomtra.Reader` or
+`xomtra.Admin`) and expiry. The token (`xmt_…`) is shown **once**, together with ready
 instructions for the clients. Only its SHA-256 hash is stored; revoking takes effect
 within 30 seconds. Issue one token per person and device, so that you can revoke one
 without the others and the audit shows who asked what.
@@ -69,7 +69,7 @@ without the others and the audit shows who asked what.
    trust store, for the **certificate of the server** (`xomtra-ca.crt`).
 
 The extension is a small bridge without dependencies (`server/index.js`) that forwards
-MCP from Claude Desktop to the Xomtra endpoint. It refuses plain `http://` to anything
+MCP from Claude Desktop to the xomtra endpoint. It refuses plain `http://` to anything
 but the local machine unless you allow it explicitly.
 
 ### Claude Code

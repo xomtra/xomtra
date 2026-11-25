@@ -13,7 +13,7 @@ MODEL (
   -- timestamp (hundreds of thousands of files per batch, memory exhaustion).
   partitioned_by year(last_updated),
   cron '@hourly',
-  -- Xomtra only has what the HA recorder still holds (10 days by default, ADR 033);
+  -- xomtra only has what the HA recorder still holds (10 days by default, ADR 033);
   -- an earlier start would only add empty 6-hour batches to the first plan.
   start '14 days ago',
   grain (entity_id, last_updated),

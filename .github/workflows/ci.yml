@@ -298,8 +298,8 @@ jobs:
 
           data = DataAccess.from_settings(LakeSettings.from_env())
           policy = Policy.load()
-          admin = policy.access_for(Identity(True, "ci", roles=("Xomtra.Admin",)), KNOWN_VIEWS)
-          reader = policy.access_for(Identity(True, "ci", roles=("Xomtra.Reader",)), KNOWN_VIEWS)
+          admin = policy.access_for(Identity(True, "ci", roles=("xomtra.Admin",)), KNOWN_VIEWS)
+          reader = policy.access_for(Identity(True, "ci", roles=("xomtra.Reader",)), KNOWN_VIEWS)
           found = data.search_catalog(admin)
           print("catalog entities", found["row_count"])
           assert found["row_count"] > 0
@@ -331,14 +331,14 @@ jobs:
         run: |
           # sha256('xmt_ci_token') stored by the superuser; the MCP role may only verify.
           docker compose exec -T postgres psql -U postgres -d audit -c \
-            "INSERT INTO access.token (id, token_hash, owner, description, role) VALUES ('ci', sha256('xmt_ci_token'), 'ci', 'ci', 'Xomtra.Reader')"
+            "INSERT INTO access.token (id, token_hash, owner, description, role) VALUES ('ci', sha256('xmt_ci_token'), 'ci', 'ci', 'xomtra.Reader')"
           docker compose exec -T mcp python - <<'PY'
           from xomtra_mcp.config import Settings
           from xomtra_mcp.tokens import PostgresTokenStore, TokenStoreError, token_hash
 
           store = PostgresTokenStore(Settings().audit_dsn)
           info = store.verify(token_hash("xmt_ci_token"))
-          assert info is not None and info.role == "Xomtra.Reader", info
+          assert info is not None and info.role == "xomtra.Reader", info
           assert store.verify(token_hash("xmt_ci_wrong")) is None
           for forbidden in (store.list, lambda: store.revoke("ci", "x")):
               try:

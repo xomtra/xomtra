@@ -1,7 +1,7 @@
 # Minimal Home Assistant configuration for the hacore contract tests.
 # Synthetic entities only; no real installation data.
 homeassistant:
-  name: Xomtra contract test
+  name: xomtra contract test
   latitude: 50.0
   longitude: 14.0
   elevation: 200

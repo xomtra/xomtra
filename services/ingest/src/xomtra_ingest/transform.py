@@ -1,7 +1,7 @@
 """SQLMesh transformations bronze -> silver on DuckLake.
 
 The SQLMesh project lives in ``sqlmesh_project/`` (shipped inside the package). Its
-gateway is built here from the same environment variables as the rest of Xomtra:
+gateway is built here from the same environment variables as the rest of xomtra:
 
 * data: DuckDB with the DuckLake catalog attached as ``lake`` (default catalog), so
   SQLMesh physical tables (``sqlmesh__silver``) and views (``silver``) live in the lake;

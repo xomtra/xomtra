@@ -36,7 +36,7 @@ sed -i \
   -e 's/=hammond_ops$/=xomtra_ops/' \
   -e 's/=hammond_audit$/=xomtra_audit/' \
   -e 's/=hammond_audit_admin$/=xomtra_audit_admin/' \
-  -e 's/HAmmond\.\(Admin\|Reader\)/Xomtra.\1/g' \
+  -e 's/HAmmond\.\(Admin\|Reader\)/xomtra.\1/g' \
   -e 's/hammond_no_\(ingest\|analysis\)/xomtra_no_\1/g' \
   -e "s/^S3_BUCKET=$old_bucket\$/S3_BUCKET=$NEW/" \
   .env
@@ -109,6 +109,6 @@ Migration done. Check the admin GUI and a query in Claude, then remove the old d
   docker volume rm $(for v in $VOLUMES; do printf '%s_%s ' "$OLD" "$v"; done)
   # and the old bucket, with the same aws-cli call as above: s3 rb --force s3://$old_bucket
   rm .env.bak-$OLD
-Also: roles Xomtra.Admin / Xomtra.Reader in Entra, labels xomtra_no_ingest /
+Also: roles xomtra.Admin / xomtra.Reader in Entra, labels xomtra_no_ingest /
 xomtra_no_analysis in Home Assistant, and new personal tokens (xmt_...).
 DONE

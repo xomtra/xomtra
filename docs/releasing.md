@@ -1,6 +1,6 @@
 # Releases
 
-Xomtra is released as one product: every package, service and container image of a
+xomtra is released as one product: every package, service and container image of a
 release carries the same version (ADR 045).
 
 ## Versions and channels
@@ -50,7 +50,7 @@ uv run python scripts/release.py prepare 0.2.0   # versions, compose defaults, C
 # review CHANGELOG.md (upgrade notes!), commit, open PR "Release 0.2.0", squash-merge
 git switch main && git pull
 # wait until the CI run of the merge commit on main is green (publish jobs included)
-git tag -s v0.2.0 -m "Xomtra 0.2.0"
+git tag -s v0.2.0 -m "xomtra 0.2.0"
 git push origin v0.2.0
 ```
 
@@ -69,7 +69,7 @@ Every pull request with a user-visible change adds a line under `[Unreleased]` i
 
 ```bash
 git clone --branch v0.2.0 --depth 1 https://github.com/xomtra/xomtra.git
-cd Xomtra/deploy/compose
+cd xomtra/deploy/compose
 cp .env.example .env && chmod 600 .env
 # fill in .env, then replace the three *_IMAGE lines with the ones from
 # xomtra-0.2.0-images.env (release assets) so that the images are pinned by digest
@@ -94,14 +94,14 @@ cosign verify ghcr.io/xomtra/xomtra-mcp@sha256:<digest> \
 5. Roll back by restoring the backup and the previous `*_IMAGE` lines (pinned by
    digest, so the old images are pulled again).
 
-**From 0.4.x (code name HAmmond) to Xomtra** (ADR 071): after step 3, with the new
+**From 0.4.x (code name HAmmond) to xomtra** (ADR 071): after step 3, with the new
 `*_IMAGE` lines in `.env` but before starting anything, run
 `sh migrate-from-hammond.sh` in the compose directory instead of step 4. It stops the old
 stack, rewrites `.env` (`XOMTRA_*`, roles, bucket, compose project `xomtra`), copies
 the volumes, renames the Postgres roles, copies the lake bucket, points the DuckLake
 catalog to it and starts the new stack. The old volumes, the old bucket and
 `.env.bak-hammond` stay as the rollback until you remove them. Afterwards: add the Entra
-app roles `Xomtra.Admin`/`Xomtra.Reader` and assign them, rename the Home Assistant
+app roles `xomtra.Admin`/`xomtra.Reader` and assign them, rename the Home Assistant
 labels to `xomtra_no_ingest`/`xomtra_no_analysis` and issue new personal tokens.
 
 ## Repository settings (one-time, maintainer)

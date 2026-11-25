@@ -1,6 +1,6 @@
-# Xomtra
+# xomtra
 
-Xomtra turns the history of a [Home Assistant](https://www.home-assistant.io/) installation
+xomtra turns the history of a [Home Assistant](https://www.home-assistant.io/) installation
 into a queryable data platform and exposes it to AI assistants (e.g. Claude) through the
 [Model Context Protocol](https://modelcontextprotocol.io/), with identity and roles from
 Microsoft Entra ID.
@@ -54,7 +54,7 @@ Please report vulnerabilities privately, see [SECURITY.md](SECURITY.md).
 Container images are published to `ghcr.io/xomtra/` and signed with
 [cosign](https://docs.sigstore.dev/) v3 (keyless, GitHub OIDC; the signature is stored
 in the new bundle format, which cosign v2 does not find). Verify with cosign v3 before
-deploying (the repository name in the identity is case-sensitive: `Xomtra`). Released
+deploying (the identity is case-sensitive and uses the lowercase `xomtra/xomtra`). Released
 images carry a second signature from the release workflow, see
 [docs/releasing.md](docs/releasing.md); development builds of `main` only this one:
 

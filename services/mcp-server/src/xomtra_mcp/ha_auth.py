@@ -4,7 +4,7 @@ Home Assistant has an IndieAuth-style authorization code flow: the client is not
 registered, its ``client_id`` is a URL and the ``redirect_uri`` must be on the same host.
 There is no ID token, so the identity comes from the WebSocket command
 ``auth/current_user`` called with the user's access token. HA tokens carry all rights of
-the user (no scopes): Xomtra uses them only for that call.
+the user (no scopes): xomtra uses them only for that call.
 
 * MCP (``XOMTRA_AUTH_MODE=ha``, public access): :class:`HomeAssistantProvider`, a FastMCP
   ``OAuthProxy`` with HA upstream, and :class:`HomeAssistantTokenVerifier`.
@@ -34,7 +34,7 @@ from hacore.errors import HAAuthError, HAError
 logger = logging.getLogger(__name__)
 
 IDP = "ha"
-DEFAULT_ROLE_MAP = "admin=Xomtra.Admin,user=Xomtra.Reader"
+DEFAULT_ROLE_MAP = "admin=xomtra.Admin,user=xomtra.Reader"
 USER_CACHE_SECONDS = 60
 
 
@@ -44,13 +44,13 @@ class LoginError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class RoleMap:
-    """Xomtra role of HA administrators (incl. the owner) and of other HA users.
+    """xomtra role of HA administrators (incl. the owner) and of other HA users.
 
     ``None`` refuses that kind of user (e.g. ``user=`` lets only administrators in).
     """
 
-    admin: str | None = "Xomtra.Admin"
-    user: str | None = "Xomtra.Reader"
+    admin: str | None = "xomtra.Admin"
+    user: str | None = "xomtra.Reader"
 
     @classmethod
     def parse(cls, text: str) -> RoleMap:
@@ -95,7 +95,7 @@ class HAUser:
 
 
 def roles_for(user: HAUser, role_map: RoleMap, allowed: list[str] | None = None) -> list[str]:
-    """Xomtra roles of an HA user; empty = the user may not sign in."""
+    """xomtra roles of an HA user; empty = the user may not sign in."""
     if allowed:
         wanted = {a.casefold() for a in allowed}
         if user.id.casefold() not in wanted and user.name.casefold() not in wanted:
@@ -140,7 +140,7 @@ class HomeAssistantTokenVerifier(TokenVerifier):
             raise TokenVerificationError("Home Assistant is not reachable") from err
         roles = roles_for(user, self.role_map, self.allowed_users)
         if not roles:
-            logger.info("HA user %s is not allowed to use Xomtra", user.id)
+            logger.info("HA user %s is not allowed to use xomtra", user.id)
             return None
         return user.claims(roles)
 
@@ -172,7 +172,7 @@ class HomeAssistantProvider(OAuthProxy):
     """OAuth proxy for Claude with Home Assistant as the upstream identity provider.
 
     HA is a public client without secret, PKCE or resource indicators. Claude registers
-    with Xomtra (DCR, limited to Claude's redirect URIs) and gets Xomtra's own tokens;
+    with xomtra (DCR, limited to Claude's redirect URIs) and gets xomtra's own tokens;
     the HA tokens stay encrypted in the proxy's storage.
     """
 
@@ -211,7 +211,7 @@ class HomeAssistantProvider(OAuthProxy):
         claims = await self._verifier.user_claims(str(idp_tokens.get("access_token", "")))
         if claims is None:
             raise TokenError(
-                "invalid_grant", "This Home Assistant user is not allowed to use Xomtra"
+                "invalid_grant", "This Home Assistant user is not allowed to use xomtra"
             )
         return claims
 

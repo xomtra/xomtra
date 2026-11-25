@@ -35,7 +35,7 @@ from xomtra_mcp.tokens import PersonalTokenVerifier, PostgresTokenStore, TokenSt
 logger = logging.getLogger(__name__)
 
 INSTRUCTIONS = """\
-Xomtra exposes the history and catalog of a Home Assistant installation.
+xomtra exposes the history and catalog of a Home Assistant installation.
 
 Start with `search_catalog` to find entities (by words, area, domain or kind), then
 `describe_entity` for details and data quality, and `get_timeseries` for values over
@@ -109,7 +109,7 @@ def create_server(
     tokens: TokenStore | None = None,
 ) -> FastMCP:
     mcp = FastMCP(
-        name="Xomtra",
+        name="xomtra",
         instructions=INSTRUCTIONS,
         auth=build_auth(settings, tokens),
         mask_error_details=True,
@@ -128,7 +128,7 @@ def create_server(
 
     @mcp.tool(annotations=READ_ONLY)
     def whoami() -> dict[str, Any]:
-        """Return the identity and app roles of the signed-in user, as Xomtra sees them."""
+        """Return the identity and app roles of the signed-in user, as xomtra sees them."""
         ident = current_identity()
         return {
             "authenticated": ident.authenticated,
@@ -141,9 +141,9 @@ def create_server(
 
     @mcp.tool(annotations=READ_ONLY)
     def server_info() -> dict[str, Any]:
-        """Return Xomtra server version and which back-ends are configured."""
+        """Return xomtra server version and which back-ends are configured."""
         return {
-            "name": "Xomtra",
+            "name": "xomtra",
             "version": __version__,
             "auth_mode": settings.auth_mode,
             "access_mode": settings.access_mode,

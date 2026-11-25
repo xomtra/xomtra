@@ -129,7 +129,7 @@ sudo docker compose exec dagster-daemon xomtra-ingest correlations
 
 ### Outside temperature history from Open-Meteo
 
-A `weather.*` entity only has the history Xomtra collected. With
+A `weather.*` entity only has the history xomtra collected. With
 `XOMTRA_OPEN_METEO_ENABLED=true`, `catalog_daily` first stores the hourly
 `temperature_2m` of the [Open-Meteo historical archive](https://open-meteo.com/en/docs/historical-weather-api)
 for the HA home location (from the HA configuration, rounded to two decimals, about
@@ -162,7 +162,7 @@ After the correlations, `catalog_daily` looks at every series of the same hourly
   `n_eff` = anomalous hours, `observed`/`expected` = mean value and usual value of
   those hours, `period_start`/`period_end` = the episode. A series needs 14 days of
   baseline, so binary and enum entities (from the state history) take part only once
-  Xomtra has collected that much.
+  xomtra has collected that much.
 - `finding_type = 'change_point'` (`window_days` = `XOMTRA_CHANGEPOINT_WINDOW_DAYS`,
   90): a lasting shift of the daily mean (local days). For every split in the last 30
   days (`XOMTRA_CHANGEPOINT_RECENT_DAYS`) with at least 14 days before and 7 after, the
@@ -257,7 +257,7 @@ not see. Create the first snapshot by hand after deploying:
 sudo docker compose exec dagster-daemon xomtra-ingest findings-weekly
 ```
 
-Example questions: *"What did Xomtra find last week?"*, *"Are there anomalies on the
+Example questions: *"What did xomtra find last week?"*, *"Are there anomalies on the
 heat pump in the last days?"* (`get_findings` with `entity_id`).
 
 ## Roles and policy
@@ -266,8 +266,8 @@ The built-in policy (`services/mcp-server/src/xomtra_mcp/policy.yaml`):
 
 | Role | Tools | Views | Hidden entities | Hidden columns | Rows per call |
 | --- | --- | --- | --- | --- | --- |
-| `Xomtra.Admin` | all | all | none | none | 10 000 |
-| `Xomtra.Reader` | catalog, data and findings tools | all but `catalog_drift` | `person.*`, `device_tracker.*`, `zone.*`, `camera.*`, `image.*`, `lock.*`, `alarm_control_panel.*`, `*_location` | `states.attributes` | 1 000 |
+| `xomtra.Admin` | all | all | none | none | 10 000 |
+| `xomtra.Reader` | catalog, data and findings tools | all but `catalog_drift` | `person.*`, `device_tracker.*`, `zone.*`, `camera.*`, `image.*`, `lock.*`, `alarm_control_panel.*`, `*_location` | `states.attributes` | 1 000 |
 | no role | `whoami` only | – | – | – | – |
 
 Hidden entities and columns are filtered inside the database (the views a caller can
@@ -278,7 +278,7 @@ hidden from Reader because they carry free text (media titles, addresses, coordi
 e-mails) also outside the hidden domains. To change
 the policy, mount your own file into the `mcp` container and set `XOMTRA_POLICY_FILE`.
 
-Assign the roles in Entra: **Enterprise applications → Xomtra MCP → Users and groups**
+Assign the roles in Entra: **Enterprise applications → xomtra MCP → Users and groups**
 (see [Entra app registration](entra-app-registration.md), step 6). A new role takes
 effect after the user reconnects the connector in claude.ai.
 
