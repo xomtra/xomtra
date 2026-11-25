@@ -275,3 +275,34 @@ def test_change_points_v2_quiet_on_autocorrelated_noise() -> None:
     ids = [f["entity_id"] for f in found]
     assert "sensor.s0" in ids
     assert len(ids) <= 3
+
+
+def test_anomalies_v2_nearly_constant_series_do_not_own_the_reference() -> None:
+    """A sensor stuck at one value with rare jumps has a robust scale near 0 and z in
+    the millions. Without the resolution floor and the z cap a few of them made the
+    pooled reference so heavy that nothing passed (homelab, 0.4.0)."""
+    rng = np.random.default_rng(3)
+    days, n, stuck = 63, 40, 5
+    t = days * 24
+    hours = np.array([END - timedelta(hours=t - i) for i in range(t)])
+    values = rng.normal(0, 1, (t, n))
+    for j in range(n - stuck, n):
+        values[:, j] = 20.0 + rng.normal(0, 1e-6, t)  # stuck, float jitter only
+        jumps = rng.choice(t - 7 * 24, 3, replace=False)
+        values[jumps, j] += rng.uniform(5, 50, 3)  # rare one-hour jumps in the baseline
+    values[-36:-24, 0] += 15  # one real 12-hour episode in the recent week
+    series = [an.corr.Series(f"sensor.s{j}", "mean", None) for j in range(n)]
+    local = np.array([h.hour for h in hours])
+    dow = np.array([h.isoweekday() for h in hours])
+    grid = an.corr.Grid(hours=hours, local_hour=local, local_dow=dow, series=series, values=values)
+    found, stats = an.detect_anomalies_v2(grid, an.AnomalyParams(timezone="UTC"))
+    assert stats["candidates"] > 0
+    assert "sensor.s0" in [f["entity_id"] for f in found]
+    assert an._episode_stat(1e6, 4) == pytest.approx(an.Z_CAP * 2)
+
+
+def test_resolution() -> None:
+    v = np.array([[1.0, 0.0], [1.5, 0.0], [2.0, 0.0], [np.nan, 0.0]])
+    res = an._resolution(v, np.ones(4, dtype=bool))
+    assert res[0] == pytest.approx(0.5)
+    assert res[1] == 0.0

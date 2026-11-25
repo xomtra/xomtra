@@ -105,6 +105,11 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    The run logs the histogram of p- and q-values (no entity names) for the
    calibration of `q`.
 
+Stored are at most `HAMMOND_CORRELATION_TOP` (100) findings per window: unflagged ones
+first, then explained or unstable ones (`indirect`, `common_factor`, `same_area`,
+`house_context`, `unstable`, ...), trivial ones (`duplicate_suspect`, `same_device`)
+last, each part by `|r|`.
+
 `entity_id` leads `related_entity_id` by `lag_hours`. `first_detected_at` stays from the
 first run that found the pair; every run replaces the findings of its window. A
 correlation is a hint to look at, not a cause.
@@ -163,8 +168,10 @@ series); whether they are reported depends on calibrated p-values and the
 Benjamini–Hochberg FDR over all candidates of a type (`HAMMOND_ANOMALY_MAX_Q`, 0.05),
 not on a fixed threshold per series:
 
-- anomalies: the strength of an episode is its peak `|z|` times the square root of its
-  hours. Every baseline week is scored against the other baseline weeks; the strongest
+- anomalies: the strength of an episode is its peak `|z|` (at most 50, `HAMMOND_ANOMALY_Z_CAP`) times the square
+  root of its hours. The scale is never below the sensor's resolution (median step
+  between its distinct values); with the cap, a nearly constant sensor whose rare jumps
+  reach a z of millions cannot own the tail of the pooled reference. Every baseline week is scored against the other baseline weeks; the strongest
   episode of each series and day (0 if none) forms the reference, pooled over series.
   `p_value` is the share of the reference at least as strong (generalised Pareto tail
   beyond it). Days after a detected change point of the series are left out of its

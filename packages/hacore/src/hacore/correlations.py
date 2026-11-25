@@ -1104,12 +1104,25 @@ def select_findings(
                 "related_group": [] if same_group else _others(members[gb], b.entity_id),
             }
         )
-    # Trivial pairs (one quantity twice, two sensors of one device) go last.
-    candidates.sort(key=lambda f: bool(f["flags"]))  # stable: |r| order kept within
+    candidates.sort(key=_tier)  # stable: |r| order kept within a tier
+
     out = candidates[: params.top]
     for rank, f in enumerate(out, start=1):
         f["rank"] = rank
     return out
+
+
+# One quantity twice, two sensors of one device: true, but nothing to learn.
+TRIVIAL_FLAGS = frozenset({"duplicate_suspect", "same_device"})
+
+
+def _tier(f: dict[str, Any]) -> int:
+    """Unflagged pairs first, then explained or unstable ones (indirect, same area,
+    house context, ...), trivial pairs last. With strong duplicates ranked by |r| among
+    the flagged ones, the stored top N held no explained pair at all (homelab, 0.4.0)."""
+    if not f["flags"]:
+        return 0
+    return 2 if TRIVIAL_FLAGS & set(f["flags"]) else 1
 
 
 def _others(group: list[str], entity_id: str) -> list[str]:

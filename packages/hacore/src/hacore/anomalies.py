@@ -69,6 +69,10 @@ PRIOR_VALUES = 8
 SCALE_FLOOR = 0.5
 # ... and for shares of time at least this (3 minutes of an hour).
 SHARE_SCALE_FLOOR = 0.05
+# v2: |z| above this counts as this in the episode statistic. A nearly constant series
+# has a scale near 0 and z in the millions; a few such series would own the tail of
+# the pooled reference and nothing else could pass (homelab, 0.4.0).
+Z_CAP = 50.0
 # Anomalous hours separated by at most this many normal hours form one episode.
 EPISODE_GAP = 1
 # Episodes kept per series (the strongest ones).
@@ -112,6 +116,7 @@ class AnomalyParams:
     method: str = "v2"
     max_q: float = 0.05
     min_effect_z: float = 3.0  # v2 anomalies: peak |z| at least this
+    z_cap: float = Z_CAP  # v2 anomalies: |z| counted at most this in the statistic
     min_shift_lr: float = 2.0  # v2 change points: shift in long-run deviations
     permutations: int = 200
     seed: int = 0
@@ -488,16 +493,32 @@ def _z(values: FloatArray, exp: Expectation, floor: FloatArray) -> FloatArray:
     return out
 
 
-def _episode_stat(peak: float, count: int) -> float:
-    """Strength of an episode: peak |z| times the square root of its hours."""
-    return abs(peak) * float(np.sqrt(count))
+def _episode_stat(peak: float, count: int, cap: float = Z_CAP) -> float:
+    """Strength of an episode: peak |z| (at most ``cap``) times the square root of its
+    hours."""
+    return min(abs(peak), cap) * float(np.sqrt(count))
+
+
+def _resolution(values: FloatArray, baseline: npt.NDArray[np.bool_]) -> FloatArray:
+    """Median gap between neighbouring distinct baseline values of every series: a
+    deviation smaller than the step the sensor reports in is not measurable, so the
+    scale never goes below it."""
+    out = np.zeros(values.shape[1])
+    base = values[baseline]
+    for j in range(values.shape[1]):
+        col = base[:, j]
+        gaps = np.diff(np.unique(col[~np.isnan(col)]))
+        gaps = gaps[gaps > 0]
+        if len(gaps):
+            out[j] = float(np.median(gaps))
+    return out
 
 
 def _strongest_episodes(
-    z: FloatArray, threshold: float, limit: int
+    z: FloatArray, threshold: float, limit: int, *, cap: float = Z_CAP
 ) -> list[tuple[int, int, float, int]]:
     found = episodes(z, threshold)
-    return sorted(found, key=lambda e: -_episode_stat(e[2], e[3]))[:limit]
+    return sorted(found, key=lambda e: -_episode_stat(e[2], e[3], cap))[:limit]
 
 
 def _reference(
@@ -531,8 +552,12 @@ def _reference(
             for j in usable:
                 if j in shifts and held_idx[day] + 23 >= shifts[j]:
                     continue
-                found = _strongest_episodes(z_k[day : day + 24, j], params.min_effect_z, 1)
-                reference.append(_episode_stat(found[0][2], found[0][3]) if found else 0.0)
+                found = _strongest_episodes(
+                    z_k[day : day + 24, j], params.min_effect_z, 1, cap=params.z_cap
+                )
+                reference.append(
+                    _episode_stat(found[0][2], found[0][3], params.z_cap) if found else 0.0
+                )
     return reference
 
 
@@ -560,6 +585,8 @@ def detect_anomalies_v2(
     p-value of a recent episode is its exceedance probability in that sample, with a
     generalised Pareto tail beyond it; Benjamini-Hochberg over all candidate episodes;
     an episode is reported with ``q <= max_q`` and a peak ``|z| >= min_effect_z``.
+    The scale is at least the series' resolution and the statistic caps |z| at
+    ``Z_CAP``: nearly constant series must not own the tail of the pooled reference.
     """
     shifts = shifts or {}
     t_len = len(grid.hours)
@@ -580,7 +607,7 @@ def detect_anomalies_v2(
         if s.entity_id != params.outside_temp and known_base[j] >= MIN_BASELINE_HOURS
     ]
     exp = expectation(values, how, grid.local_hour, baseline, grid.series)
-    floor = _discrete_floor(values, baseline, exp)
+    floor = np.fmax(_discrete_floor(values, baseline, exp), _resolution(values, baseline))
     z = _z(values, exp, floor)
     reference = _reference(
         values,
@@ -602,13 +629,13 @@ def detect_anomalies_v2(
     for j in usable:
         s = grid.series[j]
         for first, last, peak, count in _strongest_episodes(
-            z[first_recent:, j], params.min_effect_z, MAX_EPISODES_PER_SERIES
+            z[first_recent:, j], params.min_effect_z, MAX_EPISODES_PER_SERIES, cap=params.z_cap
         ):
             a, b = first_recent + first, first_recent + last
             sel = slice(a, b + 1)
             hit = np.abs(np.nan_to_num(z[sel, j])) >= params.min_effect_z
             flags = _anomaly_flags(count, sel, temp_z, shifts.get(j), a)
-            cand_stat.append(_episode_stat(peak, count))
+            cand_stat.append(_episode_stat(peak, count, params.z_cap))
             cands.append(
                 {
                     "finding_id": _id(ANOMALY, s, hours[a].isoformat()),
@@ -882,9 +909,10 @@ def _methods(params: AnomalyParams) -> tuple[str, str]:
             "change, observed/expected = median after/before, n_eff = days after",
         )
     return (
-        f"hour-of-week median and robust deviation (Qn for discrete series) over "
-        f"{params.baseline_days} d before the last {params.recent_days} d; conformal p of "
-        "the episode (peak |z| x sqrt(hours)) against leave-one-week-out baseline "
+        f"hour-of-week median and robust deviation (Qn for discrete series, at least the "
+        f"sensor's resolution) over {params.baseline_days} d before the last "
+        f"{params.recent_days} d; conformal p of the episode (min(peak |z|, {params.z_cap:g}) x "
+        "sqrt(hours)) against leave-one-week-out baseline "
         f"episodes, BH over episodes q <= {params.max_q:g}, peak |z| >= "
         f"{params.min_effect_z:g}; score = peak z, n_eff = anomalous hours (v2, ADR 062)",
         f"shift of the daily level in the last {params.changepoint_recent_days} d; p from "
