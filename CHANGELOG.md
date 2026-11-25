@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Xomtra are documented in this file. The format follows
+All notable changes to xomtra are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see
 [docs/releasing.md](docs/releasing.md)). Before 1.0.0 a minor release may contain
@@ -10,6 +10,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 (sections: Added, Changed, Deprecated, Removed, Fixed, Security).
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-11-25
 
 ### Added
 
@@ -75,13 +77,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Changed
 
-- **Breaking: HAmmond is now Xomtra (ADR 071).** The project moved to the organization
+- **Breaking: hammond is now xomtra (ADR 071).** The project moved to the organization
   **xomtra** (repository `github.com/xomtra/xomtra`) and every name follows: images
   `ghcr.io/xomtra/xomtra-{mcp,ingest,caddy}` and `xomtra-addon-{amd64,aarch64}`, Python
   packages `xomtra_mcp` and `xomtra_ingest`, commands `xomtra-*`, environment variables
   `XOMTRA_*`, compose project `xomtra` (containers and volumes), lake bucket `xomtra`,
   Postgres roles `xomtra_ops`, `xomtra_audit` and `xomtra_audit_admin`, Entra roles
-  `Xomtra.Admin` and `Xomtra.Reader`, Home Assistant labels `xomtra_no_ingest` and
+  `xomtra.Admin` and `xomtra.Reader`, Home Assistant labels `xomtra_no_ingest` and
   `xomtra_no_analysis`, personal tokens `xmt_…` and the add-on slug `xomtra`. Releases up
   to 0.4.1 keep the image addresses of their `images.env`; signatures of new releases
   name the new repository. Upgrade: put the `*_IMAGE` lines of the release's
@@ -247,7 +249,8 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/xomtra/xomtra/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/xomtra/xomtra/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/xomtra/xomtra/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/xomtra/xomtra/compare/v0.2.0...v0.3.0

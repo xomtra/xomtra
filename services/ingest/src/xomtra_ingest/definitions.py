@@ -1,4 +1,4 @@
-"""Dagster code location of Xomtra ingest.
+"""Dagster code location of xomtra ingest.
 
 Jobs
     ``ingest_hourly``     registries -> statistics -> SQLMesh run (scheduled hourly)

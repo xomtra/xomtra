@@ -1,4 +1,4 @@
-# Xomtra in the local access mode (ADR 056): the MCP endpoint and the admin GUI are
+# xomtra in the local access mode (ADR 056): the MCP endpoint and the admin GUI are
 # reachable only in the LAN, nothing is exposed to the internet and no public DNS name,
 # ACME or port forward is needed. TLS uses Caddy's own local CA; clients trust it by
 # importing https://<host>/xomtra-ca.crt (or pin it in the Claude Desktop extension).
@@ -25,7 +25,7 @@
 	default_sni {$XOMTRA_LOCAL_HOST}
 	pki {
 		ca local {
-			name "Xomtra local CA"
+			name "xomtra local CA"
 		}
 	}
 }
@@ -59,7 +59,7 @@ https://{$XOMTRA_LOCAL_HOST} {
 			handle @dagster {
 				forward_auth admin:8100 {
 					uri /admin/auth/check
-					copy_headers X-Xomtra-User
+					copy_headers X-xomtra-User
 				}
 				reverse_proxy dagster-webserver:3000
 			}

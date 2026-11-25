@@ -38,7 +38,7 @@ class FakeEntra:
     """Token and JWKS endpoints of Entra; issues ID tokens with the given roles."""
 
     def __init__(self) -> None:
-        self.roles: list[str] = ["Xomtra.Admin"]
+        self.roles: list[str] = ["xomtra.Admin"]
         self.nonce = ""
         self.tenant = TENANT
 
@@ -146,7 +146,7 @@ async def test_catalog_escapes_input(data: DataAccess) -> None:
 
 async def test_sign_in_without_admin_role_is_denied() -> None:
     entra, audit = FakeEntra(), MemoryAuditSink()
-    entra.roles = ["Xomtra.Reader"]
+    entra.roles = ["xomtra.Reader"]
     async with client_for(make_app(entra, None, audit)) as client:
         resp = await sign_in(client, entra)
         assert resp.status_code == 403
@@ -168,7 +168,7 @@ async def test_callback_rejects_bad_state_and_tenant() -> None:
 
 async def test_forged_session_cookie_is_ignored() -> None:
     forged = Signer("another-key" * 4, "session").dumps(
-        {"sub": "x", "roles": ["Xomtra.Admin"]}, 3600
+        {"sub": "x", "roles": ["xomtra.Admin"]}, 3600
     )
     async with client_for(make_app(FakeEntra(), None, MemoryAuditSink())) as client:
         client.cookies.set(SESSION_COOKIE, forged, path="/admin")

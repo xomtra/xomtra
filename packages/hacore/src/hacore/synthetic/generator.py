@@ -2,7 +2,7 @@
 
 A household is drawn from an *archetype* with parameters sampled from ranges, so that
 every seed is a different home. Hidden drivers (outside temperature, solar irradiance,
-occupancy of the home and of each room) generate the sensors Xomtra sees; planted
+occupancy of the home and of each room) generate the sensors xomtra sees; planted
 relations of known strength and lag (automations, chains A -> C -> B and hidden common
 drivers of 3-5 series) are added on top, and the rest are unrelated sensors. Realistic defects:
 quantisation, missing hours, outage blocks, a Zigbee-like outage of a whole room,

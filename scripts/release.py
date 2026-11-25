@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Release helper for Xomtra (see docs/releasing.md). Standard library only.
+"""Release helper for xomtra (see docs/releasing.md). Standard library only.
 
     python3 scripts/release.py prepare 0.2.0        # release PR: versions, compose, CHANGELOG
     python3 scripts/release.py prepare 0.2.0-rc.1   # pre-release (beta channel)
@@ -258,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"\nNext: review CHANGELOG.md, open a PR 'Release {version.semver}', "
                 f"squash-merge it, wait for the main CI to publish the images, then\n"
                 f"  git switch main && git pull && "
-                f"git tag -s {version.tag} -m 'Xomtra {version.semver}' && "
+                f"git tag -s {version.tag} -m 'xomtra {version.semver}' && "
                 f"git push origin {version.tag}"
             )
         elif args.command == "check":

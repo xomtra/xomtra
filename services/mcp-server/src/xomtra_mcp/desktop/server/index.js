@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Xomtra bridge for Claude Desktop (ADR 056): MCP over stdio <-> Streamable HTTP.
+// xomtra bridge for Claude Desktop (ADR 056): MCP over stdio <-> Streamable HTTP.
 //
-// Claude Desktop starts local MCP servers over stdio only; Xomtra runs on a server in
-// the LAN. This bridge forwards every JSON-RPC message to the Xomtra endpoint with the
+// Claude Desktop starts local MCP servers over stdio only; xomtra runs on a server in
+// the LAN. This bridge forwards every JSON-RPC message to the xomtra endpoint with the
 // personal token and writes the answers back. No dependencies: Node's own http/https,
 // so nothing is downloaded at install time.
 //
@@ -36,7 +36,7 @@ function config(env) {
   const raw = (env.XOMTRA_URL || "").trim();
   const token = (env.XOMTRA_TOKEN || "").trim();
   if (!raw) fail("XOMTRA_URL is not set (MCP endpoint, e.g. https://xomtra.lan/mcp)");
-  if (!token) fail("XOMTRA_TOKEN is not set (personal token from the Xomtra admin GUI)");
+  if (!token) fail("XOMTRA_TOKEN is not set (personal token from the xomtra admin GUI)");
   let url;
   try {
     url = new URL(raw);
@@ -128,7 +128,7 @@ class Bridge {
         });
         res.on("error", reject);
       });
-      req.on("timeout", () => req.destroy(new Error("Xomtra did not answer in time")));
+      req.on("timeout", () => req.destroy(new Error("xomtra did not answer in time")));
       req.on("error", reject);
       if (body !== undefined) req.write(JSON.stringify(body));
       req.end();
@@ -167,7 +167,7 @@ class Bridge {
     try {
       res = await this.post(message);
     } catch (err) {
-      this.errorFor(message, `Cannot reach Xomtra at ${this.url.origin}: ${err.message}`);
+      this.errorFor(message, `Cannot reach xomtra at ${this.url.origin}: ${err.message}`);
       return;
     }
     if (res.status === 404 && this.session && !retried && this.initialize) {
@@ -181,13 +181,13 @@ class Bridge {
     if (res.status === 401 || res.status === 403) {
       this.errorFor(
         message,
-        "Xomtra refused the token (revoked, expired or mistyped). Issue a new token in " +
-          "the Xomtra admin GUI and enter it in the extension settings.",
+        "xomtra refused the token (revoked, expired or mistyped). Issue a new token in " +
+          "the xomtra admin GUI and enter it in the extension settings.",
       );
       return;
     }
     if (res.status >= 400) {
-      this.errorFor(message, `Xomtra answered HTTP ${res.status}`);
+      this.errorFor(message, `xomtra answered HTTP ${res.status}`);
       return;
     }
     this.remember(res, message);

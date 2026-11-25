@@ -1,12 +1,12 @@
 {
   "manifest_version": "0.2",
   "name": "xomtra",
-  "display_name": "Xomtra",
+  "display_name": "xomtra",
   "version": "0.0.0",
-  "description": "History, catalog and findings of your Home Assistant, from your Xomtra server in the LAN.",
-  "long_description": "Connects Claude Desktop to a Xomtra server on your local network. Issue a personal token in the Xomtra admin GUI (Tokens) and enter it here. Read-only: Xomtra never changes anything in Home Assistant.",
+  "description": "History, catalog and findings of your Home Assistant, from your xomtra server in the LAN.",
+  "long_description": "Connects Claude Desktop to a xomtra server on your local network. Issue a personal token in the xomtra admin GUI (Tokens) and enter it here. Read-only: xomtra never changes anything in Home Assistant.",
   "author": {
-    "name": "Xomtra contributors",
+    "name": "xomtra contributors",
     "url": "https://github.com/xomtra/xomtra"
   },
   "homepage": "https://github.com/xomtra/xomtra",
@@ -30,15 +30,15 @@
   "user_config": {
     "url": {
       "type": "string",
-      "title": "Xomtra address",
-      "description": "MCP endpoint of your Xomtra server, e.g. https://xomtra.lan/mcp",
+      "title": "xomtra address",
+      "description": "MCP endpoint of your xomtra server, e.g. https://xomtra.lan/mcp",
       "required": true,
       "default": ""
     },
     "token": {
       "type": "string",
       "title": "Personal token",
-      "description": "Token from the Xomtra admin GUI (Tokens), starts with xmt_",
+      "description": "Token from the xomtra admin GUI (Tokens), starts with xmt_",
       "sensitive": true,
       "required": true
     },

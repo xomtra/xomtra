@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prints the environment of the Xomtra services (sourced by every s6 service):
+# Prints the environment of the xomtra services (sourced by every s6 service):
 # generated secrets from /data/secrets.env and the add-on options from
 # /data/options.json. Run by `. xomtra-env`.
 set -eu

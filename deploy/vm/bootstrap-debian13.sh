@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap a fresh Debian 13 (trixie) VM as the Xomtra host.
+# Bootstrap a fresh Debian 13 (trixie) VM as the xomtra host.
 #
 #   sudo ADMIN_CIDR=192.0.2.0/24 ./bootstrap-debian13.sh
 #

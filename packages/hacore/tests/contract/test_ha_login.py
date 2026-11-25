@@ -2,7 +2,7 @@
 
 Lives with the hacore contract tests because they share the onboarded instance; the
 code under test is in xomtra_mcp.ha_auth. Checks what the implementation relies on:
-HA accepts a client_id on another host than HA itself (Xomtra's URL), with the redirect
+HA accepts a client_id on another host than HA itself (xomtra's URL), with the redirect
 URI on that host; the code exchange without secret or PKCE; auth/current_user; refresh;
 and revocation of the whole session.
 """
@@ -100,7 +100,7 @@ async def test_mcp_tokens_refresh_and_revoke(ha_url: str, tokens: OnboardedToken
     verifier = HomeAssistantTokenVerifier(ha_url=ha_url, role_map=RoleMap())
     access = await verifier.verify_token(issued["access_token"])
     assert access is not None
-    assert access.claims["roles"] == ["Xomtra.Reader"]
+    assert access.claims["roles"] == ["xomtra.Reader"]
     assert access.claims["preferred_username"] == username
 
     refreshed = await token_request(

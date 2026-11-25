@@ -1,4 +1,4 @@
-# Xomtra stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
+# xomtra stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
 # + Postgres (DuckLake catalog, Dagster and SQLMesh state) + SeaweedFS (S3).
 # Usage: ./init-env.sh (generates .env with all internal secrets, ADR 061), check the
 # few values it asks about, then docker compose up -d
@@ -145,7 +145,7 @@ services:
     networks: [backend]
 
   ducklake-init:
-    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.4.1}
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.5.0}
     entrypoint: ["python", "-m", "hacore.lake", "init"]
     environment: *lake-env
     depends_on:
@@ -158,7 +158,7 @@ services:
 
   mcp:
     <<: *hardening
-    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.4.1}
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.5.0}
     environment:
       <<: *lake-env
       XOMTRA_AUTH_MODE: ${XOMTRA_AUTH_MODE:-entra}
@@ -170,7 +170,7 @@ services:
       # Sign-in with a Home Assistant account (XOMTRA_AUTH_MODE=ha, ADR 053).
       XOMTRA_HA_AUTH_URL: ${XOMTRA_HA_AUTH_URL:-}
       XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
-      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=Xomtra.Admin,user=Xomtra.Reader}
+      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=xomtra.Reader}
       XOMTRA_ENTRA_REQUIRED_SCOPES: ${XOMTRA_ENTRA_REQUIRED_SCOPES:-mcp.access}
       XOMTRA_JWT_SIGNING_KEY: ${XOMTRA_JWT_SIGNING_KEY:-}
       XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
@@ -201,7 +201,7 @@ services:
   # Live state_changed stream with catch-up (writes bronze.ha_states continuously).
   ingest-stream:
     <<: *hardening
-    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.4.1}
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.5.0}
     command: ["xomtra-ingest", "stream"]
     environment:
       <<: *ingest-env
@@ -226,7 +226,7 @@ services:
   # retention). Runs execute in this container.
   dagster-daemon:
     <<: *hardening
-    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.4.1}
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.5.0}
     command: ["dagster-daemon", "run", "-w", "/app/dagster/workspace.yaml"]
     environment:
       <<: *ingest-env
@@ -248,7 +248,7 @@ services:
   # http://127.0.0.1:3000/admin/dagster/
   dagster-webserver:
     <<: *hardening
-    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.4.1}
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.5.0}
     command:
       [
         "dagster-webserver", "-h", "0.0.0.0", "-p", "3000",
@@ -277,7 +277,7 @@ services:
   # retention, audit; guards the Dagster UI for Caddy (forward_auth).
   admin:
     <<: *hardening
-    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.4.1}
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.5.0}
     # The image entrypoint is xomtra-mcp; the admin GUI is another program in it.
     entrypoint: ["xomtra-admin"]
     environment:
@@ -291,7 +291,7 @@ services:
       # Sign-in with a Home Assistant account (XOMTRA_AUTH_MODE=ha, ADR 053).
       XOMTRA_HA_AUTH_URL: ${XOMTRA_HA_AUTH_URL:-}
       XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
-      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=Xomtra.Admin,user=Xomtra.Reader}
+      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=xomtra.Reader}
       XOMTRA_ADMIN_SESSION_KEY: ${XOMTRA_ADMIN_SESSION_KEY:?set XOMTRA_ADMIN_SESSION_KEY in .env}
       # MCP endpoint shown with new personal tokens (local access); default <base_url>/mcp.
       XOMTRA_MCP_URL: ${XOMTRA_MCP_URL:-}
@@ -325,7 +325,7 @@ services:
 
   caddy:
     <<: *hardening
-    image: ${XOMTRA_CADDY_IMAGE:-ghcr.io/xomtra/xomtra-caddy:0.4.1}
+    image: ${XOMTRA_CADDY_IMAGE:-ghcr.io/xomtra/xomtra-caddy:0.5.0}
     # The image checks the values its access mode needs at start (deploy/caddy/start.sh).
     environment:
       XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-public}

@@ -32,7 +32,7 @@ class AdminSettings(BaseSettings):
     entra_tenant_id: str | None = None
     entra_client_id: str | None = None
     entra_client_secret: SecretStr | None = None
-    admin_role: str = "Xomtra.Admin"
+    admin_role: str = "xomtra.Admin"
     # Signs the session cookie; >= 32 characters, stable across restarts.
     admin_session_key: SecretStr | None = None
     admin_session_hours: int = Field(default=8, ge=1, le=24)

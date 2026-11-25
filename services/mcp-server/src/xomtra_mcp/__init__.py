@@ -1,4 +1,4 @@
-"""Xomtra MCP server."""
+"""xomtra MCP server."""
 
 from importlib.metadata import PackageNotFoundError, version
 

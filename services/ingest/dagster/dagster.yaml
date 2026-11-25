@@ -1,4 +1,4 @@
-# Dagster instance of Xomtra ingest. DAGSTER_HOME points to this (read-only) directory;
+# Dagster instance of xomtra ingest. DAGSTER_HOME points to this (read-only) directory;
 # run data, logs and artifacts go to the /data volume, run/event storage to Postgres.
 storage:
   postgres:

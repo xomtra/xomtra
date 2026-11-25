@@ -18,12 +18,12 @@ def test_no_role_only_whoami() -> None:
     assert access.can_call("whoami")
     assert not access.can_call("query_sql")
     assert access.allowed_views == []
-    unauth = POLICY.access_for(ident("Xomtra.Admin", authenticated=False), KNOWN_VIEWS)
+    unauth = POLICY.access_for(ident("xomtra.Admin", authenticated=False), KNOWN_VIEWS)
     assert not unauth.can_call("query_sql")
 
 
 def test_reader_and_admin() -> None:
-    reader = POLICY.access_for(ident("Xomtra.Reader"), KNOWN_VIEWS)
+    reader = POLICY.access_for(ident("xomtra.Reader"), KNOWN_VIEWS)
     assert reader.can_call("query_sql")
     assert not reader.can_call("ha_overview")
     assert "catalog_drift" not in reader.allowed_views
@@ -36,7 +36,7 @@ def test_reader_and_admin() -> None:
     assert reader.columns_hidden_in("states") == ["attributes"]
     assert reader.columns_hidden_in("entities") == []
 
-    both = POLICY.access_for(ident("Xomtra.Reader", "Xomtra.Admin"), KNOWN_VIEWS)
+    both = POLICY.access_for(ident("xomtra.Reader", "xomtra.Admin"), KNOWN_VIEWS)
     assert both.entity_allowed("person.jana")  # only what every role denies stays denied
     assert both.can_call("ha_overview")
     assert both.allowed_views == sorted(KNOWN_VIEWS)

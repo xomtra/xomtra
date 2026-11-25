@@ -38,7 +38,7 @@ RUN /app/.venv/bin/python -m hacore.lake install-extensions
 
 FROM ${PYTHON_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/xomtra/xomtra" \
-      org.opencontainers.image.description="Xomtra Home Assistant add-on (lite edition)" \
+      org.opencontainers.image.description="xomtra Home Assistant add-on (lite edition)" \
       org.opencontainers.image.licenses="Apache-2.0" \
       io.hass.type="addon"
 ARG TARGETARCH
@@ -67,7 +67,7 @@ ENV PATH=/app/.venv/bin:/usr/lib/postgresql/17/bin:/command:$PATH \
     S6_KEEP_ENV=1
 HEALTHCHECK --interval=60s --timeout=5s --start-period=120s --retries=3 \
   CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status == 200 else 1)"]
-# s6-overlay starts as root and runs Postgres as user postgres and the Xomtra services
+# s6-overlay starts as root and runs Postgres as user postgres and the xomtra services
 # as user xomtra (s6-setuidgid); the Trivy finding DS-0002 is ignored for this file only
 # (.trivyignore.yaml).
 ENTRYPOINT ["/init"]

@@ -1,7 +1,7 @@
 [project]
 name = "xomtra-workspace"
 version = "0.0.0"
-description = "Xomtra development workspace (not published)"
+description = "xomtra development workspace (not published)"
 requires-python = ">=3.13"
 license = "Apache-2.0"
 dependencies = ["hacore", "xomtra-ingest", "xomtra-mcp"]

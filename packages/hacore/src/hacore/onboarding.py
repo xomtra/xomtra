@@ -1,7 +1,7 @@
 """Automated onboarding of a fresh Home Assistant instance (contract tests, dev stack).
 
 Creates the owner account through the onboarding API, then a dedicated non-admin user
-the way production uses Xomtra, and returns a long-lived token for each. Only meant for
+the way production uses xomtra, and returns a long-lived token for each. Only meant for
 throwaway instances in containers: credentials are generated, not configured.
 
 CLI::
@@ -108,7 +108,7 @@ async def _long_lived_token(base_url: str, access_token: str, name: str) -> str:
 async def _create_user(base_url: str, admin_token: str, username: str, password: str) -> None:
     async with HAClient(base_url, admin_token) as ha:
         user = await ha.send_command(
-            "config/auth/create", name="Xomtra", group_ids=["system-users"], local_only=False
+            "config/auth/create", name="xomtra", group_ids=["system-users"], local_only=False
         )
         await ha.send_command(
             "config/auth_provider/homeassistant/create",

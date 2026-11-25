@@ -1,6 +1,6 @@
-# Xomtra
+# xomtra
 
-Xomtra keeps the history of your Home Assistant in its own data lake, finds
+xomtra keeps the history of your Home Assistant in its own data lake, finds
 correlations, anomalies and lasting changes in it every night and makes all of it
 available to Claude and other MCP clients.
 
@@ -8,7 +8,7 @@ available to Claude and other MCP clients.
 
 1. Start the add-on. The first start creates its database and internal keys in the
    add-on's data folder; this takes a minute.
-2. Open **Xomtra** in the sidebar (Home Assistant administrators only).
+2. Open **xomtra** in the sidebar (Home Assistant administrators only).
 3. On **Tokens**, issue a personal token for each person and device.
 4. On **Connect clients**, download the Claude Desktop extension or copy the command for
    Claude Code. The MCP endpoint is port 8000 of your Home Assistant host.

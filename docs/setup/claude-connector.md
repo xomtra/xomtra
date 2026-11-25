@@ -1,7 +1,7 @@
 # Claude connector (public access)
 
 Public access mode (`XOMTRA_ACCESS_MODE=public`, the default): claude.ai on the web,
-desktop and phone reach Xomtra through Anthropic's servers. Sign-in with Entra ID
+desktop and phone reach xomtra through Anthropic's servers. Sign-in with Entra ID
 (below) or with a [Home Assistant account](ha-login.md). For a LAN-only setup without
 any of this, see [local access](local-access.md).
 
@@ -29,7 +29,7 @@ What Caddy lets through:
 | --- | --- | --- |
 | `/authorize`, `/consent`, `/auth/callback` | anywhere | sign-in steps in **your browser** |
 | everything else (`/mcp`, `/token`, `/register`, `/.well-known/*`) | `CLAUDE_IP_RANGES` only | called by Claude's servers |
-| `/admin`, `/admin/*` | `ADMIN_CIDR` only, then Entra role `Xomtra.Admin` | [admin GUI and Dagster UI](admin-gui.md) |
+| `/admin`, `/admin/*` | `ADMIN_CIDR` only, then Entra role `xomtra.Admin` | [admin GUI and Dagster UI](admin-gui.md) |
 | `/healthz` | nobody (404) | internal health check only |
 
 The browser paths only start or finish an Entra sign-in; without a successful sign-in of
@@ -47,12 +47,12 @@ curl -s -o /dev/null -w '%{http_code}\n' https://<public-host>/authorize        
 
 claude.ai → **Settings → Connectors → Add custom connector**
 
-- Name: `Xomtra`
+- Name: `xomtra`
 - URL: `https://<public-host>/mcp`
 - Advanced settings: leave OAuth client ID/secret **empty** (Claude registers itself
-  dynamically at Xomtra's OAuth proxy).
+  dynamically at xomtra's OAuth proxy).
 
-Click **Connect**: you see Xomtra's consent page, then the Entra sign-in (MFA per your
+Click **Connect**: you see xomtra's consent page, then the Entra sign-in (MFA per your
 Conditional Access), then you are back in claude.ai.
 
 ## 3. Verify (PoC acceptance)
@@ -60,7 +60,7 @@ Conditional Access), then you are back in claude.ai.
 In a new chat with the connector enabled, ask Claude to call `whoami` and
 `server_info` (and `ha_overview` if Home Assistant is configured). Expected:
 
-- `whoami` shows your name, `Xomtra.Admin` in `roles` and the `mcp.access` scope,
+- `whoami` shows your name, `xomtra.Admin` in `roles` and the `mcp.access` scope,
 - a user without assignment in the enterprise app cannot finish the sign-in,
 - disconnecting the connector and reconnecting works; restarting the `mcp` container
   does not force a new sign-in (stable `XOMTRA_JWT_SIGNING_KEY` + `/data` volume),

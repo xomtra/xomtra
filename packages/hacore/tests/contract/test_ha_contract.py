@@ -1,4 +1,4 @@
-"""What Xomtra relies on in the Home Assistant WebSocket API, as a non-admin user."""
+"""What xomtra relies on in the Home Assistant WebSocket API, as a non-admin user."""
 
 import asyncio
 from datetime import UTC, datetime, timedelta

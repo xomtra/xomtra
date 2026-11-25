@@ -42,7 +42,7 @@ Two independent checks:
 1. **Network:** Caddy accepts `/admin` only from `ADMIN_CIDR` (the network of your admin
    machine); from anywhere else it answers `403`.
 2. **Identity:** the GUI signs you in with Entra ID (OpenID Connect, code flow with PKCE)
-   and requires the app role `Xomtra.Admin`. The session cookie is signed, `Secure`,
+   and requires the app role `xomtra.Admin`. The session cookie is signed, `Secure`,
    `HttpOnly`, limited to `/admin` and valid for 8 hours. Caddy asks the GUI
    (`forward_auth`) before every request to the Dagster UI.
 
@@ -53,7 +53,7 @@ Every page view, sign-in and refused sign-in lands in the audit table
 
 1. **Entra:** app registration → **Authentication → Add a platform → Web**, redirect URI
    `https://<public-host>/admin/auth/callback` (next to the existing
-   `https://<public-host>/auth/callback`). Make sure your user has the `Xomtra.Admin`
+   `https://<public-host>/auth/callback`). Make sure your user has the `xomtra.Admin`
    role (step 6 of [the Entra guide](entra-app-registration.md)).
 2. **`.env`:**
 

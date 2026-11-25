@@ -1,8 +1,8 @@
 # Home Assistant add-on (lite edition, ADR 050, 063). Everything runs in one container:
 # Postgres (DuckLake catalog, audit, tokens), the worker (live stream + scheduled jobs),
 # the MCP server for the LAN (local access, ADR 056) and the admin GUI (Ingress, ADR 070).
-name: Xomtra
-version: "0.4.1"
+name: xomtra
+version: "0.5.0"
 slug: xomtra
 description: History and analyses of your Home Assistant for Claude (MCP server)
 url: https://github.com/xomtra/xomtra
@@ -18,7 +18,7 @@ homeassistant_api: true
 ingress: true
 ingress_port: 8100
 panel_icon: mdi:chart-timeline-variant
-panel_title: Xomtra
+panel_title: xomtra
 panel_admin: true
 # The Supervisor restarts the add-on when the MCP server stops answering.
 watchdog: http://[HOST]:[PORT:8000]/healthz

@@ -61,13 +61,13 @@ class Settings(BaseSettings):
     ha_auth_url: str | None = None
     # Optional allow-list of HA users (id or name); empty = every HA user with a role.
     ha_allowed_users: Annotated[list[str], NoDecode] = []
-    # Xomtra role of HA administrators and of other HA users (empty value = refused).
+    # xomtra role of HA administrators and of other HA users (empty value = refused).
     ha_role_map: str = DEFAULT_ROLE_MAP
 
     # Access policy (ADR 038); default: the packaged policy.yaml.
     policy_file: Path | None = None
     # Roles of the (unauthenticated) caller with XOMTRA_AUTH_MODE=none, local dev only.
-    dev_roles: Annotated[list[str], NoDecode] = ["Xomtra.Admin"]
+    dev_roles: Annotated[list[str], NoDecode] = ["xomtra.Admin"]
 
     # Data tools over the lake (connection from XOMTRA_LAKE_* / XOMTRA_S3_*).
     data_enabled: bool = True

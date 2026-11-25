@@ -1,6 +1,6 @@
 # Host VM (Proxmox, Debian 13)
 
-The VM is the only Internet-facing part of Xomtra. It goes into an **existing DMZ
+The VM is the only Internet-facing part of xomtra. It goes into an **existing DMZ
 network** (`<dmz-cidr>`) that is isolated from the internal networks by the router; no
 new VLAN is needed. Placeholders: `<vm-ip>` (static address of the VM in the DMZ),
 `<ha-ip>` (Home Assistant), `<admin-cidr>` (network you administer from).

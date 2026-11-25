@@ -1,4 +1,4 @@
-# Xomtra public entry point.
+# xomtra public entry point.
 #
 # Required environment:
 #   XOMTRA_PUBLIC_HOST   public DNS name, e.g. mcp.example.org
@@ -14,7 +14,7 @@
 #   - Everything else (MCP endpoint, token/registration endpoints, metadata) is called by
 #     Claude's servers and is accepted only from CLAUDE_IP_RANGES.
 #   - /admin (admin GUI and Dagster UI) only from ADMIN_CIDR; the admin app then requires
-#     an Entra sign-in with the role Xomtra.Admin and guards the Dagster UI through
+#     an Entra sign-in with the role xomtra.Admin and guards the Dagster UI through
 #     forward_auth (ADR 041).
 #   - Every refusal has a short text/plain body: an empty response without a
 #     Content-Type (with nosniff) makes some browsers offer it as a download.
@@ -58,7 +58,7 @@
 			handle @dagster {
 				forward_auth admin:8100 {
 					uri /admin/auth/check
-					copy_headers X-Xomtra-User
+					copy_headers X-xomtra-User
 				}
 				reverse_proxy dagster-webserver:3000
 			}
