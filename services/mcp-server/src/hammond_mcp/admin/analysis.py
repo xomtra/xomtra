@@ -277,3 +277,19 @@ def current_findings(
             return []
         cols = [d[0] for d in cur.description or []]
         return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+
+
+def run_confidence(data: DataAccess) -> list[dict[str, Any]]:
+    """Last correlation runs with their confidence and entities without an area
+    (ADR 067)."""
+    with data.trusted_cursor() as cur:
+        try:
+            cur.execute(
+                "SELECT window_days, run_at, confidence, reasons, series, entities, "
+                "group_coverage, drivers, ungrouped FROM lake.catalog.analysis_run "
+                "WHERE finding_type = 'correlation' ORDER BY window_days DESC"
+            )
+        except duckdb.Error:  # no run yet
+            return []
+        cols = [d[0] for d in cur.description or []]
+        return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]

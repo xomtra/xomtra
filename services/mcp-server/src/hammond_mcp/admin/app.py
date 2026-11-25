@@ -35,6 +35,7 @@ from hammond_mcp.admin.analysis import (
     SettingsStoreError,
     current_findings,
     preview,
+    run_confidence,
 )
 from hammond_mcp.admin.config import PREFIX, AdminSettings
 from hammond_mcp.admin.html import CSS, cards, e, page, table
@@ -661,7 +662,10 @@ class AdminApp:
                 f"<select name=days>{until}</select><button>Dismiss</button></form>"
             )
 
-        body += f"<p class=muted>{len(rows)} findings (max 300)</p>" + table(
+        body += self._confidence_html(
+            await asyncio.to_thread(run_confidence, self.data) if self.data is not None else []
+        )
+        body += f"<h2>Current findings</h2><p class=muted>{len(rows)} (max 300)</p>" + table(
             ["type", "entity", "related", "window", "score", "q", "flags", "period start", ""],
             [
                 [
@@ -703,6 +707,45 @@ class AdminApp:
             trusted_html={7},
         )
         return HTMLResponse(page(title, body, user.get("username")), status_code)
+
+    @staticmethod
+    def _confidence_html(runs: list[dict[str, Any]]) -> str:
+        """Low-power indicator and area coverage of the last correlation runs (ADR 067)."""
+        if not runs:
+            return ""
+        out = "<h2>Confidence of the correlations</h2>" + table(
+            ["window", "run", "confidence", "reasons", "series", "entities", "with area"],
+            [
+                [
+                    r["window_days"],
+                    r["run_at"],
+                    r["confidence"],
+                    r["reasons"],
+                    r["series"],
+                    r["entities"],
+                    None if r["group_coverage"] is None else f"{r['group_coverage']:.0%}",
+                ]
+                for r in runs
+            ],
+            {0, 4, 5},
+        )
+        ungrouped = sorted({e for r in runs for e in (r.get("ungrouped") or [])})
+        if any(r["confidence"] == "low" for r in runs):
+            out += (
+                "<p class=warn>Low power: with few series or few entities in an area the "
+                "false correlations are strong ones with a shared cause the analysis cannot "
+                "see, so a stricter threshold does not help (ADR 067). Assign the entities "
+                "below to areas in Home Assistant; that measurably lowers the false "
+                "findings.</p>"
+            )
+        if ungrouped:
+            out += (
+                f"<details><summary>{len(ungrouped)} analysed entities without an area"
+                "</summary><p>"
+                + ", ".join(f"<code>{e(x)}</code>" for x in ungrouped[:500])
+                + "</p></details>"
+            )
+        return out
 
     async def finding_dismiss(self, request: Request, user: dict[str, Any]) -> Response:
         form = await self._form(request)

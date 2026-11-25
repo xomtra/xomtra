@@ -614,9 +614,40 @@ class DataAccess:
                     "methods": [
                         {"finding_type": t, "window_days": w, "method": m} for t, w, m in methods
                     ],
+                    "confidence": self._run_confidence(),
                 }
 
             return self._timed(cur, run)
+
+    def _run_confidence(self) -> list[Row]:
+        """Confidence of the last correlation runs (ADR 067): aggregate counts only, so
+        every reader may see it; read with the trusted cursor (no view)."""
+        with self.trusted_cursor() as cur:
+            try:
+                rows = cur.execute(
+                    "SELECT window_days, confidence, reasons, series, entities, "
+                    "group_coverage FROM lake.catalog.analysis_run "
+                    "WHERE finding_type = 'correlation' ORDER BY window_days DESC"
+                ).fetchall()
+            except duckdb.Error:
+                return []  # no run table yet (before the first run of 0.5)
+        return [
+            {
+                "window_days": w,
+                "level": level,
+                "reasons": list(reasons or []),
+                "series": series,
+                "entities": entities,
+                "group_coverage": coverage,
+                "note": (
+                    "low power: treat the correlations as hypotheses; complete the HA "
+                    "areas to raise it"
+                    if level == "low"
+                    else None
+                ),
+            }
+            for w, level, reasons, series, entities, coverage in rows
+        ]
 
     def get_weekly_summary(self, access: Access, *, week: date | None = None, top: int = 10) -> Row:
         access.require_view("catalog_finding_weekly")

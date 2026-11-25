@@ -159,6 +159,12 @@ async def test_get_findings(data: DataAccess) -> None:
     corr = await call(server(data, READER), "get_findings", finding_type="correlation")
     assert [f["finding_id"] for f in corr["findings"]] == ["f1"]
     assert corr["methods"] == [{"finding_type": "correlation", "window_days": 30, "method": "test"}]
+    (conf,) = corr["confidence"]
+    assert conf["window_days"] == 30
+    assert conf["level"] == "low"
+    assert conf["group_coverage"] == 0.25
+    assert "hypotheses" in conf["note"]
+    assert "ungrouped" not in conf
     with pytest.raises(ToolError, match="denied"):
         await call(server(data, READER), "get_findings", entity_id="person.jana")
 

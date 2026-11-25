@@ -10,7 +10,7 @@ shows the state of the installation. Sign-in with Entra ID or, with
 | Catalog | searchable entity profile (kind, change rate, value range, stale, range shift) |
 | Drift | changes between daily profiles, last 30 days |
 | Retention | configured retention periods with their cut-off dates, size of every lake table |
-| Findings | current findings with *Dismiss* (for good or for 30/90/365 days, with a reason) and the list of dismissed findings with *Undo* |
+| Findings | confidence of the last correlation runs (low power, area coverage, analysed entities without an area, ADR 067), current findings with *Dismiss* (for good or for 30/90/365 days, with a reason) and the list of dismissed findings with *Undo* |
 | Analysis settings | thresholds of correlations, anomalies and change points (target q, minimum \|r\|, z cap, windows, method), with a preview of their effect on the current findings and the history of changes |
 | Audit | last 200 calls of MCP tools and of this GUI, with the identity provider (`entra`, `ha`, `token`) |
 | Tokens | local access only: issue and revoke personal tokens, connect instructions and the Claude Desktop extension ([local access](local-access.md)) |

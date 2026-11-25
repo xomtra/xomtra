@@ -165,5 +165,8 @@ async def test_findings_page_lists_current_findings(data: DataAccess) -> None:
         page = (await client.get("/admin/findings?type=correlation")).text
         assert "binary_sensor.door" in page
         assert "same_device" not in page  # flagged ones only on request
+        assert "Confidence of the correlations" in page
+        assert "Low power" in page
+        assert "3 analysed entities without an area" in page
         flagged = (await client.get("/admin/findings?type=correlation&flagged=1")).text
         assert "same_device" in flagged
