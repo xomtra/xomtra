@@ -101,19 +101,28 @@ def frame_rows(n: int, cell: str, split: str) -> list[dict[str, Any]]:
 def test_stratified_sample_weights_and_human_sample() -> None:
     frame = (
         frame_rows(300, "correlation|kept|savings", "calibration")
-        + frame_rows(10, "anomaly|kept|fault", "validation")
-        + frame_rows(200, "anomaly|kept|none", "test")
+        + frame_rows(10, "anomaly|kept|fault", "calibration")
+        + frame_rows(200, "anomaly|kept|none", "calibration")
+        # validation and test are small parts of the frame (one window per house)
+        + frame_rows(12, "anomaly|kept|fault", "validation")
+        + frame_rows(30, "correlation|kept|savings", "validation")
+        + frame_rows(40, "anomaly|kept|none", "test")
     )
-    sample = us.stratified_sample(frame, total=100, min_per_cell=20, human_per_set=5)
+    sample = us.stratified_sample(frame, total=100, min_per_cell=20, human_per_set=10)
     assert len(sample) == 100
-    by_cell = Counter(r["cell"] for r in sample)
-    assert by_cell["anomaly|kept|fault"] == 10
-    rare = next(r for r in sample if r["cell"] == "anomaly|kept|fault")
-    assert rare["weight"] == 1.0
-    big = next(r for r in sample if r["cell"] == "correlation|kept|savings")
-    assert big["weight"] == pytest.approx(300 / by_cell["correlation|kept|savings"], abs=1e-3)
     human = Counter(r["split"] for r in sample if r["human"])
-    assert human == {"validation": 5, "test": 5}
+    assert human == {"validation": 10, "test": 10}
+    assert all(r["split"] == "calibration" for r in sample if not r["human"])
+    calibration = Counter(r["cell"] for r in sample if r["split"] == "calibration")
+    assert calibration["anomaly|kept|fault"] == 10
+    assert sum(calibration.values()) == 80
+    rare = next(r for r in sample if r["cell"] == "anomaly|kept|fault" and not r["human"])
+    assert rare["weight"] == 1.0
+    big = next(r for r in sample if r["cell"] == "correlation|kept|savings" and not r["human"])
+    assert big["weight"] == pytest.approx(300 / calibration["correlation|kept|savings"], abs=1e-3)
+    # both validation cells are in the human sample, each weighted inside validation
+    validation = Counter(r["cell"] for r in sample if r["split"] == "validation")
+    assert set(validation) == {"anomaly|kept|fault", "correlation|kept|savings"}
     # strength terciles are drawn evenly inside a cell
     s = [r["strength"] for r in sample if r["cell"] == "correlation|kept|savings"]
     assert min(s) < 1 / 3 < 2 / 3 < max(s)

@@ -34,7 +34,10 @@ today? If not, releases keep R0.
   of the validation workflow). Channel names are mapped to device classes so that the
   rulebook sorts them into families; the run reports the families of the channels and
   the coverage. Inside a cell the draw alternates over the strength terciles.
-- **Human sample:** **200 findings**, 100 from validation and 100 from test. The ranking
+- **Human sample:** **200 findings**, 100 from validation and 100 from test, each drawn
+  stratified inside its set (at least 5 per cell where a cell has them); the rest of the
+  1,000 comes from calibration. The AI raters rate all 1,000. Weights refer to the
+  frame of the finding's set. The ranking
   model is trained only on AI ratings of the calibration set; human and training
   ratings never overlap. A repeated gate after a changed rubric uses 100 **new**
   findings from the validation reserve.
