@@ -24,6 +24,25 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   (`hacore.synthetic`, `python -m hacore.synthetic.evaluate`, ADR 062): archetypes,
   hidden drivers, planted relations, defects and inserted events. See
   docs/analysis-evaluation.md.
+- Correlation findings carry `p_value` and `explained_by`, and new flags
+  `common_factor`, `indirect` and `unstable` (ADR 062). `get_findings` returns them;
+  flagged findings are hidden unless `include_flagged`.
+- Correlation flag `same_area` (ADR 064): a relation between two entities in one Home
+  Assistant area (or, without an area, one area named in their ids or names) is
+  explained by the room's occupancy and ranked after the unflagged findings.
+- Correlation flag `house_context` (ADR 064): a relation explained by a presence
+  entity of the residents. Groups and drivers reach the analyses through a
+  domain-neutral context (`hacore.context`); Home Assistant is its first adapter.
+
+### Changed
+
+- Correlation significance v2 (ADR 062, `HAMMOND_CORRELATION_METHOD=v2`, default):
+  variance of `r` from the autocorrelations of both series, an empirical null of
+  circularly shifted pairs instead of Bonferroni over lags, and structural flags. On
+  the synthetic households the share of false or unexplained findings drops several
+  times; findings between autocorrelated but unrelated series disappear. Set
+  `HAMMOND_CORRELATION_METHOD=v1` for the previous method. The next run replaces the
+  findings of each window.
 
 ## [0.3.0] - 2026-11-24
 

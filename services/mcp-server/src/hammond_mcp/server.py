@@ -267,7 +267,8 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
             bool,
             Field(
                 description="Also findings flagged as trivial or explained: "
-                "duplicate_suspect, same_device, short (one hour), weather, level_shift"
+                "duplicate_suspect, same_device, short (one hour), weather, level_shift, "
+                "common_factor, indirect, same_area, house_context, unstable"
             ),
         ] = False,
         new_since: Annotated[

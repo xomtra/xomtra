@@ -447,3 +447,15 @@ def test_label_leaves_an_entity_out_of_the_analysis(plain: duckdb.DuckDBPyConnec
     assert result.series_excluded == 1  # the outside temperature stays a driver
     assert result.notes == []
     assert not any("sensor.b" in pair(f) for f in findings(plain))
+
+
+def test_same_area_is_flagged(plain: duckdb.DuckDBPyConnection) -> None:
+    """ADR 064: a relation inside one HA area is explained by the room's occupancy."""
+    seed(plain)
+    plain.execute("ALTER TABLE lake.silver.entities ADD COLUMN area_id VARCHAR")
+    plain.execute("ALTER TABLE lake.silver.entities ADD COLUMN name VARCHAR")
+    plain.execute("INSERT INTO lake.silver.entities (entity_id, area_id) VALUES ('sensor.b', 'x')")
+    plain.execute("UPDATE lake.silver.entities SET area_id = 'x' WHERE entity_id = 'sensor.a'")
+    corr.run(plain, params(outside_temp="sensor.outside"), now=NOW)
+    ab = next(f for f in findings(plain) if set(pair(f)) == {"sensor.a", "sensor.b"})
+    assert "same_area" in ab["flags"]  # type: ignore[operator]

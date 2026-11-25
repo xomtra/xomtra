@@ -4,7 +4,7 @@ A household is drawn from an *archetype* with parameters sampled from ranges, so
 every seed is a different home. Hidden drivers (outside temperature, solar irradiance,
 occupancy of the home and of each room) generate the sensors HAmmond sees; planted
 relations of known strength and lag (automations, chains A -> C -> B and hidden common
-drivers) are added on top, and the rest are unrelated sensors. Realistic defects:
+drivers of 3-5 series) are added on top, and the rest are unrelated sensors. Realistic defects:
 quantisation, missing hours, outage blocks, a Zigbee-like outage of a whole room,
 duplicated entities.
 
@@ -36,6 +36,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import numpy.typing as npt
 
+from hacore.areas import AreaInfo, EntityArea, resolve
 from hacore.correlations import Grid, Series
 
 type FloatArray = npt.NDArray[np.float64]
@@ -89,12 +90,23 @@ class HouseholdSpec:
     # A Monday at midnight UTC, so the yearly cycle starts in winter.
     start: datetime = datetime(2025, 1, 6, tzinfo=UTC)
     events: bool = False  # insert anomalies and change points (InsertedEvent)
+    # Home Assistant areas (ADR 064): share of rooms whose entities have an area in HA,
+    # and share of the other rooms named after the room (sensor.kitchen_co2) rather than
+    # the device (sensor.th_3f2a_co2). None = drawn per household.
+    area_coverage: float | None = None
+    descriptive_names: float | None = None
+    # Share of households with an observed presence entity (person.resident: home or
+    # away, ADR 064 house_context). None = drawn per household.
+    presence: float | None = None
 
     def __post_init__(self) -> None:
         if self.archetype not in ARCHETYPES:
             raise ValueError(f"unknown archetype {self.archetype!r}")
         if self.n_series < 4 or self.days < 14:
             raise ValueError("a household needs at least 4 series and 14 days")
+        for share in (self.area_coverage, self.descriptive_names, self.presence):
+            if share is not None and not 0 <= share <= 1:
+                raise ValueError("area shares must be between 0 and 1")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,8 +134,25 @@ class Household:
     parents: dict[str, list[Parent]]
     duplicates: set[frozenset[str]] = field(default_factory=set)
     events: list[InsertedEvent] = field(default_factory=list)
+    # Room (area id) of each room sensor: the truth, whatever HA knows.
+    room_of: dict[str, str] = field(default_factory=dict)
+    # Area of each entity as set in HA (rooms with an area only), and the areas.
+    ha_area: dict[str, str] = field(default_factory=dict)
+    areas: list[AreaInfo] = field(default_factory=list)
 
     outside_temp: str = OUTSIDE_TEMP
+
+    def entity_areas(self) -> dict[str, EntityArea]:
+        """Areas as the analysis resolves them: HA area, else a match in the name."""
+        entities = {s.entity_id for s in self.grid.series}
+        return resolve(((e, self.ha_area.get(e), None) for e in sorted(entities)), self.areas)
+
+    def area_coverage(self) -> float | None:
+        """Share of room sensors whose area the analysis knows (HA or name)."""
+        if not self.room_of:
+            return None
+        known = self.entity_areas()
+        return sum(e in known for e in self.room_of) / len(self.room_of)
 
     @property
     def keys(self) -> list[str]:
@@ -147,6 +176,10 @@ class Household:
             visit(node)
         return memo
 
+    @cached_property
+    def _observed(self) -> frozenset[str]:
+        return frozenset(self.keys)
+
     def ancestors(self, node: str) -> frozenset[str]:
         return self._ancestors.get(node, frozenset())
 
@@ -166,8 +199,12 @@ class Household:
         if b in pa or a in pb:
             return Relation.DIRECT
         anc_a, anc_b = self.ancestors(a), self.ancestors(b)
-        if a in anc_b or b in anc_a:
-            return Relation.INDIRECT
+        for x, anc_y in ((a, anc_b), (b, anc_a)):
+            if x in anc_y:
+                # Through hidden nodes only (person -> room occupancy -> motion) the
+                # relation is direct for anything that sees the observed series.
+                between = [n for n in anc_y if n in self._observed and x in self.ancestors(n)]
+                return Relation.INDIRECT if between else Relation.DIRECT
         shared = (anc_a | {a}) & (anc_b | {b})
         if not shared:
             return Relation.UNRELATED
@@ -177,6 +214,11 @@ class Household:
         if shared - weather:
             return Relation.COMMON
         return Relation.WEATHER
+
+    def shared_hidden(self, a: str, b: str) -> frozenset[str]:
+        """Hidden drivers both series depend on (``h:...`` nodes)."""
+        both = (self.ancestors(a) | {a}) & (self.ancestors(b) | {b})
+        return frozenset(n for n in both if n.startswith("h:"))
 
     def direct_pairs(self) -> list[tuple[str, str, float, int]]:
         """Planted direct relations between observed series: (parent, child, |r|, lag)."""
@@ -220,6 +262,21 @@ class _Builder:
         self.parents: dict[str, list[Parent]] = {}
         self.duplicates: set[frozenset[str]] = set()
         self._names: set[str] = set()
+        # Areas use their own generator, so the series stay those of earlier releases.
+        self.area_rng = np.random.default_rng([spec.seed, ARCHETYPES.index(spec.archetype), 64])
+        self.coverage = (
+            spec.area_coverage
+            if spec.area_coverage is not None
+            else float(self.area_rng.uniform(0.4, 1.0))
+        )
+        self.descriptive = (
+            spec.descriptive_names
+            if spec.descriptive_names is not None
+            else float(self.area_rng.uniform(0.3, 1.0))
+        )
+        self.room_area: dict[int, str] = {}
+        self.room_in_ha: dict[int, bool] = {}
+        self.room_label: dict[int, str] = {}
 
     # -- primitives --
 
@@ -350,6 +407,12 @@ def _room(
     occ_node = b.hidden(f"h:room_{k}", [Parent(HOME)])
     dark = solar < 0.05
     room_name = f"{kind}_{k}" if k >= len(ROOM_KINDS) else kind
+    b.room_area[k] = room_name
+    b.room_in_ha[k] = bool(b.area_rng.random() < b.coverage)
+    # Entities of a room without an HA area may still be named after it.
+    named = b.room_in_ha[k] or b.area_rng.random() < b.descriptive
+    b.room_label[k] = room_name if named else f"th_{int(b.area_rng.integers(0, 1 << 16)):04x}"
+    room_name = b.room_label[k]
     sensors = MINIMAL_SENSORS if minimal else ROOM_SENSORS
     rest = list(sensors[1:])
     b.rng.shuffle(rest)  # first sensor always present, the rest in random order
@@ -482,7 +545,7 @@ def _planted(b: _Builder, archetype: str, budget: int) -> None:
     i = 0
     while budget >= 2:
         kind = str(b.rng.choice(["direct", "chain", "common"], p=[0.5, 0.25, 0.25]))
-        if kind == "chain" and budget < 3:
+        if kind in ("chain", "common") and budget < 3:
             kind = "direct"
         lag0 = archetype == "power_user" and b.rng.random() < 0.7
 
@@ -508,12 +571,16 @@ def _planted(b: _Builder, archetype: str, budget: int) -> None:
             b.add(b.name(f"sensor.planted_{i}_b"), y, [Parent(ck, l2, w2)])
             budget -= 3
         else:
+            # A hidden driver of 3-5 series. With two or three children no
+            # observational test tells it from direct relations (no tetrad); the
+            # evaluation reports those apart.
             node = b.hidden(f"h:planted_{i}")
-            for side in ("a", "b"):
+            children = min(budget, int(b.rng.integers(3, 6)))
+            for side in "abdefg"[:children]:
                 w, lg = strength(), lag()
                 y = w * b.shift(src, lg) + math.sqrt(1 - w * w) * b.ar1(0.7)[:, 0]
                 b.add(b.name(f"sensor.planted_{i}_{side}"), y, [Parent(node, lg, w)])
-            budget -= 2
+            budget -= children
         i += 1
 
 
@@ -603,6 +670,26 @@ def _insert_events(b: _Builder, values: FloatArray) -> list[InsertedEvent]:
     return events
 
 
+PRESENCE = "person.resident"
+PRESENCE_SHARE = 0.7  # households with a presence entity when not set in the spec
+
+
+def _presence(b: _Builder, home: FloatArray) -> None:
+    """An observed presence entity (phone app: home or away, 2 % of hours wrong) that
+    becomes the parent of everything the home's occupancy drives."""
+    rng = np.random.default_rng([b.spec.seed, ARCHETYPES.index(b.spec.archetype), 65])
+    share = b.spec.presence if b.spec.presence is not None else PRESENCE_SHARE
+    if rng.random() >= share:
+        return
+    wrong = rng.random(b.t) < 0.02
+    key = b.add(PRESENCE, np.where(wrong, 1 - home, home), [Parent(HOME)], metric="share")
+    for node, parents in b.parents.items():
+        if node != key:
+            b.parents[node] = [
+                Parent(key, p.lag, p.weight) if p.node == HOME else p for p in parents
+            ]
+
+
 # ---- entry point --------------------------------------------------------------------
 
 
@@ -645,6 +732,7 @@ def generate(spec: HouseholdSpec) -> Household:
     _planted(b, spec.archetype, min(n_planted, spec.n_series - b.count))
     _unrelated(b, max(0, spec.n_series - b.count))
 
+    _presence(b, home)
     values = np.column_stack(b.values)
     events = _insert_events(b, values) if spec.events else []
     values = _defects(b, values)
@@ -663,4 +751,13 @@ def generate(spec: HouseholdSpec) -> Household:
         parents=b.parents,
         duplicates=b.duplicates,
         events=events,
+        room_of={
+            s.entity_id: b.room_area[g] for s, g in zip(b.series, b.groups, strict=True) if g >= 0
+        },
+        ha_area={
+            s.entity_id: b.room_area[g]
+            for s, g in zip(b.series, b.groups, strict=True)
+            if g >= 0 and b.room_in_ha[g]
+        },
+        areas=[AreaInfo(a, (a.replace("_", " "),)) for a in sorted(set(b.room_area.values()))],
     )

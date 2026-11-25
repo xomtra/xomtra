@@ -102,8 +102,13 @@ VIEWS: dict[str, View] = {
             "n_eff = anomalous hours. 'change_point': lasting level shift from period_start; "
             "score = shift in robust deviations, observed/expected = level after/before. "
             "flags (trivial or explained findings): duplicate_suspect, same_device, short, "
-            "weather, level_shift; rank 1 = strongest within type and window.",
-            ("entity_group", "related_group"),
+            "weather, level_shift, common_factor (shared or hidden driver), indirect "
+            "(explained by the series in explained_by), same_area (both in one HA area), "
+            "house_context (explained by the residents' presence), "
+            "unstable (does not replicate in "
+            "both halves of the window); p_value = calibrated p-value of the pair; "
+            "rank 1 = strongest within type and window.",
+            ("entity_group", "related_group", "explained_by"),
         ),
         View(
             "catalog_finding_weekly",
@@ -111,7 +116,7 @@ VIEWS: dict[str, View] = {
             ("entity_id", "related_entity_id"),
             "Weekly snapshots of catalog_finding (prefer get_weekly_summary): week_start = "
             "local Monday of the summarised week, snapshot_at, then the finding columns.",
-            ("entity_group", "related_group"),
+            ("entity_group", "related_group", "explained_by"),
         ),
     )
 }
@@ -235,6 +240,13 @@ class DataAccess:
                     {"db": LAKE_ALIAS},
                 ).fetchall()
             }
+            columns: dict[str, set[str]] = {}
+            for table, column in cur.execute(
+                "SELECT schema_name || '.' || table_name, column_name FROM duckdb_columns() "
+                "WHERE database_name = $db",
+                {"db": LAKE_ALIAS},
+            ).fetchall():
+                columns.setdefault(table, set()).add(column)
             for view in VIEWS.values():
                 if view.source not in existing:
                     continue
@@ -244,7 +256,13 @@ class DataAccess:
                 where = f" WHERE NOT ({hidden_rows})" if deny else ""
                 hidden = access.columns_hidden_in(view.name)
                 exclude = f" EXCLUDE ({', '.join(hidden)})" if hidden else ""
-                lists = [c for c in view.entity_lists if c not in hidden]
+                # A list column added in a later release may be missing until the
+                # ingest service has upgraded the table.
+                lists = [
+                    c
+                    for c in view.entity_lists
+                    if c not in hidden and c in columns.get(view.source, {c})
+                ]
                 replace = (
                     " REPLACE ("
                     + ", ".join(
@@ -505,7 +523,8 @@ class DataAccess:
         cols = extra + (
             "f.finding_type, f.window_days, f.rank, f.entity_id, f.metric, f.state, "
             "f.related_entity_id, f.related_metric, f.related_state, f.lag_hours, f.score, "
-            "f.q_value, f.n_eff, f.observed, f.expected, f.flags, f.entity_group, "
+            "f.q_value, f.p_value, f.n_eff, f.observed, f.expected, f.flags, f.explained_by, "
+            "f.entity_group, "
             "f.related_group, f.period_start, f.period_end, f.first_detected_at, "
             "f.detected_at, f.finding_id"
         )

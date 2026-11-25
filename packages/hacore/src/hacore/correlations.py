@@ -46,7 +46,9 @@ import duckdb
 import numpy as np
 import numpy.typing as npt
 
-from hacore import weather
+from hacore import areas, weather
+from hacore import significance as sig
+from hacore.context import EMPTY, Context
 from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, load_no_analysis
 from hacore.lake import LAKE_ALIAS, sql_literal
 
@@ -81,6 +83,8 @@ FINDING_COLUMNS = """
     related_group VARCHAR[],
     observed DOUBLE,
     expected DOUBLE,
+    p_value DOUBLE,
+    explained_by VARCHAR[],
     first_detected_at TIMESTAMPTZ,
     detected_at TIMESTAMPTZ NOT NULL
 """
@@ -90,6 +94,8 @@ ADDED_COLUMNS = (
     ("related_group", "VARCHAR[]"),
     ("observed", "DOUBLE"),
     ("expected", "DOUBLE"),
+    ("p_value", "DOUBLE"),
+    ("explained_by", "VARCHAR[]"),
 )
 # Columns of one finding as produced by an analysis (the rest is set when writing).
 _ROW_DEFAULTS: dict[str, Any] = {
@@ -107,6 +113,8 @@ _ROW_DEFAULTS: dict[str, Any] = {
     "related_group": [],
     "observed": None,
     "expected": None,
+    "p_value": None,
+    "explained_by": [],
 }
 _ROW_KEYS = frozenset(
     {*_ROW_DEFAULTS, "finding_id", "entity_id", "rank", "period_start", "period_end"}
@@ -155,6 +163,9 @@ class CorrelationParams:
     timezone: str = "UTC"
     include_states: bool = True
     labels: ExclusionLabels = DEFAULT_LABELS
+    # Significance method: "v2" calibrated (ADR 062), "v1" n_eff + Bonferroni (ADR 042).
+    method: str = "v2"
+    seed: int = 0  # of the null sample (v2), so a run is reproducible
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +201,7 @@ class CorrelationResult:
     period_start: datetime | None = None
     period_end: datetime | None = None
     notes: list[str] = field(default_factory=list)
+    significance: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -204,6 +216,7 @@ class CorrelationResult:
             "period_start": self.period_start.isoformat() if self.period_start else None,
             "period_end": self.period_end.isoformat() if self.period_end else None,
             "notes": self.notes,
+            "significance": self.significance,
         }
 
 
@@ -584,14 +597,25 @@ class Pairs:
     # Group of each column: columns joined by a lag-0 correlation >= DUPLICATE_R share
     # the smallest index of their group (near-duplicates: one quantity measured twice).
     groups: npt.NDArray[np.int64] | None = None
+    # v2 (ADR 062): calibrated p-values, structural flags and explaining columns.
+    p: FloatArray | None = None
+    flags: list[list[str]] | None = None
+    explained_by: list[list[int]] | None = None
 
 
-def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
-    """Best-lag correlation of every pair of columns, with FDR-corrected q-values.
+@dataclass(slots=True)
+class _Scan:
+    z: FloatArray  # standardised, clipped residuals, missing = 0
+    mask: FloatArray
+    r1: FloatArray  # lag-1 autocorrelation of each column
+    best_r: FloatArray  # [i, j]: strongest corr(x_i(t), x_j(t + k)) over k >= 0
+    best_lag: npt.NDArray[np.int64]
+    best_n: FloatArray  # common hours at that lag
+    groups: npt.NDArray[np.int64]
 
-    ``r[i, j]`` at lag ``k`` is corr(x_i(t), x_j(t + k)): column ``i`` leads by ``k`` hours.
-    Correlations use only hours both series have (pairwise complete observations).
-    """
+
+def _scan(resid: FloatArray, max_lag: int) -> _Scan:
+    """Best-lag correlation of every ordered pair of columns (pairwise complete hours)."""
     t_len, n = resid.shape
     mask = (~np.isnan(resid)).astype(float)
     mean = np.nanmean(resid, axis=0)
@@ -636,12 +660,22 @@ def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
         best_lag[better] = k
         best_n[better] = cnt[better]
     np.fill_diagonal(best_r, 0)
+    return _Scan(z, mask, r1, best_r, best_lag, best_n, groups)
 
-    lead, follow = np.nonzero(best_r)
-    r = best_r[lead, follow]
-    lag = best_lag[lead, follow]
-    phi = r1[lead] * r1[follow]
-    n_eff = np.maximum(best_n[lead, follow] * (1 - phi) / (1 + phi), 10)
+
+def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
+    """Best-lag correlation of every pair of columns, with FDR-corrected q-values
+    (method v1, ADR 042: lag-1 n_eff and Bonferroni over lags).
+
+    ``r[i, j]`` at lag ``k`` is corr(x_i(t), x_j(t + k)): column ``i`` leads by ``k`` hours.
+    Correlations use only hours both series have (pairwise complete observations).
+    """
+    sc = _scan(resid, max_lag)
+    lead, follow = np.nonzero(sc.best_r)
+    r = sc.best_r[lead, follow]
+    lag = sc.best_lag[lead, follow]
+    phi = sc.r1[lead] * sc.r1[follow]
+    n_eff = np.maximum(sc.best_n[lead, follow] * (1 - phi) / (1 + phi), 10)
     t_stat = r * np.sqrt((n_eff - 2) / np.maximum(1 - r**2, 1e-12))
     p = np.array([math.erfc(abs(float(x)) / math.sqrt(2)) for x in t_stat])
     p = np.minimum(p * (max_lag + 1), 1.0)  # Bonferroni over the tested lags
@@ -652,8 +686,254 @@ def lagged_correlations(resid: FloatArray, max_lag: int) -> Pairs:
         r=r,
         n_eff=n_eff,
         q=benjamini_hochberg(p),
-        groups=groups,
+        groups=sc.groups,
+        p=p,
     )
+
+
+def lagged_correlations_v2(
+    resid: FloatArray,
+    max_lag: int,
+    *,
+    min_r: float = 0.3,
+    max_q: float = 0.01,
+    seed: int = 0,
+) -> tuple[Pairs, dict[str, Any]]:
+    """Best-lag correlations with calibrated p-values and structural flags (ADR 062).
+
+    Significance (``significance`` module): ``z = r / sd`` with the Bartlett/xDF
+    variance under independence, p-value of the pair's max ``|z|`` over both directions
+    and all lags from the empirical null of circularly shifted pairs, Benjamini-Hochberg
+    over pairs. Flags of significant relations: ``common_factor``, ``indirect`` (with
+    the explaining column), ``unstable``. Returns the pairs and run statistics (no
+    entity names: null size, factors removed, histogram of p and q).
+    """
+    sc = _scan(resid, max_lag)
+    n = sc.z.shape[1]
+    rho = sig.autocorrelations(sc.z, sc.mask, sig.taper_lags(sc.z.shape[0]))
+    factor = sig.variance_factor(rho)
+    lead, follow = np.nonzero(sc.best_r)
+    r = sc.best_r[lead, follow]
+    lag = sc.best_lag[lead, follow]
+    n_obs = np.maximum(sc.best_n[lead, follow], 2.0)
+    zstat = np.abs(r) / np.sqrt(factor[lead, follow] / n_obs)
+    n_eff = n_obs / factor[lead, follow]
+
+    # One statistic per unordered pair: the stronger direction (as in the null).
+    pair_z = np.zeros((n, n))
+    pair_z[lead, follow] = zstat
+    pair_z = np.maximum(pair_z, pair_z.T)
+    iu, ju = np.triu_indices(n, 1)
+    tested = pair_z[iu, ju] > 0
+    rng = np.random.default_rng(seed)
+    null = sig.circular_null(sc.z, sc.mask, factor, max_lag, rng)
+    p_pair = np.ones((n, n))
+    q_pair = np.ones((n, n))
+    if tested.any():
+        p_u = null.pvalues(pair_z[iu, ju][tested])
+        q_u = benjamini_hochberg(p_u)
+        p_pair[iu[tested], ju[tested]] = p_u
+        q_pair[iu[tested], ju[tested]] = q_u
+        p_pair = np.minimum(p_pair, p_pair.T)
+        q_pair = np.minimum(q_pair, q_pair.T)
+    p = p_pair[lead, follow]
+    q = q_pair[lead, follow]
+    accepted = q <= max_q
+    p_cut = float(p[accepted].max()) if accepted.any() else 0.0
+
+    flags: list[list[str]] = [[] for _ in range(len(r))]
+    explained: list[list[int]] = [[] for _ in range(len(r))]
+    sel = np.flatnonzero(accepted & (np.abs(r) >= min_r))
+    stats: dict[str, Any] = {
+        "null_size": null.size,
+        "factors_removed": 0,
+        "p_histogram": np.histogram(p, bins=10, range=(0, 1))[0].tolist(),
+        "q_histogram": np.histogram(q, bins=10, range=(0, 1))[0].tolist(),
+    }
+    if len(sel):
+        # Common factors: the relation largely disappears without them.
+        zf, k = sig.remove_factors(sc.z)
+        stats["factors_removed"] = k
+        if k:
+            r_f = sig.lagged_r(zf, lead[sel], follow[sel], lag[sel])
+            gone = (np.abs(r_f) < min_r) & (np.abs(r_f) < sig.FACTOR_KEEP_SHARE * np.abs(r[sel]))
+            for j in sel[gone]:
+                flags[j].append("common_factor")
+        # Indirect: explained by a third significant series with consistent lags.
+        structure = _explained_by(
+            sel,
+            known=np.flatnonzero(accepted),
+            groups=sc.groups,
+            lead=lead,
+            follow=follow,
+            lag=lag,
+            r=r,
+            factor=factor,
+            n_obs=n_obs,
+            p_cut=p_cut,
+            n=n,
+        )
+        _apply_structure(structure, flags, explained)
+        bad = sig.unstable(sc.z, sc.mask, a=lead[sel], b=follow[sel], lag=lag[sel], r=r[sel])
+        for j in sel[bad]:
+            flags[j].append("unstable")
+    return (
+        Pairs(
+            leader=lead.astype(np.int64),
+            follower=follow.astype(np.int64),
+            lag=lag,
+            r=r,
+            n_eff=n_eff,
+            q=q,
+            groups=sc.groups,
+            p=p,
+            flags=flags,
+            explained_by=explained,
+        ),
+        stats,
+    )
+
+
+@dataclass(slots=True)
+class _Structure:
+    indirect: list[tuple[int, int]]  # (entry, explaining column)
+    latent: list[tuple[int, list[int]]]  # (entry, columns sharing the hidden driver)
+    hub: list[int]  # entries where a or b is itself the driver of the neighbours
+
+
+def _apply_structure(
+    structure: _Structure, flags: list[list[str]], explained: list[list[int]]
+) -> None:
+    for j, c in structure.indirect:
+        flags[j].append("indirect")
+        explained[j].append(c)
+    for j, _members in structure.latent:
+        if "common_factor" not in flags[j]:
+            flags[j].append("common_factor")
+    # Global factors also absorb a hub with its followers: those relations are
+    # direct, the hub is observed.
+    for j in structure.hub:
+        if "common_factor" in flags[j]:
+            flags[j].remove("common_factor")
+
+
+def _nonzero(x: FloatArray) -> FloatArray:
+    return np.where(np.abs(x) < 1e-6, 1e-6, x)
+
+
+def _explained_by(
+    sel: npt.NDArray[np.int64],
+    *,
+    known: npt.NDArray[np.int64],
+    groups: npt.NDArray[np.int64],
+    lead: npt.NDArray[np.int64],
+    follow: npt.NDArray[np.int64],
+    lag: npt.NDArray[np.int64],
+    r: FloatArray,
+    factor: FloatArray,
+    n_obs: FloatArray,
+    p_cut: float,
+    n: int,
+) -> _Structure:
+    """Structure of the significant relations a - b among their common neighbours C
+    (significant with both at the run's level, lags consistent along a -> c -> b):
+
+    * **indirect** (PC step of order 1): the partial correlation of a and b given one
+      c is no longer significant at the level the run accepted;
+    * **latent** (local common driver, e.g. the occupancy of one room): with at least
+      two such neighbours, a one-factor model explains r_ab: the tetrad estimate
+      median(r_ac r_bd / r_cd) is within two standard errors (at least 0.05) of r_ab.
+      A direct relation on top of a shared driver makes r_ab larger than that; a or b
+      with a loading near 1 is itself the driver (a hub), not a hidden cause. With
+      only three series sharing a driver the model is not identifiable (no tetrad).
+    """
+    out = _Structure([], [], [])
+    if not len(sel) or p_cut <= 0:
+        return out
+    # Strongest direction of every unordered pair: r and signed lead of x over y (h).
+    mag = np.zeros((n, n))
+    mag[lead, follow] = np.abs(r)
+    strongest = (mag[lead, follow] > mag[follow, lead]) | (
+        (mag[lead, follow] == mag[follow, lead]) & (lead < follow)
+    )
+    a_s, b_s = lead[strongest], follow[strongest]
+    big_r = np.zeros((n, n))
+    big_d = np.zeros((n, n), dtype=np.int64)
+    big_r[a_s, b_s] = big_r[b_s, a_s] = r[strongest]
+    big_d[a_s, b_s], big_d[b_s, a_s] = lag[strongest], -lag[strongest]
+    # Neighbours: significant at the run's level, whatever their strength.
+    sig_m = np.zeros((n, n), dtype=bool)
+    sig_m[lead[known], follow[known]] = True
+    sig_m |= sig_m.T
+    for j in sel:
+        a, b = int(lead[j]), int(follow[j])
+        # A near-duplicate of a or b explains nothing: it is the same measurement.
+        cands = np.flatnonzero(sig_m[a] & sig_m[b] & (groups != groups[a]) & (groups != groups[b]))
+        if not len(cands):
+            continue
+        consistent = np.abs(big_d[a, cands] + big_d[cands, b] - lag[j]) <= sig.LAG_TOLERANCE
+        cands = cands[consistent]
+        if not len(cands):
+            continue
+        sd = math.sqrt(factor[a, b] / n_obs[j])
+        rac, rcb = big_r[a, cands], big_r[cands, b]
+        den = np.sqrt(np.maximum((1 - rac**2) * (1 - rcb**2), 1e-12))
+        partial = (r[j] - rac * rcb) / den
+        p_p = np.array([math.erfc(abs(float(x)) / sd / math.sqrt(2)) for x in partial])
+        best = int(np.argmax(p_p))
+        # Not significant any more at the level the run accepted (a single test at a
+        # fixed lag: the normal tail is the conservative choice here).
+        if p_p[best] > max(p_cut, 1e-12) and abs(partial[best]) < abs(r[j]):
+            out.indirect.append((int(j), int(cands[best])))
+            continue
+        if _is_hub(big_r, a=a, b=b, r_ab=float(r[j]), cands=cands):
+            out.hub.append(int(j))
+            continue
+        members = _one_factor(
+            big_r, a=a, b=b, r_ab=float(r[j]), sd=sd, cands=cands[np.argsort(-np.abs(rac * rcb))]
+        )
+        if members:
+            out.latent.append((int(j), members))
+    return out
+
+
+def _is_hub(
+    big_r: FloatArray, *, a: int, b: int, r_ab: float, cands: npt.NDArray[np.int64]
+) -> bool:
+    """Squared loading of a (or b) on what it shares with b and the neighbours close
+    to 1: a is itself the driver, a hub with several direct followers, not a series
+    driven by a hidden cause (r_ab r_ac / r_bc = 1 when a drives b and c)."""
+    load_a = float(np.median(r_ab * big_r[a, cands] / _nonzero(big_r[b, cands])))
+    load_b = float(np.median(r_ab * big_r[b, cands] / _nonzero(big_r[a, cands])))
+    return max(load_a, load_b) >= sig.HUB_LOADING
+
+
+def _one_factor(
+    big_r: FloatArray, *, a: int, b: int, r_ab: float, sd: float, cands: npt.NDArray[np.int64]
+) -> list[int]:
+    """Columns sharing one hidden driver with a and b when the tetrad estimate of r_ab
+    fits (see ``_explained_by``), else an empty list."""
+    if len(cands) < 2:
+        return []
+    cands = cands[: sig.MAX_TETRAD_NEIGHBOURS]
+    ci, di = np.triu_indices(len(cands), 1)
+    c, d = cands[ci], cands[di]
+    linked = np.abs(big_r[c, d]) >= sig.TETRAD_MIN_LINK
+    if not linked.any():
+        return []
+    c, d = c[linked], d[linked]
+    r_cd = big_r[c, d]
+    terms = ((big_r[a, c], big_r[b, d]), (big_r[a, d], big_r[b, c]))
+    est = np.concatenate([x * y / r_cd for x, y in terms])
+    rel = np.concatenate([np.sqrt(1 / x**2 + 1 / y**2 + 1 / r_cd**2) for x, y in terms])
+    r_hat = float(np.median(est))
+    # Standard error of the tetrad estimate (delta method, every r with the sd of r_ab;
+    # the estimates share their terms, so only the neighbours count).
+    se_hat = abs(r_hat) * sd * float(np.median(rel)) / math.sqrt(max(1, len(cands) - 1))
+    tolerance = max(sig.TETRAD_MIN_TOLERANCE, 2 * math.hypot(sd, se_hat))
+    if abs(r_ab - r_hat) > tolerance:
+        return []
+    return sorted({int(x) for x in np.concatenate([c, d])})
 
 
 def _pearson(
@@ -754,6 +1034,8 @@ def select_findings(
     series: list[Series],
     params: CorrelationParams,
     devices: dict[str, str],
+    *,
+    context: Context = EMPTY,
 ) -> list[dict[str, Any]]:
     """Significant pairs, unflagged ones first, each part by ``|r|``.
 
@@ -790,12 +1072,18 @@ def select_findings(
         seen.add(key)
         lag = int(pairs.lag[k])
         r = float(pairs.r[k])
-        flags = []
+        flags = list(pairs.flags[k]) if pairs.flags is not None else []
         if same_group:
             flags.append("duplicate_suspect")
         dev = devices.get(a.entity_id)
         if dev is not None and dev == devices.get(b.entity_id):
             flags.append("same_device")
+        explained_by = (
+            [series[c].entity_id for c in pairs.explained_by[k]]
+            if pairs.explained_by is not None
+            else []
+        )
+        flags = context.explain(a.entity_id, b.entity_id, flags, explained_by)
         candidates.append(
             {
                 "finding_id": finding_id(params.window_days, a, b),
@@ -808,8 +1096,10 @@ def select_findings(
                 "lag_hours": lag,
                 "score": round(r, 4),
                 "q_value": float(pairs.q[k]),
+                "p_value": float(pairs.p[k]) if pairs.p is not None else None,
                 "n_eff": round(float(pairs.n_eff[k])),
                 "flags": flags,
+                "explained_by": explained_by,
                 "entity_group": [] if same_group else _others(members[ga], a.entity_id),
                 "related_group": [] if same_group else _others(members[gb], b.entity_id),
             }
@@ -826,14 +1116,35 @@ def _others(group: list[str], entity_id: str) -> list[str]:
     return sorted(e for e in group if e != entity_id)[:MAX_GROUP_MEMBERS]
 
 
+def _pairs(resid: FloatArray, params: CorrelationParams, result: CorrelationResult) -> Pairs:
+    """Lagged correlations with the configured significance method."""
+    if params.method == "v1":
+        return lagged_correlations(resid, params.max_lag)
+    pairs, stats = lagged_correlations_v2(
+        resid, params.max_lag, min_r=params.min_r, max_q=params.max_q, seed=params.seed
+    )
+    # Distribution of p and q of all tested pairs (ADR 062 point 10), no entity names.
+    result.significance = stats
+    logger.info("Correlations (%d d) significance: %s", params.window_days, stats)
+    return pairs
+
+
 def _method(params: CorrelationParams, used_temp: bool) -> str:
     drivers = "hour of day, day of week" + (
         f", outside temperature ({params.outside_temp})" if used_temp else ""
     )
+    if params.method == "v1":
+        test = "lag-1 n_eff, Bonferroni over lags, BH-FDR q-values (v1)"
+    else:
+        test = (
+            "Bartlett/xDF variance, p-value of max |z| over lags from circularly shifted "
+            "pairs (GPD tail), BH-FDR over pairs; flags common_factor, indirect "
+            "(explained_by), unstable (v2, ADR 062)"
+        )
     return (
         f"hourly residuals after {drivers}, minus their {HIGHPASS_HOURS} h moving average; "
         f"lag 0..{params.max_lag} h; near-duplicates (lag-0 |r| >= {DUPLICATE_R}) grouped; "
-        "entity_id leads related_entity_id by lag_hours; BH-FDR q-values"
+        f"entity_id leads related_entity_id by lag_hours; {test}"
     )
 
 
@@ -873,6 +1184,7 @@ def write_findings(
                 "$entity_group::VARCHAR[] AS entity_group, "
                 "$related_group::VARCHAR[] AS related_group, "
                 "$observed::DOUBLE AS observed, $expected::DOUBLE AS expected, "
+                "$p_value::DOUBLE AS p_value, $explained_by::VARCHAR[] AS explained_by, "
                 "coalesce($period_start::TIMESTAMPTZ, $ps::TIMESTAMPTZ) AS period_start, "
                 "coalesce($period_end::TIMESTAMPTZ, $pe::TIMESTAMPTZ) AS period_end",
                 [
@@ -926,8 +1238,10 @@ def run(
     *,
     now: datetime | None = None,
     alias: str = LAKE_ALIAS,
+    context: Context | None = None,
 ) -> CorrelationResult:
-    """Compute correlations for one window and replace its findings."""
+    """Compute correlations for one window and replace its findings. ``context`` (ADR
+    064) defaults to the Home Assistant one from the lake (areas, presence)."""
     now = (now or datetime.now(UTC)).astimezone(UTC)
     result = CorrelationResult(window_days=params.window_days)
     ensure_schema(con, alias)
@@ -978,9 +1292,15 @@ def run(
     result.period_end = _to_dt(grid.hours[-1]) + timedelta(hours=1)
     findings: list[dict[str, Any]] = []
     if len(series) >= 2:
-        pairs = lagged_correlations(resid, params.max_lag)
+        pairs = _pairs(resid, params, result)
         result.pairs_tested = len(pairs.r)
-        findings = select_findings(pairs, series, params, _devices(con, alias))
+        findings = select_findings(
+            pairs,
+            series,
+            params,
+            _devices(con, alias),
+            context=areas.load_context(con, alias) if context is None else context,
+        )
     write_findings(
         con,
         findings,

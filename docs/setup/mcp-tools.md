@@ -62,9 +62,13 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    uptime or a filling disk do not correlate with each other.
 3. Correlation of every pair with a lag of 0–24 hours (the best lag wins), on hours
    both series have (Pearson over those hours, residuals clipped to ±4 standard
-   deviations so a few spikes cannot carry a pair); significance corrected for
-   autocorrelation, Bonferroni over lags
-   and Benjamini–Hochberg FDR over pairs.
+   deviations so a few spikes cannot carry a pair). Significance (ADR 062,
+   `HAMMOND_CORRELATION_METHOD=v2`, the default): `z = r / sd` with the variance of `r`
+   under independence from the autocorrelations of both series (Bartlett/xDF); the
+   p-value (`p_value`) of the pair's largest `|z|` over both directions and all lags
+   comes from an empirical null of circularly shifted pairs (whole days, so the daily
+   cycle stays aligned) with a generalised Pareto tail; Benjamini–Hochberg FDR over
+   pairs (`q_value`). `v1` is the method of 0.3.0 (Bonferroni over lags).
 4. Series with a lag-0 `|r| >= 0.95` form a group of near-duplicates (one quantity
    measured twice: % and MB, a phase and the total, a daily and a monthly counter).
 5. Pairs with `|score| >= 0.3` and `q_value <= 0.01`, at most 100 per window. A relation
@@ -73,6 +77,33 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
    strongest direction, lag and metric). Pairs of one entity are skipped; `flags` marks
    `same_device` and `duplicate_suspect` (a pair inside one group), which are usually
    trivial and are ranked after the unflagged ones.
+6. Structure of the significant relations (v2), also ranked after the unflagged ones:
+   - `common_factor`: the relation disappears once the largest common components of
+     all series are removed (Marchenko–Pastur edge, at most five), or the pair and at
+     least two common neighbours fit one hidden driver (tetrad test: the occupancy of a
+     room, one appliance seen by several sensors). An observed hub (a series that
+     itself drives the others) is not a hidden driver: its relations stay direct.
+     Three series sharing a driver cannot be told from direct relations by any test on
+     the data alone.
+   - `indirect`: a third significant series C explains the pair (partial correlation
+     not significant, lags consistent along A → C → B); C is in `explained_by`.
+   - `unstable`: in a window of at least 180 days the relation does not keep its sign
+     and `|r| >= 0.2` in both halves.
+   - `same_area` (ADR 064): both entities are in one Home Assistant area (the entity's
+     area, else its device's). Motion, light and CO₂ of one room correlate through its
+     occupancy; such a relation is explained, not a discovery. An entity without an
+     area is matched by its id and name against the area ids, names and aliases
+     (whole words, diacritics ignored, one area only). An entity with no area found
+     gets no flag: its relations stay among the unflagged ones.
+   - `house_context` (ADR 064): the relation is explained by a presence entity of the
+     residents (`person.*`, `device_tracker.*`, `zone.*`, a `binary_sensor` with device
+     class `presence`) in `explained_by`. A relation with a presence entity itself is
+     direct and never `common_factor`.
+   The analyses themselves know nothing about Home Assistant: `same_area` and
+   `house_context` come from a context of groups (areas) and observed drivers
+   (presence) that `hacore.areas` builds from the HA registries (`hacore.context`).
+   The run logs the histogram of p- and q-values (no entity names) for the
+   calibration of `q`.
 
 `entity_id` leads `related_entity_id` by `lag_hours`. `first_detected_at` stays from the
 first run that found the pair; every run replaces the findings of its window. A
