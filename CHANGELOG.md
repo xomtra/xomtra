@@ -11,6 +11,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Fixed
+
+- Home Assistant add-on: it did not start ("expected url" for `mcp_url`). The empty
+  default of the optional option failed the Supervisor's check of `url?`; optional
+  options now have no default, and a test keeps the defaults in line with the schema.
+
 ## [0.5.0] - 2026-11-25
 
 ### Added
