@@ -200,8 +200,9 @@ def score_correlations(m: RunMetrics, findings: list[dict[str, Any]]) -> None:
 
 def _robust_scale(grid: corr.Grid, params: an.AnomalyParams) -> tuple[FloatArray, FloatArray]:
     """Deviation of every series in the recent week as the method scales it, and
-    whether the series is heavy-tailed: its robust deviation is under ``HEAVY_TAIL_RATIO`` of the 5-95 %
-    spread of its baseline residuals (an appliance that idles most hours)."""
+    whether the series is heavy-tailed: its robust deviation is under
+    ``HEAVY_TAIL_RATIO`` of the 5-95 % spread of its baseline residuals (an appliance
+    that idles most hours)."""
     t = len(grid.hours)
     first_recent = t - params.recent_days * 24
     idx = np.arange(t)

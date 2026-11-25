@@ -947,7 +947,8 @@ def _methods(params: AnomalyParams) -> tuple[str, str]:
         )
     return (
         f"hour-of-week median and robust deviation (Qn for discrete series, at least the "
-        f"sensor's resolution and the series' 99th percentile residual / 4) over {params.baseline_days} d before the last "
+        "sensor's resolution and the series' 99th percentile residual / 4) over "
+        f"{params.baseline_days} d before the last "
         f"{params.recent_days} d; conformal p of the episode (min(peak |z|, {params.z_cap:g}) x "
         "sqrt(hours)) against leave-one-week-out baseline "
         f"episodes, BH over episodes q <= {params.max_q:g}, peak |z| >= "
