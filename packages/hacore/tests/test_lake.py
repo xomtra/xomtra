@@ -68,3 +68,41 @@ def test_duckdb_resource_options() -> None:
     con = duckdb.connect(config={k: v for k, v in custom.items() if k != "temp_directory"})
     assert con.execute("SELECT current_setting('threads')").fetchone() == (1,)
     con.close()
+
+
+LOCAL_ENV = {k: v for k, v in ENV.items() if not k.startswith("HAMMOND_S3_")} | {
+    "HAMMOND_LAKE_DATA_PATH": "/data/lake",
+}
+
+
+def test_local_data_path_needs_no_object_storage() -> None:
+    settings = LakeSettings.from_env(LOCAL_ENV)
+    assert settings.is_local
+    assert settings.data_path == "/data/lake/"
+    assert "httpfs" not in settings.extensions
+    assert "DATA_PATH '/data/lake/'" in attach_sql(settings)
+    assert "se'cret" not in repr(settings)
+
+
+def test_local_data_path_must_be_absolute() -> None:
+    with pytest.raises(ValueError, match="absolute"):
+        LakeSettings.from_env({**LOCAL_ENV, "HAMMOND_LAKE_DATA_PATH": "lake"})
+
+
+def test_object_storage_needs_s3_values() -> None:
+    with pytest.raises(ValueError, match="HAMMOND_S3_"):
+        LakeSettings(pg_host="db", pg_db="d", pg_user="u", pg_password="p")
+    full = LakeSettings.from_env(ENV)
+    assert not full.is_local
+    assert "httpfs" in full.extensions
+
+
+def test_lite_edition_has_smaller_duckdb_budget() -> None:
+    lite = LakeSettings.from_env({**LOCAL_ENV, "HAMMOND_EDITION": "lite"})
+    assert lite.memory_limit == "512MB"
+    explicit = LakeSettings.from_env(
+        {**LOCAL_ENV, "HAMMOND_EDITION": "lite", "HAMMOND_DUCKDB_MEMORY_LIMIT": "1GB"}
+    )
+    assert explicit.memory_limit == "1GB"
+    with pytest.raises(ValueError, match="HAMMOND_EDITION"):
+        LakeSettings.from_env({**LOCAL_ENV, "HAMMOND_EDITION": "tiny"})

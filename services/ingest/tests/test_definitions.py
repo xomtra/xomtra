@@ -136,3 +136,15 @@ def test_label_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HAMMOND_LABEL_NO_ANALYSIS", "  ")
     with pytest.raises(ValueError, match="label"):
         IngestSettings()
+
+
+def test_lite_edition_retention_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HAMMOND_EDITION", "lite")
+    s = IngestSettings()
+    assert (s.states_retention_days, s.statistics_5min_retention_days) == (90, 90)
+    assert s.statistics_hour_retention_days == 5 * 365
+    monkeypatch.setenv("HAMMOND_STATES_RETENTION_DAYS", "30")
+    assert IngestSettings().states_retention_days == 30
+    monkeypatch.delenv("HAMMOND_EDITION")
+    monkeypatch.delenv("HAMMOND_STATES_RETENTION_DAYS")
+    assert IngestSettings().states_retention_days == 365

@@ -223,6 +223,23 @@ jobs:
               assert err.code == 401, err.code
           print(urllib.request.urlopen("http://127.0.0.1:8000/.well-known/oauth-protected-resource/mcp").read())
           PY
+      - name: Smoke test lite lake (Postgres catalog + local data files, ADR 050)
+        working-directory: deploy/compose
+        run: |
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres \
+            -c "CREATE DATABASE ducklake_lite OWNER ducklake"
+          # No object storage: no HAMMOND_S3_* values at all. `docker compose run` has
+          # no --tmpfs, so the image runs directly on the compose backend network.
+          set -o pipefail
+          docker run --rm --network hammond_backend --read-only --cap-drop ALL \
+            --tmpfs /data:uid=10001,gid=10001 \
+            -e HAMMOND_EDITION=lite -e HAMMOND_LAKE_PG_HOST=postgres \
+            -e HAMMOND_LAKE_PG_DB=ducklake_lite -e HAMMOND_LAKE_PG_USER=ducklake \
+            -e HAMMOND_LAKE_PG_PASSWORD="$DUCKLAKE_PG_PASSWORD" \
+            -e HAMMOND_LAKE_DATA_PATH=/data/lake \
+            --entrypoint python "$HAMMOND_MCP_IMAGE" -m hacore.lake init 2>&1 \
+            | tee /tmp/lite-lake.log
+          grep -q "data files in local data path" /tmp/lite-lake.log
       - name: Smoke test ingest (HA -> stream/backfill -> bronze -> SQLMesh silver)
         working-directory: deploy/compose
         run: |

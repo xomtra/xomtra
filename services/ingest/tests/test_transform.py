@@ -7,7 +7,7 @@ import pytest
 from hacore import bronze
 from hacore import catalog as entity_catalog
 from hacore.history import StateRow, StatisticRow, iso_to_us
-from hacore.lake import LakeSettings, connect_local, install_extensions
+from hacore.lake import LAKE_ALIAS, LakeSettings, connect_local, install_extensions
 from hammond_ingest import transform
 
 EXT = os.environ.get("HAMMOND_DUCKDB_EXTENSION_DIR") or None
@@ -131,3 +131,12 @@ def test_catalog_uri_has_no_quotes() -> None:
     conn = transform.lake_connection(settings)
     assert isinstance(conn.secrets, dict)
     assert conn.secrets["hammond_s3"]["secret"] == "s''k"
+
+
+def test_local_lake_has_no_s3_secret() -> None:
+    settings = LakeSettings(
+        pg_host="db", pg_db="ducklake", pg_user="u", pg_password="p", local_data_path="/data/lake"
+    )
+    conn = transform.lake_connection(settings)
+    assert not conn.secrets
+    assert conn.catalogs[LAKE_ALIAS].data_path == "/data/lake/"

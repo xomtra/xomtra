@@ -66,16 +66,9 @@ def _connector_config(
 
 
 def lake_connection(settings: LakeSettings) -> DuckDBConnectionConfig:
-    secret = {
-        "type": "s3",
-        "key_id": _escape(settings.s3_access_key),
-        "secret": _escape(settings.s3_secret_key),
-        "endpoint": _escape(settings.s3_endpoint),
-        "region": _escape(settings.s3_region),
-        "url_style": "path",
-        "use_ssl": "true" if settings.s3_use_ssl else "false",
-        "scope": _escape(f"s3://{settings.s3_bucket}"),
-    }
+    secrets: dict[str, dict[str, str]] = {}
+    if not settings.is_local:
+        secrets["hammond_s3"] = _s3_secret(settings)
     return DuckDBConnectionConfig(
         catalogs={
             LAKE_ALIAS: DuckDBAttachOptions(
@@ -86,8 +79,21 @@ def lake_connection(settings: LakeSettings) -> DuckDBConnectionConfig:
             )
         },
         connector_config=_connector_config(settings.extension_dir, settings),
-        secrets={"hammond_s3": secret},
+        secrets=secrets,
     )
+
+
+def _s3_secret(settings: LakeSettings) -> dict[str, str]:
+    return {
+        "type": "s3",
+        "key_id": _escape(settings.s3_access_key),
+        "secret": _escape(settings.s3_secret_key),
+        "endpoint": _escape(settings.s3_endpoint),
+        "region": _escape(settings.s3_region),
+        "url_style": "path",
+        "use_ssl": "true" if settings.s3_use_ssl else "false",
+        "scope": _escape(f"s3://{settings.s3_bucket}"),
+    }
 
 
 def build_config(
