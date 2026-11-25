@@ -177,3 +177,22 @@ def test_same_area_is_left_out_of_the_gate_fdr() -> None:
     assert m.same_area > 0
     assert m.gate_findings == m.findings - m.same_area
     assert m.fdr_all >= m.fdr_strict
+
+
+def test_presence_entity_is_an_observed_driver() -> None:
+    """ADR 064: the residents' presence entity drives the home's occupancy; its
+    relations with the rooms are direct and never flagged as a hidden factor."""
+    h = generate(HouseholdSpec("minimalist", 60, days=90, seed=3, presence=1.0))
+    assert "person.resident=on" in h.keys
+    assert (
+        "person.resident=on"
+        not in generate(HouseholdSpec("minimalist", 60, days=90, seed=3, presence=0.0)).keys
+    )
+    motion = next(k for k in h.keys if k.endswith("_motion=on"))
+    assert h.relation("person.resident=on", motion) is Relation.DIRECT
+    findings = current_method()(h)
+    with_person = [
+        f for f in findings if "person.resident" in (f["entity_id"], f["related_entity_id"])
+    ]
+    assert with_person
+    assert not any("common_factor" in f["flags"] for f in with_person)

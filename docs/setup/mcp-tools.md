@@ -95,6 +95,13 @@ strongest pairs to `catalog.finding` (view `catalog_finding`, `finding_type =
      area is matched by its id and name against the area ids, names and aliases
      (whole words, diacritics ignored, one area only). An entity with no area found
      gets no flag: its relations stay among the unflagged ones.
+   - `house_context` (ADR 064): the relation is explained by a presence entity of the
+     residents (`person.*`, `device_tracker.*`, `zone.*`, a `binary_sensor` with device
+     class `presence`) in `explained_by`. A relation with a presence entity itself is
+     direct and never `common_factor`.
+   The analyses themselves know nothing about Home Assistant: `same_area` and
+   `house_context` come from a context of groups (areas) and observed drivers
+   (presence) that `hacore.areas` builds from the HA registries (`hacore.context`).
    The run logs the histogram of p- and q-values (no entity names) for the
    calibration of `q`.
 

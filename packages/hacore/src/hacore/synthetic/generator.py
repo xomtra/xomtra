@@ -95,13 +95,16 @@ class HouseholdSpec:
     # the device (sensor.th_3f2a_co2). None = drawn per household.
     area_coverage: float | None = None
     descriptive_names: float | None = None
+    # Share of households with an observed presence entity (person.resident: home or
+    # away, ADR 064 house_context). None = drawn per household.
+    presence: float | None = None
 
     def __post_init__(self) -> None:
         if self.archetype not in ARCHETYPES:
             raise ValueError(f"unknown archetype {self.archetype!r}")
         if self.n_series < 4 or self.days < 14:
             raise ValueError("a household needs at least 4 series and 14 days")
-        for share in (self.area_coverage, self.descriptive_names):
+        for share in (self.area_coverage, self.descriptive_names, self.presence):
             if share is not None and not 0 <= share <= 1:
                 raise ValueError("area shares must be between 0 and 1")
 
@@ -173,6 +176,10 @@ class Household:
             visit(node)
         return memo
 
+    @cached_property
+    def _observed(self) -> frozenset[str]:
+        return frozenset(self.keys)
+
     def ancestors(self, node: str) -> frozenset[str]:
         return self._ancestors.get(node, frozenset())
 
@@ -192,8 +199,12 @@ class Household:
         if b in pa or a in pb:
             return Relation.DIRECT
         anc_a, anc_b = self.ancestors(a), self.ancestors(b)
-        if a in anc_b or b in anc_a:
-            return Relation.INDIRECT
+        for x, anc_y in ((a, anc_b), (b, anc_a)):
+            if x in anc_y:
+                # Through hidden nodes only (person -> room occupancy -> motion) the
+                # relation is direct for anything that sees the observed series.
+                between = [n for n in anc_y if n in self._observed and x in self.ancestors(n)]
+                return Relation.INDIRECT if between else Relation.DIRECT
         shared = (anc_a | {a}) & (anc_b | {b})
         if not shared:
             return Relation.UNRELATED
@@ -659,6 +670,26 @@ def _insert_events(b: _Builder, values: FloatArray) -> list[InsertedEvent]:
     return events
 
 
+PRESENCE = "person.resident"
+PRESENCE_SHARE = 0.7  # households with a presence entity when not set in the spec
+
+
+def _presence(b: _Builder, home: FloatArray) -> None:
+    """An observed presence entity (phone app: home or away, 2 % of hours wrong) that
+    becomes the parent of everything the home's occupancy drives."""
+    rng = np.random.default_rng([b.spec.seed, ARCHETYPES.index(b.spec.archetype), 65])
+    share = b.spec.presence if b.spec.presence is not None else PRESENCE_SHARE
+    if rng.random() >= share:
+        return
+    wrong = rng.random(b.t) < 0.02
+    key = b.add(PRESENCE, np.where(wrong, 1 - home, home), [Parent(HOME)], metric="share")
+    for node, parents in b.parents.items():
+        if node != key:
+            b.parents[node] = [
+                Parent(key, p.lag, p.weight) if p.node == HOME else p for p in parents
+            ]
+
+
 # ---- entry point --------------------------------------------------------------------
 
 
@@ -701,6 +732,7 @@ def generate(spec: HouseholdSpec) -> Household:
     _planted(b, spec.archetype, min(n_planted, spec.n_series - b.count))
     _unrelated(b, max(0, spec.n_series - b.count))
 
+    _presence(b, home)
     values = np.column_stack(b.values)
     events = _insert_events(b, values) if spec.events else []
     values = _defects(b, values)

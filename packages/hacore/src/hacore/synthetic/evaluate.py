@@ -7,10 +7,12 @@ with the truth of each household. Metrics (ADR 062, Gate 1c criterion 6):
 ``fdr_strict``      share of findings between unrelated series (false by any reading)
 ``fdr``             as above, plus indirect and hidden-common relations reported
                     without the flag ``indirect``/``common_factor``, over the findings
-                    without ``same_area`` (the gate metric, ADR 064)
+                    without ``same_area`` / ``house_context`` (the gate metric, ADR 064)
 ``fdr_all``         the same over all findings, ``same_area`` ones included and not
                     excused by that flag (the overall view, as before ADR 064)
 ``same_area_share`` share of findings flagged ``same_area``
+``house_context_share``  share flagged ``house_context`` (explained by the presence
+                    entity of the residents)
 ``area_coverage``   share of room sensors whose area the analysis knows (HA or name);
                     the summary reports the gate FDR apart for households below 90 %
 ``recall_strong``   share of planted direct relations with |r| >= 0.5 that were found
@@ -50,6 +52,7 @@ from typing import Any
 
 import numpy as np
 
+from hacore import areas
 from hacore import correlations as corr
 from hacore.synthetic.generator import ARCHETYPES, Household, HouseholdSpec, Relation, generate
 
@@ -60,10 +63,13 @@ STRONG_LINK = 0.5
 # Households with a smaller share of room sensors in a known area are reported apart.
 INCOMPLETE_AREAS = 0.9
 
-FLAGGED_OK = {
-    Relation.INDIRECT: "indirect",
-    Relation.COMMON: "common_factor",
-}
+# A relation through a third series is reported correctly with any structural flag:
+# whether the observed third series sits between them (chain) or drives both (fork) is
+# not something the gate judges.
+STRUCTURAL = frozenset({"indirect", "common_factor", "house_context"})
+FLAGGED_OK = frozenset({Relation.INDIRECT, Relation.COMMON})
+# Flags of relations explained by the context (ADR 064): left out of the gate FDR.
+CONTEXT = frozenset({"same_area", "house_context"})
 
 
 def current_method(params: corr.CorrelationParams | None = None, *, method: str = "v2") -> Analysis:
@@ -101,7 +107,16 @@ def current_method(params: corr.CorrelationParams | None = None, *, method: str 
                 max_q=params_h.max_q,
                 seed=params_h.seed,
             )
-        return corr.select_findings(pairs, series, params_h, {}, h.entity_areas())
+        return corr.select_findings(
+            pairs,
+            series,
+            params_h,
+            {},
+            context=areas.context_of(
+                h.entity_areas(),
+                {s.entity_id for s in h.grid.series if areas.is_presence(s.entity_id)},
+            ),
+        )
 
     return run
 
@@ -120,6 +135,7 @@ class HouseholdMetrics:
     fdr: float
     fdr_all: float
     same_area: int
+    house_context: int
     area_coverage: float | None
     planted: int
     planted_strong: int
@@ -158,12 +174,25 @@ def _strength(h: Household, a: str, b: str, rel: Relation) -> float:
     return min(weights) if weights else 0.0
 
 
+def _occupancy_common(h: Household, findings: list[dict[str, Any]]) -> int:
+    """Findings whose only shared cause is the occupancy of the home or a room."""
+    out = 0
+    for f in findings:
+        a = _key(f["entity_id"], f["state"])
+        b = _key(f["related_entity_id"], f["related_state"])
+        if h.relation(a, b) is not Relation.COMMON or any(".planted_" in k for k in (a, b)):
+            continue
+        hidden = h.shared_hidden(a, b)
+        out += bool(hidden) and all(x == "h:home" or x.startswith("h:room_") for x in hidden)
+    return out
+
+
 def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> HouseholdMetrics:
     by_relation: dict[str, int] = {r.value: 0 for r in Relation}
-    false_strict = false = false_all = same_area = 0
+    false_strict = false = false_all = same_area = house = context = 0
     found: set[frozenset[str]] = set()
     dup_found = dup_flagged = 0
-    struct_found = struct_flagged = unidentifiable = occupancy = 0
+    struct_found = struct_flagged = unidentifiable = 0
     strong_found = strong_flagged = 0
     direct_found = direct_flagged = 0
     for f in findings:
@@ -173,9 +202,11 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
         by_relation[rel.value] += 1
         found.add(frozenset((a, b)))
         flags = set(f.get("flags", []))
-        explained_by_area = "same_area" in flags
-        same_area += explained_by_area
-        wrong = rel is Relation.UNRELATED or (rel in FLAGGED_OK and FLAGGED_OK[rel] not in flags)
+        explained_by_area = bool(flags & CONTEXT)
+        same_area += "same_area" in flags
+        house += "house_context" in flags
+        context += explained_by_area
+        wrong = rel is Relation.UNRELATED or (rel in FLAGGED_OK and not flags & STRUCTURAL)
         false_all += wrong
         if rel is Relation.UNRELATED:
             false_strict += 1
@@ -185,7 +216,7 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
             dup_found += 1
             dup_flagged += "duplicate_suspect" in flags
         is_planted = any(".planted_" in k for k in (a, b))
-        structural = bool(flags & {"indirect", "common_factor"})
+        structural = bool(flags & STRUCTURAL)
         if rel in FLAGGED_OK and is_planted:
             if rel is Relation.COMMON and _children(h, a) < 4:
                 unidentifiable += 1
@@ -198,10 +229,7 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
         if rel is Relation.DIRECT and is_planted:
             direct_found += 1
             direct_flagged += structural
-        if rel is Relation.COMMON and not is_planted:
-            hidden = h.shared_hidden(a, b)
-            if hidden and all(x == "h:home" or x.startswith("h:room_") for x in hidden):
-                occupancy += 1
+    occupancy = _occupancy_common(h, findings)
     observed = set(h.keys)
     planted = [p for p in h.direct_pairs() if p[0] in observed and p[1] in observed]
     strong = [p for p in planted if p[2] >= 0.5]
@@ -212,7 +240,7 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
         return sum(frozenset((a, b)) in found for a, b, _, _ in ps) / len(ps)
 
     n = len(findings)
-    gate = n - same_area
+    gate = n - context
     return HouseholdMetrics(
         archetype=h.spec.archetype,
         n_series=h.spec.n_series,
@@ -226,6 +254,7 @@ def score(h: Household, findings: list[dict[str, Any]], seconds: float) -> House
         fdr=false / gate if gate else 0.0,
         fdr_all=false_all / n if n else 0.0,
         same_area=same_area,
+        house_context=house,
         area_coverage=h.area_coverage(),
         planted=len(planted),
         planted_strong=len(strong),
@@ -282,6 +311,7 @@ def summarise(metrics: list[HouseholdMetrics]) -> list[dict[str, Any]]:
                 "fdr_pooled": _ratio(sum(m.false for m in ms), sum(m.gate_findings for m in ms)),
                 "fdr_all_pooled": _ratio(sum(round(m.fdr_all * m.findings) for m in ms), findings),
                 "same_area_share": _ratio(sum(m.same_area for m in ms), findings),
+                "house_context_share": _ratio(sum(m.house_context for m in ms), findings),
                 "area_coverage_mean": _mean(vals("area_coverage")),
                 "fdr_pooled_incomplete_areas": _ratio(
                     sum(m.false for m in ms if (m.area_coverage or 0) < INCOMPLETE_AREAS),
@@ -335,6 +365,7 @@ def specs(
     *,
     area_coverage: float | None = None,
     descriptive_names: float | None = None,
+    presence: float | None = None,
 ) -> list[HouseholdSpec]:
     return [
         HouseholdSpec(
@@ -344,6 +375,7 @@ def specs(
             seed=s,
             area_coverage=area_coverage,
             descriptive_names=descriptive_names,
+            presence=presence,
         )
         for a in archetypes
         for n in sizes
@@ -366,6 +398,7 @@ def main(argv: list[str] | None = None) -> int:
         type=float,
         help="share of rooms without an area named after the room (default: drawn)",
     )
+    parser.add_argument("--presence", type=float, help="share of households with a presence entity")
     parser.add_argument("--households", action="store_true", help="also print each household")
     args = parser.parse_args(argv)
     metrics = evaluate(
@@ -376,6 +409,7 @@ def main(argv: list[str] | None = None) -> int:
             args.archetypes.split(","),
             area_coverage=args.area_coverage,
             descriptive_names=args.descriptive_names,
+            presence=args.presence,
         ),
         current_method(method=args.method),
     )

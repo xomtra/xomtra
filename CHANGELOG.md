@@ -30,6 +30,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Correlation flag `same_area` (ADR 064): a relation between two entities in one Home
   Assistant area (or, without an area, one area named in their ids or names) is
   explained by the room's occupancy and ranked after the unflagged findings.
+- Correlation flag `house_context` (ADR 064): a relation explained by a presence
+  entity of the residents. Groups and drivers reach the analyses through a
+  domain-neutral context (`hacore.context`); Home Assistant is its first adapter.
 
 ### Changed
 

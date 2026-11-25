@@ -80,3 +80,11 @@ def test_load_from_the_lake() -> None:
     con.execute("DROP TABLE lake.silver.entities")
     con.execute("ALTER TABLE lake.silver.e2 RENAME TO entities")
     assert areas.load(con, "lake") == {}
+
+
+def test_presence_entities() -> None:
+    assert areas.is_presence("person.anna")
+    assert areas.is_presence("device_tracker.phone")
+    assert areas.is_presence("binary_sensor.someone_home", "presence")
+    assert not areas.is_presence("binary_sensor.kitchen_motion", "motion")
+    assert not areas.is_presence("binary_sensor.kitchen_occupancy", "occupancy")
