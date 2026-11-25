@@ -4,7 +4,7 @@ Status: **registered before any rating is collected.** The hash of the commit th
 this file is its time stamp. A change after the first rating is a new version of this
 file with the reason, and the report names the version it follows.
 
-Decisions behind it: ADR 062 point 9, ADR 068; the methodology (sections 8.2–8.8) is
+Decisions behind it: ADR 062 point 9, ADR 068, ADR 069; the methodology (sections 8.2–8.8) is
 summarised here so that this file stands on its own.
 
 ## 1. Question
@@ -34,13 +34,13 @@ today? If not, releases keep R0.
   of the validation workflow). Channel names are mapped to device classes so that the
   rulebook sorts them into families; the run reports the families of the channels and
   the coverage. Inside a cell the draw alternates over the strength terciles.
-- **Human sample:** **200 findings**, 100 from validation and 100 from test, each drawn
-  stratified inside its set (at least 5 per cell where a cell has them); the rest of the
-  1,000 comes from calibration. The AI raters rate all 1,000. Weights refer to the
-  frame of the finding's set. The ranking
-  model is trained only on AI ratings of the calibration set; human and training
-  ratings never overlap. A repeated gate after a changed rubric uses 100 **new**
-  findings from the validation reserve.
+- **Human sample (gate):** **200 findings**, 100 from validation and 100 from test, each
+  drawn stratified inside its set (at least 5 per cell where a cell has them); the rest
+  of the 1,000 comes from calibration. The AI raters rate all 1,000 (and, for section 6,
+  every finding of the test houses). Weights refer to the frame of the finding's set.
+  The ranking model is trained only on AI ratings of the calibration set; human and
+  training ratings never overlap. A repeated gate after a changed rubric uses 100
+  **new** findings from the validation reserve.
 - **Seed:** the sample is drawn with seed 20261125; the list of finding ids and their
   strata is committed before rating starts.
 
@@ -100,11 +100,22 @@ the model is simplified.
 
 ## 6. Primary analysis
 
-- **Metric:** NDCG@10 per household (gain 2^(rating − 1) − 1, human consensus rating)
-  on the test set, averaged over households. Secondary: precision@10 (relevant =
+- **Ratings (ADR 069):** the AI consensus rates **every** finding of the test houses
+  (about 2,500 at IDEAL). 100 human ratings over 51 test houses are about two per house,
+  too few for a ranking metric per household. The AI ratings count only if the gate of
+  section 4 holds; otherwise the primary analysis is not run and releases keep R0.
+- **Metric:** NDCG@10 per household (gain 2^(rating − 1) − 1, AI consensus rating) on
+  the test set, averaged over households. Secondary: precision@10 (relevant =
   rating ≥ 3).
 - **Baselines:** random order, the ranking of ADR 047 (unflagged first, |score|), R0;
-  upper bound: the order of the human ratings.
+  upper bound: the order of the AI consensus ratings.
+- **Human check (secondary, ADR 069):** in 10 test houses drawn with the seed, the
+  panel rates the union of the top 10 of the model, R0 and the random order (about
+  200–250 findings, same rubric and adjudication; findings already rated by the panel
+  keep their rating). Reported: human NDCG@10 of the model and R0 with its interval
+  (10 households, wide), agreement of the AI and the human order on the top, and the
+  panel's comments. It does not decide the release; a model that is better by AI but
+  worse by humans in these houses (point estimate) is reported as a warning.
 - **Success:** NDCG@10(model) − NDCG@10(R0) > 0 with the **lower bound of the 95 %
   paired cluster-bootstrap interval > 0** (1,000 resamples of households). Otherwise
   the release ships R0 (`ranking_version` r0-…).
