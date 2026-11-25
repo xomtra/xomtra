@@ -46,6 +46,7 @@ RUN --mount=from=s6,target=/s6 \
     apt-get update \
  && apt-get -y upgrade \
  && apt-get install -y --no-install-recommends postgresql-17 xz-utils \
+ && rm -f /etc/ssl/private/ssl-cert-snakeoil.key /etc/ssl/certs/ssl-cert-snakeoil.pem \
  && tar -C / -Jxpf /s6/s6-overlay-noarch.tar.xz \
  && tar -C / -Jxpf "/s6/s6-overlay-${TARGETARCH}.tar.xz" \
  && apt-get purge -y xz-utils \
