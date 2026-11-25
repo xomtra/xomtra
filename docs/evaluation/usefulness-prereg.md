@@ -26,9 +26,14 @@ today? If not, releases keep R0.
   a cell. Population estimates are weighted by 1 / selection probability. About
   **1,000 findings** for AI rating.
 - **Split:** by **household** (each household in exactly one set): calibration 60 %,
-  validation 20 %, test 20 %, stratified by dataset. Within validation and test only
-  findings from the last 25 % of a household's history (forward simulation);
-  calibration uses the whole history.
+  validation 20 %, test 20 %, stratified by dataset. Every house is analysed alone, in
+  90-day windows: validation and test houses in their **last** window (forward
+  simulation; for a history of at least 360 days it lies in the last 25 %),
+  calibration houses in up to four windows without overlap over their history.
+- **Tool:** `python -m hacore.public.usefulness_sample` (manual job `usefulness-sample`
+  of the validation workflow). Channel names are mapped to device classes so that the
+  rulebook sorts them into families; the run reports the families of the channels and
+  the coverage. Inside a cell the draw alternates over the strength terciles.
 - **Human sample:** **200 findings**, 100 from validation and 100 from test. The ranking
   model is trained only on AI ratings of the calibration set; human and training
   ratings never overlap. A repeated gate after a changed rubric uses 100 **new**

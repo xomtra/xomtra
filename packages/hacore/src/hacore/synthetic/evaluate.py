@@ -52,7 +52,7 @@ from typing import Any
 
 import numpy as np
 
-from hacore import areas
+from hacore import areas, usefulness
 from hacore import correlations as corr
 from hacore.context import EMPTY, Context
 from hacore.synthetic.generator import ARCHETYPES, Household, HouseholdSpec, Relation, generate
@@ -103,7 +103,10 @@ def current_method(params: corr.CorrelationParams | None = None, *, method: str 
 
 
 def analyse_grid(
-    grid: corr.Grid, params: corr.CorrelationParams, context: Context = EMPTY
+    grid: corr.Grid,
+    params: corr.CorrelationParams,
+    context: Context = EMPTY,
+    scorer: usefulness.Scorer = usefulness.EMPTY,
 ) -> list[dict[str, Any]]:
     """The correlation pipeline of ``hacore.correlations.run`` without the lake: clean,
     residuals, high-pass, lagged correlations (v1 or v2), findings."""
@@ -118,7 +121,11 @@ def analyse_grid(
         pairs, _ = corr.lagged_correlations_v2(
             resid, params.max_lag, min_r=params.min_r, max_q=params.max_q, seed=params.seed
         )
-    return corr.select_findings(pairs, series, params, {}, context=context)
+    index = {s: j for j, s in enumerate(grid.series)}
+    missing = np.isnan(grid.values[:, [index[s] for s in series]])
+    return corr.select_findings(
+        pairs, series, params, {}, context=context, scorer=scorer, missing=missing
+    )
 
 
 @dataclass(frozen=True, slots=True)
