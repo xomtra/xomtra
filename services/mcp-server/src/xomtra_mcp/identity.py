@@ -18,6 +18,8 @@ class Identity:
     scopes: tuple[str, ...] = field(default_factory=tuple)
     # Who vouched for the identity: entra | ha | token (ADR 040/053/059); dev without auth.
     idp: str | None = None
+    # End of the connector's sign-in (Home Assistant sessions, ADR 081), ISO 8601 UTC.
+    session_expires_at: str | None = None
 
 
 def identity_from_claims(claims: dict[str, Any], scopes: list[str]) -> Identity:
@@ -34,7 +36,12 @@ def identity_from_claims(claims: dict[str, Any], scopes: list[str]) -> Identity:
         roles=tuple(str(r) for r in roles) if isinstance(roles, list) else (),
         scopes=tuple(scopes),
         idp=str(source.get("idp") or claims.get("idp") or "entra"),
+        session_expires_at=_text(source.get("session_expires_at")),
     )
+
+
+def _text(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
 
 
 def current_identity() -> Identity:

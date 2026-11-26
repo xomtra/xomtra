@@ -1,5 +1,9 @@
 # Setup guides
 
+Not sure which installation fits? See [which installation to choose](choose-edition.md):
+limits of the add-on and of your own machine, which AI assistants connect, and what the
+external Claude connector needs (domain, A record, port 443, certificate, sign-in).
+
 Quick start: [Docker Compose](docker.md) – `docker compose up -d`, then connect Home
 Assistant in the browser (ADR 077); [local access](local-access.md) – LAN only,
 personal tokens for Claude Desktop, Claude Code and other MCP clients, sign-in to the

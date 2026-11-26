@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from xomtra_mcp.config import CLAUDE_REDIRECT_URIS, Settings
 
 ENTRA = {
+    "XOMTRA_AUTH_MODE": "entra",
     "XOMTRA_BASE_URL": "https://mcp.example.org",
     "XOMTRA_ENTRA_TENANT_ID": "00000000-0000-0000-0000-000000000001",
     "XOMTRA_ENTRA_CLIENT_ID": "00000000-0000-0000-0000-000000000002",
@@ -26,6 +27,16 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def _set(monkeypatch: pytest.MonkeyPatch, env: dict[str, str]) -> None:
     for k, v in env.items():
         monkeypatch.setenv(k, v)
+
+
+def test_ha_is_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    # ADR 081: Home Assistant sign-in is the default, Entra ID optional.
+    _set(monkeypatch, {k: v for k, v in ENTRA.items() if k != "XOMTRA_AUTH_MODE"})
+    with pytest.raises(ValidationError, match="XOMTRA_AUTH_MODE=entra"):
+        Settings()
+    monkeypatch.delenv("XOMTRA_ENTRA_CLIENT_ID")
+    monkeypatch.setenv("XOMTRA_HA_URL", "http://ha.lan:8123")
+    assert Settings().auth_mode == "ha"
 
 
 def test_entra_defaults(monkeypatch: pytest.MonkeyPatch) -> None:

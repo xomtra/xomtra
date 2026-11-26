@@ -16,10 +16,13 @@ import pytest
 from hacore import HAClient, HAError
 from hacore.onboarding import OnboardedTokens
 from xomtra_mcp.ha_auth import (
+    HAUserDirectory,
     HomeAssistantLogin,
     HomeAssistantTokenVerifier,
     RoleMap,
+    delete_ha_session,
     fetch_current_user,
+    session_id,
 )
 
 CLIENT_ID = "https://xomtra.example.org/"
@@ -130,3 +133,47 @@ async def test_mcp_tokens_refresh_and_revoke(ha_url: str, tokens: OnboardedToken
     assert gone.status_code == 400
     with pytest.raises(HAError):
         await fetch_current_user(ha_url, new_access)
+
+
+async def test_session_id_mfa_flag_and_delete(ha_url: str, tokens: OnboardedTokens) -> None:
+    """ADR 081: the access token names its refresh token (iss), auth/current_user lists the
+    MFA modules, and the HA session can be deleted with the user's own access token."""
+    username, password = await create_user(ha_url, tokens.admin_token, admin=False)
+    code = await login_code(ha_url, username, password)
+    reply = await token_request(
+        ha_url, {"grant_type": "authorization_code", "code": code, "client_id": CLIENT_ID}
+    )
+    issued: dict[str, Any] = reply.json()
+    access = issued["access_token"]
+    async with HAClient(ha_url, access) as ha:
+        user = await ha.send_command("auth/current_user")
+        refresh_tokens = await ha.send_command("auth/refresh_tokens")
+    assert isinstance(user.get("mfa_modules"), list)
+    sid = session_id(access)
+    assert sid is not None
+    assert sid in {t["id"] for t in refresh_tokens}
+    await delete_ha_session(ha_url, access, sid)
+    gone = await token_request(
+        ha_url,
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": issued["refresh_token"],
+            "client_id": CLIENT_ID,
+        },
+    )
+    assert gone.status_code == 400
+
+
+async def test_user_directory_with_admin_token(ha_url: str, tokens: OnboardedTokens) -> None:
+    """ADR 081: xomtra's own (admin) HA connection lists users with active and admin flags."""
+    username, _ = await create_user(ha_url, tokens.admin_token, admin=False)
+
+    async def connection() -> tuple[str, str]:
+        return ha_url, tokens.admin_token
+
+    users = await HAUserDirectory(connection).users()
+    assert users is not None
+    assert any(u.is_admin for u in users.values())
+    plain = next(u for u in users.values() if u.name == username)
+    assert plain.is_active
+    assert not plain.is_admin

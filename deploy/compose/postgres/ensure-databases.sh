@@ -132,6 +132,84 @@ SELECT format('GRANT EXECUTE ON FUNCTION access.verify_token(bytea) TO %I', :'us
 SELECT format('GRANT SELECT, INSERT ON access.token TO %I', :'adm') \gexec
 SELECT format('GRANT UPDATE (revoked_at, revoked_by) ON access.token TO %I', :'adm') \gexec
 
+-- Claude connector with Home Assistant sign-in (ADR 081). ha_user: HA users who tried to
+-- sign in and the role an admin gave them (NULL = no access; HA administrators always
+-- get the admin role). session: one row per sign-in, keyed by the id of the HA refresh
+-- token of that sign-in (revoked in HA right after it); it ends at expires_at or when an
+-- admin disconnects it. The MCP server may only call the functions below; the admin GUI
+-- lists, sets roles, disconnects.
+CREATE TABLE IF NOT EXISTS access.ha_user (
+  ha_user_id    text PRIMARY KEY,
+  name          text NOT NULL,
+  is_admin      boolean NOT NULL DEFAULT false,
+  role          text,
+  first_seen_at timestamptz NOT NULL DEFAULT now(),
+  last_seen_at  timestamptz,
+  changed_at    timestamptz,
+  changed_by    text
+);
+CREATE TABLE IF NOT EXISTS access.session (
+  id           text PRIMARY KEY,
+  idp          text NOT NULL,
+  subject      text NOT NULL,
+  name         text,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  expires_at   timestamptz NOT NULL,
+  last_used_at timestamptz,
+  revoked_at   timestamptz,
+  revoked_by   text
+);
+CREATE OR REPLACE FUNCTION access.ha_user_seen(user_id text, user_name text, admin boolean)
+RETURNS text
+LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $f$
+  INSERT INTO access.ha_user AS u (ha_user_id, name, is_admin, last_seen_at)
+  VALUES (user_id, left(user_name, 200), admin, now())
+  ON CONFLICT (ha_user_id) DO UPDATE SET name = EXCLUDED.name, is_admin = EXCLUDED.is_admin,
+    last_seen_at = CASE
+      WHEN u.last_seen_at IS NULL OR u.last_seen_at < now() - interval '5 minutes' THEN now()
+      ELSE u.last_seen_at END
+  RETURNING u.role
+$f$;
+CREATE OR REPLACE FUNCTION access.session_touch(sid text, provider text, sub text,
+  user_name text, days integer)
+RETURNS TABLE (id text, idp text, subject text, name text, created_at timestamptz,
+  expires_at timestamptz, last_used_at timestamptz, revoked_at timestamptz, revoked_by text)
+LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $f$
+  INSERT INTO access.session AS s (id, idp, subject, name, expires_at, last_used_at)
+  VALUES (sid, provider, sub, left(user_name, 200),
+    now() + make_interval(days => least(greatest(days, 1), 365)), now())
+  ON CONFLICT (id) DO UPDATE SET last_used_at = CASE
+      WHEN s.last_used_at IS NULL OR s.last_used_at < now() - interval '5 minutes' THEN now()
+      ELSE s.last_used_at END
+  RETURNING s.id, s.idp, s.subject, s.name, s.created_at, s.expires_at, s.last_used_at,
+    s.revoked_at, s.revoked_by
+$f$;
+CREATE OR REPLACE FUNCTION access.session_check(sid text)
+RETURNS TABLE (id text, idp text, subject text, name text, created_at timestamptz,
+  expires_at timestamptz, last_used_at timestamptz, revoked_at timestamptz, revoked_by text,
+  is_admin boolean, role text)
+LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $f$
+  WITH touched AS (
+    UPDATE access.session s SET last_used_at = CASE
+        WHEN s.last_used_at IS NULL OR s.last_used_at < now() - interval '5 minutes' THEN now()
+        ELSE s.last_used_at END
+    WHERE s.id = sid
+    RETURNING s.*
+  )
+  SELECT t.id, t.idp, t.subject, t.name, t.created_at, t.expires_at, t.last_used_at,
+    t.revoked_at, t.revoked_by, coalesce(u.is_admin, false), u.role
+  FROM touched t LEFT JOIN access.ha_user u ON u.ha_user_id = t.subject
+$f$;
+REVOKE ALL ON FUNCTION access.session_check(text) FROM PUBLIC;
+SELECT format('GRANT EXECUTE ON FUNCTION access.session_check(text) TO %I', :'usr') \gexec
+REVOKE ALL ON FUNCTION access.ha_user_seen(text, text, boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION access.session_touch(text, text, text, text, integer) FROM PUBLIC;
+SELECT format('GRANT EXECUTE ON FUNCTION access.ha_user_seen(text, text, boolean) TO %I', :'usr') \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION access.session_touch(text, text, text, text, integer) TO %I', :'usr') \gexec
+SELECT format('GRANT SELECT ON access.ha_user, access.session TO %I', :'adm') \gexec
+SELECT format('GRANT UPDATE (role, changed_at, changed_by) ON access.ha_user TO %I', :'adm') \gexec
+SELECT format('GRANT UPDATE (revoked_at, revoked_by) ON access.session TO %I', :'adm') \gexec
+
 -- Analysis settings changed in the admin GUI (ADR 060): an append-only history, the
 -- latest row of a key is its value (NULL = back to the environment or the default). The
 -- admin GUI reads and appends; the ingest (ops role) may only call

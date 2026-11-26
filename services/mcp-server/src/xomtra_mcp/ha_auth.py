@@ -10,15 +10,30 @@ the user (no scopes): xomtra uses them only for that call.
   ``OAuthProxy`` with HA upstream, and :class:`HomeAssistantTokenVerifier`.
 * Admin GUI: :class:`HomeAssistantLogin` (code -> token -> user -> token revoked).
 
-Roles: HA administrators (and the owner) get the admin role, other users the user role
-(``XOMTRA_HA_ROLE_MAP``); an optional allow-list limits who may sign in at all.
+Roles: HA administrators (and the owner) get the admin role. Other HA users get the role
+an admin gave them on the admin page Access (ADR 081), else the user role of
+``XOMTRA_HA_ROLE_MAP`` (default: none). An optional allow-list limits who may sign in at
+all. For the Claude connector xomtra also requires two-factor authentication in HA
+(``XOMTRA_HA_REQUIRE_MFA``) and ends a sign-in after ``XOMTRA_SESSION_DAYS`` (ADR 081).
+
+No HA token of a user stays in xomtra (ADR 081): right after the sign-in of the
+connector xomtra records a session (:mod:`xomtra_mcp.access`) and revokes the user's HA
+token, like the admin GUI does. Later requests are checked against that session, the
+access list and, when xomtra's own HA connection may list users, against HA's user
+directory (removed or deactivated users and changed admin rights take effect within
+minutes).
 """
 
 from __future__ import annotations
 
+import asyncio
+import base64
+import json
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC
 from typing import Any
 from urllib.parse import urlencode
 
@@ -30,11 +45,17 @@ from mcp.server.auth.provider import TokenError
 
 from hacore import HAClient
 from hacore.errors import HAAuthError, HAError
+from xomtra_mcp.access import (
+    DEFAULT_SESSION_DAYS,
+    AccessStore,
+    AccessStoreError,
+    SessionAccess,
+)
 
 logger = logging.getLogger(__name__)
 
 IDP = "ha"
-DEFAULT_ROLE_MAP = "admin=xomtra.Admin,user=xomtra.Reader"
+DEFAULT_ROLE_MAP = "admin=xomtra.Admin,user="
 USER_CACHE_SECONDS = 60
 
 
@@ -74,15 +95,24 @@ class HAUser:
     name: str
     is_owner: bool
     is_admin: bool
+    # At least one multi-factor module (e.g. TOTP) is enabled for the user.
+    mfa: bool = False
 
     @classmethod
     def from_reply(cls, reply: dict[str, Any]) -> HAUser:
+        modules = reply.get("mfa_modules")
         return cls(
             id=str(reply["id"]),
             name=str(reply.get("name") or ""),
             is_owner=bool(reply.get("is_owner")),
             is_admin=bool(reply.get("is_admin")),
+            mfa=isinstance(modules, list)
+            and any(isinstance(m, dict) and m.get("enabled") for m in modules),
         )
+
+    @property
+    def admin(self) -> bool:
+        return self.is_admin or self.is_owner
 
     def claims(self, roles: list[str]) -> dict[str, Any]:
         return {
@@ -94,14 +124,116 @@ class HAUser:
         }
 
 
-def roles_for(user: HAUser, role_map: RoleMap, allowed: list[str] | None = None) -> list[str]:
-    """xomtra roles of an HA user; empty = the user may not sign in."""
+def roles_for(
+    user: HAUser,
+    role_map: RoleMap,
+    allowed: list[str] | None = None,
+    listed: str | None = None,
+) -> list[str]:
+    """xomtra roles of an HA user; empty = the user may not sign in.
+
+    ``listed`` is the role from the access list of the admin GUI (ADR 081); it applies
+    to users who are not HA administrators and takes precedence over ``role_map.user``.
+    """
     if allowed:
         wanted = {a.casefold() for a in allowed}
         if user.id.casefold() not in wanted and user.name.casefold() not in wanted:
             return []
-    role = role_map.admin if (user.is_admin or user.is_owner) else role_map.user
+    role = role_map.admin if user.admin else (listed or role_map.user)
     return [role] if role else []
+
+
+def session_id(access_token: str) -> str | None:
+    """Id of the HA refresh token behind an HA access token (its ``iss`` claim).
+
+    Not a verification: the token is checked by HA (``auth/current_user``) before this
+    value is used.
+    """
+    parts = access_token.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
+    except (ValueError, TypeError):
+        return None
+    iss = payload.get("iss") if isinstance(payload, dict) else None
+    return iss if isinstance(iss, str) and 0 < len(iss) <= 128 else None
+
+
+class RefusedError(Exception):
+    """The HA user may not use xomtra now; the message is safe to show."""
+
+
+async def delete_ha_session(ha_url: str, access_token: str, refresh_token_id: str) -> None:
+    """Delete the HA refresh token (the whole HA session) as its own user; best effort."""
+    try:
+        async with HAClient(ha_url, access_token, timeout=10) as ha:
+            await ha.send_command("auth/delete_refresh_token", refresh_token_id=refresh_token_id)
+    except (HAError, TimeoutError):
+        logger.warning("Could not delete the Home Assistant session of a closed sign-in")
+
+
+async def revoke_ha_refresh_token(ha_url: str, refresh_token: str) -> bool:
+    """Revoke an HA refresh token (and its access tokens) at ``/auth/revoke``."""
+    try:
+        async with httpx2.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{ha_url.rstrip('/')}/auth/revoke", data={"token": refresh_token}
+            )
+    except httpx2.HTTPError:
+        return False
+    return resp.status_code == 200
+
+
+@dataclass(frozen=True, slots=True)
+class DirectoryUser:
+    id: str
+    name: str
+    is_active: bool
+    is_admin: bool
+
+
+class HAUserDirectory:
+    """HA's users as xomtra's own HA connection sees them (``config/auth/list``).
+
+    Needs an administrator token; otherwise (or with HA unreachable) :meth:`users`
+    returns None and the state recorded at the sign-in applies.
+    """
+
+    def __init__(
+        self,
+        connection: Callable[[], Awaitable[tuple[str, str] | None]],
+        cache_seconds: int = 300,
+    ) -> None:
+        self._connection = connection
+        self.cache_seconds = cache_seconds
+        self._cached: tuple[float, dict[str, DirectoryUser] | None] | None = None
+
+    async def users(self) -> dict[str, DirectoryUser] | None:
+        now = time.monotonic()
+        if self._cached and self._cached[0] > now:
+            return self._cached[1]
+        result: dict[str, DirectoryUser] | None = None
+        conn = await self._connection()
+        if conn is not None:
+            try:
+                async with HAClient(conn[0], conn[1], timeout=10) as ha:
+                    reply = await ha.send_command("config/auth/list")
+                result = {
+                    str(u["id"]): DirectoryUser(
+                        id=str(u["id"]),
+                        name=str(u.get("name") or ""),
+                        is_active=bool(u.get("is_active", True)),
+                        is_admin=bool(u.get("is_owner"))
+                        or "system-admin" in (u.get("group_ids") or []),
+                    )
+                    for u in reply
+                    if isinstance(u, dict) and "id" in u
+                }
+            except (HAError, TimeoutError, TypeError, KeyError):
+                logger.info("Home Assistant users could not be listed; using the sign-in state")
+        self._cached = (now + self.cache_seconds, result)
+        return result
 
 
 async def fetch_current_user(ha_url: str, access_token: str) -> HAUser:
@@ -121,28 +253,114 @@ class HomeAssistantTokenVerifier(TokenVerifier):
         role_map: RoleMap,
         allowed_users: list[str] | None = None,
         cache_seconds: int = USER_CACHE_SECONDS,
+        store: AccessStore | None = None,
+        require_mfa: bool = False,
+        session_days: int = DEFAULT_SESSION_DAYS,
+        directory: HAUserDirectory | None = None,
     ) -> None:
         super().__init__()
+        self.directory = directory
         self.ha_url = ha_url
         self.role_map = role_map
         self.allowed_users = allowed_users or []
         self.cache_seconds = cache_seconds
+        self.store = store
+        self.require_mfa = require_mfa
+        self.session_days = session_days
         self._cache: dict[str, tuple[float, AccessToken | None]] = {}
 
     async def user_claims(self, token: str) -> dict[str, Any] | None:
-        """Claims of the token's user, or None if HA rejects the token or the user."""
+        """Claims of the token's user, or None if the session, HA or the user refuse.
+
+        With a store, a token whose sign-in has a session is checked against the session
+        only (its HA token was revoked at the sign-in); otherwise HA checks the token.
+        """
+        try:
+            sid = session_id(token) if self.store is not None else None
+            state = await self._store_call(self._check, sid) if sid else None
+            if state is not None:
+                return await self.session_claims(state)
+            return await self.checked_claims(token)
+        except RefusedError as why:
+            logger.info("Home Assistant sign-in refused: %s", why)
+            return None
+
+    def _check(self, sid: str) -> SessionAccess | None:
+        assert self.store is not None  # noqa: S101 - only called with a store
+        return self.store.session_check(sid)
+
+    async def session_claims(self, state: SessionAccess) -> dict[str, Any]:
+        """Claims of a recorded session; raises :class:`RefusedError` if it may not go on."""
+        row = state.session
+        if not row.active():
+            raise RefusedError("This sign-in has ended (disconnected or expired): connect again")
+        is_admin = state.is_admin
+        if self.directory is not None and (users := await self.directory.users()) is not None:
+            current = users.get(row.subject)
+            if current is None or not current.is_active:
+                raise RefusedError("The Home Assistant user was removed or deactivated")
+            is_admin = current.is_admin
+        user = HAUser(row.subject, row.name or "", is_owner=False, is_admin=is_admin)
+        roles = roles_for(user, self.role_map, self.allowed_users, state.role)
+        if not roles:
+            raise RefusedError(f"Home Assistant user {user.name or user.id} has no access")
+        claims = user.claims(roles)
+        claims["sid"] = row.id
+        claims["session_expires_at"] = row.expires_at.astimezone(UTC).isoformat()
+        return claims
+
+    async def checked_claims(self, token: str) -> dict[str, Any]:
+        """Claims of the token's user; raises :class:`RefusedError` with the reason."""
         try:
             user = await fetch_current_user(self.ha_url, token)
-        except HAAuthError:
-            return None
+        except HAAuthError as err:
+            raise RefusedError("Home Assistant did not accept the sign-in") from err
         except HAError as err:
             # HA unreachable: not a verdict on the token.
             raise TokenVerificationError("Home Assistant is not reachable") from err
-        roles = roles_for(user, self.role_map, self.allowed_users)
+        listed = await self._store_call(self._seen, user)
+        roles = roles_for(user, self.role_map, self.allowed_users, listed)
         if not roles:
-            logger.info("HA user %s is not allowed to use xomtra", user.id)
+            raise RefusedError(
+                f"Home Assistant user {user.name or user.id} has no access to xomtra yet: "
+                "an administrator gives access on the admin page Access"
+            )
+        if self.require_mfa and not user.mfa:
+            raise RefusedError(
+                f"Home Assistant user {user.name or user.id} has no two-factor "
+                "authentication: turn it on in the Home Assistant profile (Security) first"
+            )
+        claims = user.claims(roles)
+        sid = session_id(token) if self.store is not None else None
+        if sid is not None:
+            row = await self._store_call(
+                self.store.session_touch,  # type: ignore[union-attr]
+                sid,
+                IDP,
+                user.id,
+                user.name,
+                self.session_days,
+            )
+            if not row.active():
+                await delete_ha_session(self.ha_url, token, sid)
+                raise RefusedError(
+                    "This sign-in has ended (disconnected or expired): connect again"
+                )
+            claims["sid"] = sid
+            claims["session_expires_at"] = row.expires_at.astimezone(UTC).isoformat()
+        return claims
+
+    def _seen(self, user: HAUser) -> str | None:
+        assert self.store is not None  # noqa: S101 - only called with a store
+        return self.store.ha_user_seen(user.id, user.name, user.admin)
+
+    async def _store_call(self, fn: Any, *args: Any) -> Any:
+        if self.store is None:
             return None
-        return user.claims(roles)
+        try:
+            return await asyncio.to_thread(fn, *args)
+        except AccessStoreError as err:
+            raise TokenVerificationError("The access store is unavailable") from err
 
     async def verify_token(self, token: str) -> AccessToken | None:
         now = time.monotonic()
@@ -186,10 +404,22 @@ class HomeAssistantProvider(OAuthProxy):
         role_map: RoleMap,
         allowed_users: list[str] | None = None,
         allowed_client_redirect_uris: list[str] | None = None,
+        store: AccessStore | None = None,
+        require_mfa: bool = True,
+        session_days: int = DEFAULT_SESSION_DAYS,
+        directory: HAUserDirectory | None = None,
     ) -> None:
         base = base_url.rstrip("/")
+        self._ha_url = ha_url
+        self._revoke_after_sign_in = store is not None
         self._verifier = HomeAssistantTokenVerifier(
-            ha_url=ha_url, role_map=role_map, allowed_users=allowed_users
+            ha_url=ha_url,
+            role_map=role_map,
+            allowed_users=allowed_users,
+            store=store,
+            require_mfa=require_mfa,
+            session_days=session_days,
+            directory=directory,
         )
         super().__init__(
             upstream_authorization_endpoint=f"{ha_auth_url.rstrip('/')}/auth/authorize",
@@ -203,17 +433,35 @@ class HomeAssistantProvider(OAuthProxy):
             forward_resource=False,
             jwt_signing_key=jwt_signing_key,
             allowed_client_redirect_uris=allowed_client_redirect_uris,
+            # HA sends no refresh_expires_in: Claude's tokens live as long as the session
+            # (ADR 081), fixed from the sign-in. The HA token is revoked at the sign-in,
+            # so nothing is refreshed at HA; every request is checked against the session.
+            fallback_refresh_token_expiry_seconds=session_days * 86400,
+            fastmcp_access_token_expiry_seconds=session_days * 86400 if store is not None else None,
         )
 
     async def _extract_upstream_claims(self, idp_tokens: dict[str, Any]) -> dict[str, Any] | None:
         # Called when Claude exchanges its code: refuse users without a role here, so the
         # connector reports a failed sign-in instead of looping on 401.
-        claims = await self._verifier.user_claims(str(idp_tokens.get("access_token", "")))
-        if claims is None:
-            raise TokenError(
-                "invalid_grant", "This Home Assistant user is not allowed to use xomtra"
-            )
-        return claims
+        try:
+            claims = await self._verifier.checked_claims(str(idp_tokens.get("access_token", "")))
+        except RefusedError as why:
+            logger.info("Home Assistant sign-in refused: %s", why)
+            reason = str(why)
+        else:
+            await self._drop_ha_token(idp_tokens)
+            return claims
+        await self._drop_ha_token(idp_tokens)
+        # Raised outside the handler: TokenError is frozen and cannot take a __cause__.
+        raise TokenError("invalid_grant", reason)
+
+    async def _drop_ha_token(self, idp_tokens: dict[str, Any]) -> None:
+        """ADR 081: keep no HA token of the user once the sign-in is checked."""
+        refresh = idp_tokens.get("refresh_token")
+        if not self._revoke_after_sign_in or not isinstance(refresh, str):
+            return
+        if not await revoke_ha_refresh_token(self._ha_url, refresh):
+            logger.warning("Could not revoke the Home Assistant token of a connector sign-in")
 
 
 @dataclass(slots=True)

@@ -38,7 +38,7 @@ XOMTRA_CONTRACT_HA_URL=http://127.0.0.1:8123 uv run pytest -m contract
 docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.dev.yaml up -d --build
 ```
 
-Without Entra configuration the MCP server can run with `XOMTRA_AUTH_MODE=none`, which is
+For local development the MCP server can run with `XOMTRA_AUTH_MODE=none`, which is
 only allowed when it listens on a loopback address (local development).
 
 ## Releases and installation

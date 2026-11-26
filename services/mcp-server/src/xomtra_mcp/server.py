@@ -13,7 +13,7 @@ import asyncio
 import inspect
 import logging
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
@@ -25,12 +25,13 @@ from starlette.responses import JSONResponse
 
 from hacore import HAClient, fetch_registries
 from xomtra_mcp import __version__
+from xomtra_mcp.access import AccessStore, PostgresAccessStore, expiry_warning
 from xomtra_mcp.audit import AuditSink, LogAuditSink, PostgresAuditSink
 from xomtra_mcp.config import Settings
 from xomtra_mcp.data import DataAccess, parse_time
 from xomtra_mcp.guard import PolicyMiddleware
 from xomtra_mcp.guidelines import CORE_GUIDELINES, DEFAULT_GUIDELINES, Guidelines, ThemeSource
-from xomtra_mcp.ha_auth import HomeAssistantProvider
+from xomtra_mcp.ha_auth import HAUserDirectory, HomeAssistantProvider
 from xomtra_mcp.identity import Identity, current_identity
 from xomtra_mcp.policy import Policy, current_access
 from xomtra_mcp.tokens import PersonalTokenVerifier, PostgresTokenStore, TokenStore
@@ -82,7 +83,11 @@ def guidelines_attacher(guidelines: Guidelines) -> Callable[[dict[str, Any]], di
 READ_ONLY = {"readOnlyHint": True, "openWorldHint": False}
 
 
-def build_auth(settings: Settings, tokens: TokenStore | None = None) -> AuthProvider | None:
+def build_auth(
+    settings: Settings,
+    tokens: TokenStore | None = None,
+    access: AccessStore | None = None,
+) -> AuthProvider | None:
     if settings.auth_mode == "none":
         logger.warning("Authentication is DISABLED (local development only)")
         return None
@@ -97,6 +102,13 @@ def build_auth(settings: Settings, tokens: TokenStore | None = None) -> AuthProv
         ha_url, auth_url = settings.ha_url, settings.browser_ha_url
         if not (ha_url and auth_url and signing_key and base_url):
             raise RuntimeError("Home Assistant auth configuration is incomplete")
+        dsn = settings.audit_dsn
+        resolver = settings.ha_resolver()
+
+        async def connection() -> tuple[str, str] | None:
+            conn = await asyncio.to_thread(resolver.get)
+            return (conn.url, conn.token) if conn is not None else None
+
         return HomeAssistantProvider(
             base_url=str(base_url),
             ha_url=ha_url,
@@ -105,6 +117,10 @@ def build_auth(settings: Settings, tokens: TokenStore | None = None) -> AuthProv
             role_map=settings.role_map,
             allowed_users=settings.ha_allowed_users,
             allowed_client_redirect_uris=settings.allowed_client_redirect_uris,
+            store=access or (PostgresAccessStore(dsn) if dsn else None),
+            require_mfa=settings.ha_require_mfa,
+            session_days=settings.session_days,
+            directory=HAUserDirectory(connection),
         )
     client_id, tenant_id = settings.entra_client_id, settings.entra_tenant_id
     secret = settings.entra_client_secret
@@ -118,6 +134,8 @@ def build_auth(settings: Settings, tokens: TokenStore | None = None) -> AuthProv
         required_scopes=settings.entra_required_scopes,
         jwt_signing_key=signing_key.get_secret_value(),
         allowed_client_redirect_uris=settings.allowed_client_redirect_uris,
+        # Used when Entra sends no refresh token lifetime (ADR 081).
+        fallback_refresh_token_expiry_seconds=settings.session_days * 86400,
     )
 
 
@@ -141,13 +159,14 @@ def create_server(
     policy: Policy | None = None,
     tokens: TokenStore | None = None,
     theme: ThemeSource | None = None,
+    access: AccessStore | None = None,
 ) -> FastMCP:
     guidelines = Guidelines(defaults=settings.default_guidelines, theme=theme)
     with_guidelines = guidelines_attacher(guidelines)
     mcp = FastMCP(
         name="xomtra",
         instructions=build_instructions(guidelines),
-        auth=build_auth(settings, tokens),
+        auth=build_auth(settings, tokens, access),
         mask_error_details=True,
     )
     mcp.add_middleware(
@@ -175,6 +194,7 @@ def create_server(
             "roles": list(ident.roles),
             "scopes": list(ident.scopes),
             "identity_provider": ident.idp,
+            "sign_in_ends_at": ident.session_expires_at,
         }
 
     @mcp.tool(annotations=READ_ONLY)
@@ -182,15 +202,17 @@ def create_server(
         """Return xomtra server version and which back-ends are configured. Call it once
         before answering about the house: it carries the guidelines for answering with
         xomtra data (answer_guidelines)."""
-        return with_guidelines(
-            {
-                "name": "xomtra",
-                "version": __version__,
-                "auth_mode": settings.auth_mode,
-                "access_mode": settings.access_mode,
-                "home_assistant_configured": resolver.get() is not None,
-            }
-        )
+        info: dict[str, Any] = {
+            "name": "xomtra",
+            "version": __version__,
+            "auth_mode": settings.auth_mode,
+            "access_mode": settings.access_mode,
+            "home_assistant_configured": resolver.get() is not None,
+        }
+        ends = current_identity().session_expires_at
+        if ends and (warning := expiry_warning(datetime.fromisoformat(ends))):
+            info["sign_in_notice"] = warning
+        return with_guidelines(info)
 
     if resolver.from_env or resolver.storable:
 

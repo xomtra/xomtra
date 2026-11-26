@@ -1,9 +1,11 @@
 # Claude connector (public access)
 
-Public access mode (`XOMTRA_ACCESS_MODE=public`, the default): claude.ai on the web,
-desktop and phone reach xomtra through Anthropic's servers. Sign-in with Entra ID
-(below) or with a [Home Assistant account](ha-login.md). For a LAN-only setup without
-any of this, see [local access](local-access.md).
+Public access mode (`XOMTRA_ACCESS_MODE=public`): claude.ai on the web, desktop and
+phone reach xomtra through Anthropic's servers. Sign-in with a
+[Home Assistant account](ha-login.md) (default, ADR 081) or, optionally, with Entra ID
+(`XOMTRA_AUTH_MODE=entra`, [guide](entra-app-registration.md)). What this setup needs
+in short: [which installation to choose](choose-edition.md#2b-external-connector). For a
+LAN-only setup without any of this, see [local access](local-access.md).
 
 ## 1. Publish the server over HTTPS
 

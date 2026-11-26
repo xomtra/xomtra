@@ -14,6 +14,7 @@ from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from hacore.ha_connection import Resolver
+from xomtra_mcp.access import DEFAULT_SESSION_DAYS
 from xomtra_mcp.ha_auth import DEFAULT_ROLE_MAP, RoleMap
 
 # Redirect URIs used by Claude (claude.ai / Claude Desktop) for remote MCP connectors.
@@ -32,9 +33,10 @@ def _split_csv(value: object) -> object:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="XOMTRA_", extra="ignore")
 
-    # Who signs in (admin GUI; MCP in public access): Entra ID, a Home Assistant account
-    # (ADR 053) or nobody (local development on loopback only).
-    auth_mode: Literal["entra", "ha", "none"] = "entra"
+    # Who signs in (admin GUI; MCP in public access): a Home Assistant account (ADR 053,
+    # the default since ADR 081), Entra ID (optional) or nobody (local development on
+    # loopback only).
+    auth_mode: Literal["ha", "entra", "none"] = "ha"
     # public = OAuth for Claude through Caddy on a public host (ADR 026/028);
     # local = MCP only in the LAN with personal tokens from the admin GUI (ADR 056/059).
     access_mode: Literal["public", "local"] = "public"
@@ -65,8 +67,13 @@ class Settings(BaseSettings):
     ha_auth_url: str | None = None
     # Optional allow-list of HA users (id or name); empty = every HA user with a role.
     ha_allowed_users: Annotated[list[str], NoDecode] = []
-    # xomtra role of HA administrators and of other HA users (empty value = refused).
+    # xomtra role of HA administrators and of other HA users (empty value = refused);
+    # other users get access on the admin page Access (ADR 081).
     ha_role_map: str = DEFAULT_ROLE_MAP
+    # Claude connector with HA sign-in: only HA users with two-factor authentication.
+    ha_require_mfa: bool = True
+    # Claude connector: a sign-in ends this many days after it started (ADR 081).
+    session_days: int = Field(default=DEFAULT_SESSION_DAYS, ge=7, le=365)
 
     # Access policy (ADR 038); default: the packaged policy.yaml.
     policy_file: Path | None = None
@@ -122,6 +129,12 @@ class Settings(BaseSettings):
         elif self.auth_mode == "ha":
             required = ("base_url", "ha_url", "jwt_signing_key", "audit_pg_host")
             required += ("audit_pg_password",)
+            if self.entra_client_id and self.ha_url is None:
+                raise ValueError(
+                    "Home Assistant sign-in is the default now (ADR 081), but Entra values "
+                    "are set: add XOMTRA_AUTH_MODE=entra to keep Entra ID, or set "
+                    "XOMTRA_HA_URL for the Home Assistant sign-in."
+                )
         else:
             required = (
                 "base_url",

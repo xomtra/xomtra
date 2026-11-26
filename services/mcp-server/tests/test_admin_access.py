@@ -242,6 +242,7 @@ def test_admin_settings_for_ha() -> None:
 def test_admin_settings_empty_optional_values(monkeypatch: pytest.MonkeyPatch) -> None:
     # compose passes unset variables as empty strings (homelab .env without new keys)
     for key, value in {
+        "XOMTRA_AUTH_MODE": "entra",
         "XOMTRA_BASE_URL": BASE,
         "XOMTRA_ADMIN_SESSION_KEY": "s" * 40,
         "XOMTRA_ENTRA_TENANT_ID": "t",
@@ -257,3 +258,77 @@ def test_admin_settings_empty_optional_values(monkeypatch: pytest.MonkeyPatch) -
     assert s.mcp_url is None
     assert s.ha_auth_url is None
     assert s.ha_allowed_users == []
+
+
+# ---- access of the Claude connector (ADR 081) ------------------------------------------
+
+
+async def test_access_page_roles_and_disconnect(fake_ha: tuple[FakeHA, str]) -> None:
+    from xomtra_mcp.access import MemoryAccessStore
+
+    fake, url = fake_ha
+    fake.results["auth/current_user"] = {"id": "u1", "name": "Jana", "is_admin": True}
+    access = MemoryAccessStore()
+    access.ha_user_seen("u1", "Jana", True)
+    access.ha_user_seen("u2", "Petr", False)
+    access.session_touch("rt-1", "ha", "u2", "Petr", 180)
+    settings = AdminSettings(
+        auth_mode="ha",
+        access_mode="public",
+        base_url=BASE,  # type: ignore[arg-type]
+        ha_url=url,
+        ha_auth_url="https://ha.example.org",
+        admin_session_key=SecretStr("s" * 40),
+    )
+    http = FakeHAHttp()
+    login = HomeAssistantLogin(
+        ha_url=url,
+        ha_auth_url="https://ha.example.org",
+        client_id=settings.client_id,
+        redirect_uri=settings.redirect_uri,
+        http=httpx2.AsyncClient(transport=httpx2.MockTransport(http.handler)),
+    )
+    audit = MemoryAuditSink()
+    app = AdminApp(settings, data=None, audit=audit, ha_login=login, access=access).build()
+    origin = {"origin": BASE, "sec-fetch-site": "same-origin"}
+    async with client_for(app) as client:
+        await sign_in(client)
+        page = await client.get("/admin/access")
+        assert page.status_code == 200
+        assert "Home Assistant administrator" in page.text
+        assert "Petr" in page.text
+        assert "Disconnect" in page.text
+        cross = await client.post(
+            "/admin/access/role",
+            data={"id": "u2", "role": "xomtra.Reader"},
+            headers={"origin": "https://evil.example"},
+        )
+        assert cross.status_code == 403
+        bad = await client.post(
+            "/admin/access/role", data={"id": "u2", "role": "xomtra.Admin"}, headers=origin
+        )
+        assert bad.status_code == 400
+        ok = await client.post(
+            "/admin/access/role", data={"id": "u2", "role": "xomtra.Reader"}, headers=origin
+        )
+        assert ok.status_code == 303
+        assert access.users["u2"].role == "xomtra.Reader"
+        gone = await client.post("/admin/access/disconnect", data={"id": "rt-1"}, headers=origin)
+        assert gone.status_code == 303
+        assert access.rows["rt-1"].revoked_by == "Jana"
+        page = await client.get("/admin/access")
+        assert "disconnected" in page.text
+    tools = [r.tool for r in audit.records]
+    assert "admin:access_role" in tools
+    assert "admin:access_disconnect" in tools
+
+
+async def test_access_page_explains_other_modes(fake_ha: tuple[FakeHA, str]) -> None:
+    fake, url = fake_ha
+    fake.results["auth/current_user"] = {"id": "u1", "name": "Jana", "is_admin": True}
+    app, _, _ = make_app(url, FakeHAHttp())  # local access mode
+    async with client_for(app) as client:
+        await sign_in(client)
+        page = await client.get("/admin/access")
+        assert page.status_code == 200
+        assert "personal tokens" in page.text

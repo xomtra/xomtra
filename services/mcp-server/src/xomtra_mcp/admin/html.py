@@ -213,6 +213,7 @@ NAV = (
     ("/analysis", "Analysis settings"),
     ("/audit", "Audit"),
     ("/tokens", "Tokens"),
+    ("/access", "Access"),
     ("/dagster/", "Dagster"),
 )
 

@@ -42,6 +42,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from hacore.analysis_settings import BY_KEY, SPECS, Spec, Value
 from hacore.ha_connection import HAConnection, StoreError, normalize_url
 from hacore.ha_connection import save as save_connection
+from xomtra_mcp.access import AccessStore, AccessStoreError, PostgresAccessStore
 from xomtra_mcp.admin import i18n, setup, status, view
 from xomtra_mcp.admin.analysis import (
     FINDING_TYPES,
@@ -141,8 +142,9 @@ CLIENTS_NOTE = (
     " token, such as VS Code or Cursor."
     "</span><span class=more>"
     "Assistants that connect from the cloud cannot reach it: claude.ai on the web"
-    " and on phones, or ChatGPT connectors. They need a public https:// address "
-    "with sign-in, which the installation on its own virtual machine provides."
+    " and on phones, or ChatGPT connectors. Claude on the web and on phones needs a "
+    "public https:// address with sign-in, which the installation on its own virtual "
+    "machine provides. ChatGPT and other cloud assistants are not supported yet."
     "</span></p>"
 )
 
@@ -174,6 +176,7 @@ class AdminApp:
         ha_login: HomeAssistantLogin | None = None,
         tokens: TokenStore | None = None,
         analysis: SettingsStore | None = None,
+        access: AccessStore | None = None,
     ) -> None:
         self.settings = settings
         self.data = data
@@ -205,6 +208,9 @@ class AdminApp:
         if analysis is None and dsn:
             analysis = PostgresSettingsStore(dsn)
         self.analysis = analysis
+        if access is None and dsn and settings.auth_mode == "ha":
+            access = PostgresAccessStore(dsn)
+        self.access = access
         self.ingress = settings.auth_mode == "ingress"
         self.headers = dict(HEADERS)
         if self.ingress:
@@ -1295,6 +1301,148 @@ class AdminApp:
             )
         return RedirectResponse(f"{prefix()}/tokens", status_code=303)
 
+    # ---- access of the Claude connector (ADR 081) ------------------------------------
+
+    def _access_refused(self, user: dict[str, Any]) -> Response | None:
+        if self.settings.auth_mode == "entra":
+            text = (
+                "With Entra ID, who may use xomtra and with which role is set in Entra "
+                "(app roles of the enterprise application). Sign-ins end in Entra too."
+            )
+        elif self.settings.access_mode == "local" or self.ingress:
+            text = (
+                "In the local access mode, Claude and other MCP clients connect with "
+                "personal tokens; issue and revoke them on the page Tokens."
+            )
+        elif self.access is None:
+            return HTMLResponse(
+                page("Access", "<p class=bad>The access store is unavailable.</p>", None), 503
+            )
+        else:
+            return None
+        return HTMLResponse(page("Access", f"<p class=muted>{e(text)}</p>", user.get("username")))
+
+    async def access_page(self, request: Request, user: dict[str, Any]) -> Response:
+        refused = self._access_refused(user)
+        if refused is not None or self.access is None:
+            return refused or Response(status_code=404)
+        try:
+            users = await asyncio.to_thread(self.access.ha_users)
+            sessions = await asyncio.to_thread(self.access.sessions)
+        except AccessStoreError:
+            return HTMLResponse(
+                page("Access", "<p class=bad>The access store is unavailable.</p>", None), 503
+            )
+        user_rows = []
+        for u in users:
+            if u.is_admin:
+                control = "xomtra.Admin (Home Assistant administrator)"
+            else:
+                options = "".join(
+                    f"<option value='{v}'{' selected' if (u.role or '') == v else ''}>"
+                    f"{label}</option>"
+                    for v, label in (("", "no access"), ("xomtra.Reader", "xomtra.Reader"))
+                )
+                control = (
+                    f"<form class=filters method=post action='{prefix()}/access/role'>"
+                    f"<input type=hidden name=id value='{e(u.ha_user_id)}'>"
+                    f"<select name=role>{options}</select><button>Save</button></form>"
+                )
+            user_rows.append([u.name, u.last_seen_at, control])
+        now = datetime.now(UTC)
+        session_rows = []
+        for sess in sessions:
+            if sess.active(now):
+                action = (
+                    f"<form method=post action='{prefix()}/access/disconnect'>"
+                    f"<input type=hidden name=id value='{e(sess.id)}'>"
+                    "<button>Disconnect</button></form>"
+                )
+            else:
+                action = "disconnected" if sess.revoked_at else "ended"
+            session_rows.append(
+                [
+                    sess.name or sess.subject,
+                    sess.created_at,
+                    sess.expires_at,
+                    sess.last_used_at,
+                    action,
+                ]
+            )
+        mfa = (
+            "Two-factor authentication in Home Assistant is required for the Claude connector."
+            if self.settings.ha_require_mfa
+            else "Two-factor authentication in Home Assistant is not required "
+            "(XOMTRA_HA_REQUIRE_MFA=false)."
+        )
+        body = (
+            "<h2>Home Assistant users</h2>"
+            "<p class=muted>Home Assistant administrators always have the role xomtra.Admin. "
+            "Other users get no access until you give them the role xomtra.Reader here. "
+            "A user appears in this list after their first attempt to connect Claude.</p>"
+            f"<p class=muted>{e(mfa)}</p>"
+            + table(["user", "last seen", "access"], user_rows, trusted_html={2})
+            + "<h2>Connected Claude connectors</h2>"
+            "<p class=muted>Each sign-in of the Claude connector, newest first. xomtra "
+            "keeps no Home Assistant token of the user: it is revoked right after the "
+            "sign-in. Disconnect stops a sign-in within a minute.</p>"
+            "<p class=muted>Sign-in lifetime in days: "
+            f"<strong>{self.settings.session_days}</strong></p>"
+            "<p class=muted>After it, the user connects again from a network where the "
+            "browser reaches Home Assistant.</p>"
+            + table(["user", "signed in", "ends", "last used", ""], session_rows, trusted_html={4})
+        )
+        return HTMLResponse(page("Access", body, user.get("username")))
+
+    async def access_role(self, request: Request, user: dict[str, Any]) -> Response:
+        refused = self._access_refused(user)
+        if refused is not None or self.access is None:
+            return refused or Response(status_code=404)
+        form = await self._form(request)
+        ha_user_id, role = form.get("id", "")[:128], form.get("role", "")
+        if role not in ("", "xomtra.Reader"):
+            return HTMLResponse(page("Access", "<p class=bad>Unknown role.</p>", None), 400)
+        try:
+            done = await asyncio.to_thread(
+                self.access.set_ha_user_role, ha_user_id, role or None, user.get("username")
+            )
+            await self._audit(
+                "access_role",
+                user,
+                arguments={"ha_user_id": ha_user_id, "role": role or None},
+                outcome="ok" if done else "error",
+                error=None if done else "unknown user",
+            )
+        except (AccessStoreError, AuditError):
+            return HTMLResponse(
+                page("Access", "<p class=bad>The access store or audit is unavailable.</p>", None),
+                503,
+            )
+        return RedirectResponse(f"{prefix()}/access", status_code=303)
+
+    async def access_disconnect(self, request: Request, user: dict[str, Any]) -> Response:
+        refused = self._access_refused(user)
+        if refused is not None or self.access is None:
+            return refused or Response(status_code=404)
+        session_id = (await self._form(request)).get("id", "")[:128]
+        try:
+            done = await asyncio.to_thread(
+                self.access.revoke_session, session_id, user.get("username")
+            )
+            await self._audit(
+                "access_disconnect",
+                user,
+                arguments={"session": session_id},
+                outcome="ok" if done else "error",
+                error=None if done else "not found or already disconnected",
+            )
+        except (AccessStoreError, AuditError):
+            return HTMLResponse(
+                page("Access", "<p class=bad>The access store or audit is unavailable.</p>", None),
+                503,
+            )
+        return RedirectResponse(f"{prefix()}/access", status_code=303)
+
     def _endpoint(self) -> str:
         """MCP endpoint for clients: the setting, else (Ingress) the HA host on :8000."""
         if self.settings.mcp_url is None and (guess := view.current.get().endpoint):
@@ -1569,6 +1717,17 @@ class AdminApp:
             Route(
                 f"{PREFIX}/tokens/revoke",
                 p("token_revoke", self.token_revoke, audit=False),
+                methods=["POST"],
+            ),
+            Route(f"{PREFIX}/access", p("access", self.access_page)),
+            Route(
+                f"{PREFIX}/access/role",
+                p("access_role", self.access_role, audit=False),
+                methods=["POST"],
+            ),
+            Route(
+                f"{PREFIX}/access/disconnect",
+                p("access_disconnect", self.access_disconnect, audit=False),
                 methods=["POST"],
             ),
             Route(f"{PREFIX}/connect", p("connect", self.connect_page)),

@@ -11,6 +11,42 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Admin page **Access** (public access with Home Assistant sign-in, ADR 081): give HA
+  users who are not administrators the role `xomtra.Reader`, and see every sign-in of
+  the Claude connector with **Disconnect**.
+- Claude connector sign-ins end after `XOMTRA_SESSION_DAYS` (default 180); in the last
+  14 days `server_info` asks the assistant to tell the user to connect again.
+- Guide [which installation to choose](docs/setup/choose-edition.md): limits of the
+  add-on and of an own machine, supported AI assistants, what the external connector
+  needs (domain, A record, port 443, certificate, sign-in).
+
+### Changed
+
+- Home Assistant sign-in is the default (`XOMTRA_AUTH_MODE=ha`); Entra ID stays an
+  option (ADR 081). **Upgrade note:** installations with Entra ID that did not set
+  `XOMTRA_AUTH_MODE` must add `XOMTRA_AUTH_MODE=entra` to `.env` (the server refuses to
+  start with Entra values and no mode, with this hint).
+- Public access with Home Assistant sign-in: only HA administrators get in by default
+  (`XOMTRA_HA_ROLE_MAP` default `admin=xomtra.Admin,user=`); other users need a role on
+  the page Access. **Upgrade note:** users who were Readers through the old default
+  need that role on the page Access.
+- Claude connector with Home Assistant sign-in requires two-factor authentication in
+  HA (`XOMTRA_HA_REQUIRE_MFA`, default `true`).
+
+### Security
+
+- The Claude connector keeps no Home Assistant token of the user: it is revoked right
+  after the sign-in (as the admin GUI already did). Requests are checked against the
+  session, the access list and, with an administrator token in xomtra's HA connection,
+  HA's user directory.
+
+### Fixed
+
+- The note on supported AI assistants no longer says that ChatGPT connectors work with
+  an own machine: Caddy lets `/mcp` through only from Claude's IP ranges.
+
 ## [0.7.1] - 2026-11-26
 
 ### Added
