@@ -434,6 +434,12 @@ jobs:
           test -n "$code"
           docker network connect xomtra-fresh_egress ha
           docker compose up -d ingest-stream
+          # The stream must wait for the connection, not fail, before the setup.
+          for i in $(seq 1 30); do
+            docker compose logs ingest-stream | grep -q "Waiting for the Home Assistant connection" && break
+            sleep 2
+          done
+          docker compose logs ingest-stream | grep -q "Waiting for the Home Assistant connection"
           docker compose exec -T -e CODE="$code" -e HA_TOKEN="$ha_token" admin python - <<'PY'
           import os, urllib.error, urllib.parse, urllib.request
 
