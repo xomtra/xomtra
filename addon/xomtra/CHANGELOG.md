@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.6.1 - 2026-11-26
+
+### Added
+
+- Admin GUI, Tokens and Connect clients: a note on which AI assistants can connect to
+  the local access mode (assistants on a computer in the LAN, not cloud connectors
+  such as claude.ai or ChatGPT).
+- Admin GUI footer with the version (links to its release notes), xomtra.com, the
+  documentation and bug reports. The links open in a new tab and send no Referer.
+
+### Changed
+
+- Claude Desktop extension: the xomtra icon and xomtra.com as its homepage.
+- Admin GUI overview: smaller card values that fit on one line, clearer catalog column
+  names (entity kind, entities, stale entities), the profiling time in the local
+  format, and the backup note in one box.
+
+### Fixed
+
+- Claude Desktop extension did not start in Claude Desktop's built-in Node.js
+  ("Unable to connect to extension server"): the bridge only started when run as the
+  main script. It now always starts.
+- Claude Desktop extension: a server it cannot connect to (wrong address, or on macOS
+  Claude not allowed in Local Network) now gives an error with a hint within 10 s
+  instead of Claude Desktop's "Unable to connect to extension server" after a minute.
+- Admin GUI: Safari saved the Claude Desktop extension as `xomtra.zip`. It is now
+  sent as `application/octet-stream` with a plain file name and saves as
+  `xomtra.mcpb`.
+- Admin GUI after an upgrade: the browser kept the previous version's stylesheet and
+  script (cached for an hour or a day) and showed the new pages half unstyled. Their
+  URLs now carry a version (also the tips and the icon), so an upgrade loads the new
+  ones, and the token diagram stays readable without its stylesheet.
+- Home Assistant add-on: the update dialog said "No changelog found". The add-on now
+  ships its own `CHANGELOG.md` with the last five released versions;
+  `scripts/release.py prepare` writes it and `check` refuses a tag without it.
+
 ## 0.6.0 - 2026-11-26
 
 ### Added
@@ -184,47 +220,5 @@
   pairs after the unflagged ones, so explained relations (`indirect`, `house_context`,
   ...) were never stored. Explained and unstable pairs now come before the trivial
   ones.
-
-## 0.4.0 - 2026-11-25
-
-### Added
-
-- Editions (ADR 050): `HAMMOND_EDITION=full|lite` selects default retention and DuckDB
-  memory; `HAMMOND_LAKE_DATA_PATH` keeps the lake data files in a local directory
-  instead of object storage (no SeaweedFS needed). Existing installations are unchanged.
-- `hammond-ingest worker` (ADR 050): live stream and the scheduled jobs in one process
-  instead of Dagster, with runs in the new Postgres database `ops`; `hammond-ingest job`
-  and `hammond-ingest runs`. `deploy/compose/compose.lite.yaml` runs the lite edition
-  (no SeaweedFS, no Dagster, lake data in a local volume).
-- Synthetic households with known truth for evaluating the analyses
-  (`hacore.synthetic`, `python -m hacore.synthetic.evaluate`, ADR 062): archetypes,
-  hidden drivers, planted relations, defects and inserted events. See
-  docs/analysis-evaluation.md.
-- Correlation findings carry `p_value` and `explained_by`, and new flags
-  `common_factor`, `indirect` and `unstable` (ADR 062). `get_findings` returns them;
-  flagged findings are hidden unless `include_flagged`.
-- Correlation flag `same_area` (ADR 064): a relation between two entities in one Home
-  Assistant area (or, without an area, one area named in their ids or names) is
-  explained by the room's occupancy and ranked after the unflagged findings.
-- Correlation flag `house_context` (ADR 064): a relation explained by a presence
-  entity of the residents. Groups and drivers reach the analyses through a
-  domain-neutral context (`hacore.context`); Home Assistant is its first adapter.
-
-### Changed
-
-- Correlation significance v2 (ADR 062, `HAMMOND_CORRELATION_METHOD=v2`, default):
-  variance of `r` from the autocorrelations of both series, an empirical null of
-  circularly shifted pairs instead of Bonferroni over lags, and structural flags. On
-  the synthetic households the share of false or unexplained findings drops several
-  times; findings between autocorrelated but unrelated series disappear. Set
-  `HAMMOND_CORRELATION_METHOD=v1` for the previous method. The next run replaces the
-  findings of each window.
-- Anomalies and change points v2 (ADR 062, `HAMMOND_ANOMALY_METHOD=v2`, default):
-  conformal p-values of anomaly episodes against the installation's own baseline weeks
-  and permutation p-values of change points (AR(1) surrogates), each with the
-  Benjamini–Hochberg FDR over all series (`HAMMOND_ANOMALY_MAX_Q`, 0.05) instead of
-  fixed thresholds per series. With many series far fewer false anomalies; in a very
-  small installation only strong ones pass. Findings carry `p_value` and `q_value`.
-  Set `HAMMOND_ANOMALY_METHOD=v1` for the previous method.
 
 Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md

@@ -51,7 +51,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
-    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.6.0}
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.6.1}
     command: ["xomtra-ingest", "worker"]
     environment:
       XOMTRA_LAKE_PG_HOST: postgres

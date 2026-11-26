@@ -148,7 +148,7 @@ services:
     networks: [backend]
 
   ducklake-init:
-    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.6.0}
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.6.1}
     entrypoint: ["python", "-m", "hacore.lake", "init"]
     environment: *lake-env
     depends_on:
@@ -161,7 +161,7 @@ services:
 
   mcp:
     <<: *hardening
-    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.6.0}
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.6.1}
     environment:
       <<: *lake-env
       XOMTRA_AUTH_MODE: ${XOMTRA_AUTH_MODE:-entra}
@@ -204,7 +204,7 @@ services:
   # Live state_changed stream with catch-up (writes bronze.ha_states continuously).
   ingest-stream:
     <<: *hardening
-    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.6.0}
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.6.1}
     command: ["xomtra-ingest", "stream"]
     environment:
       <<: *ingest-env
@@ -229,7 +229,7 @@ services:
   # retention). Runs execute in this container.
   dagster-daemon:
     <<: *hardening
-    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.6.0}
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.6.1}
     command: ["dagster-daemon", "run", "-w", "/app/dagster/workspace.yaml"]
     environment:
       <<: *ingest-env
@@ -251,7 +251,7 @@ services:
   # http://127.0.0.1:3000/admin/dagster/
   dagster-webserver:
     <<: *hardening
-    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.6.0}
+    image: ${XOMTRA_INGEST_IMAGE:-ghcr.io/xomtra/xomtra-ingest:0.6.1}
     command:
       [
         "dagster-webserver", "-h", "0.0.0.0", "-p", "3000",
@@ -280,7 +280,7 @@ services:
   # retention, audit; guards the Dagster UI for Caddy (forward_auth).
   admin:
     <<: *hardening
-    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.6.0}
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.6.1}
     # The image entrypoint is xomtra-mcp; the admin GUI is another program in it.
     entrypoint: ["xomtra-admin"]
     environment:
@@ -328,7 +328,7 @@ services:
 
   caddy:
     <<: *hardening
-    image: ${XOMTRA_CADDY_IMAGE:-ghcr.io/xomtra/xomtra-caddy:0.6.0}
+    image: ${XOMTRA_CADDY_IMAGE:-ghcr.io/xomtra/xomtra-caddy:0.6.1}
     # The image checks the values its access mode needs at start (deploy/caddy/start.sh).
     environment:
       XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-public}
