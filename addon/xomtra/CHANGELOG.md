@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.7.0 - 2026-11-26
+
+### Added
+
+- Docker Compose installs with one command (ADR 077): `docker compose up -d` works
+  without a `.env`. The new one-shot service `secrets-init` generates every internal
+  password and key into the Docker volume `secrets` (one file per service, readable
+  only by its user) and finds the server's LAN address for the local access mode.
+- Setup page in the admin GUI (`/admin/setup`): the Home Assistant URL and token are
+  entered in the browser after the first start, checked against Home Assistant and
+  stored encrypted in Postgres. Until then a one-time link is printed to
+  `docker compose logs admin`; the stream and the hourly ingest wait for the connection.
+  Signed-in administrators can change the URL or token later on the same page.
+- Guide [docs/setup/docker.md](docs/setup/docker.md).
+
+### Changed
+
+- Tone of answers with xomtra data: humour is now the default style, with at least one
+  joke or witty remark in every answer (about the house and the data, never about people,
+  safety, health or a fault, and never at the cost of exact facts). Applies to the server
+  instructions, `answer_guidelines` and the rules in tool descriptions (ADR 073, 080).
+- Compose defaults: `XOMTRA_ACCESS_MODE=local`, `XOMTRA_AUTH_MODE=ha`, `ADMIN_CIDR` all
+  private ranges; no variable is required any more. Public access still needs its
+  values in `.env`.
+- `init-env.sh` is an optional guide and no longer writes internal passwords.
+  **Upgrade note:** an existing `.env` with passwords keeps working; on the first start
+  `secrets-init` takes them over into the volume `secrets`, after which they can be
+  removed from `.env`. Back up the volume `secrets` together with the data volumes.
+- The documentation and the Claude Desktop extension now say precisely what "read only"
+  means: xomtra only reads and never calls Home Assistant services, and the assistant
+  gets read-only tools over xomtra's own data. Home Assistant has no read-only tokens,
+  so this is guaranteed by xomtra's code; the Docker guide explains why a separate
+  non-admin user is still recommended (access can be revoked at any time).
+
 ## 0.6.2 - 2026-11-26
 
 ### Fixed
@@ -126,97 +160,5 @@
   refused with 403 when Home Assistant is opened through another address than its own
   host, e.g. behind a reverse proxy. The cross-site check now trusts the browser's
   `Sec-Fetch-Site` header and compares the Origin only where that header is missing.
-
-## 0.5.0 - 2026-11-25
-
-### Added
-
-- Home Assistant add-on (lite edition, in development): one container with Postgres,
-  the worker and the MCP server for the LAN, supervised by s6-overlay; internal secrets
-  and the Postgres cluster are generated on the first start in `/data`; Home Assistant
-  is reached through the Supervisor. Built, scanned and started in CI (job `addon`).
-  `XOMTRA_HA_URL=http://supervisor/core` uses the Supervisor's WebSocket endpoint.
-- Admin GUI behind Home Assistant Ingress (ADR 070, add-on): `XOMTRA_AUTH_MODE=ingress`
-  takes the user from the Supervisor's `X-Remote-User-*` headers, accepts only the
-  Ingress proxy's address and serves its links under `X-Ingress-Path`;
-  `XOMTRA_DAGSTER_UI=false` hides the Dagster link. The add-on shows the GUI in the
-  sidebar for HA administrators.
-- Home Assistant add-on repository (`repository.yaml`): the add-on images
-  `xomtra-addon-amd64` and `xomtra-addon-aarch64` are built natively, signed and
-  published with every commit of `main` and promoted with every release;
-  `scripts/release.py` keeps the add-on version in step.
-- Admin GUI page *Analysis settings* (ADR 060): thresholds of correlations, anomalies
-  and change points can be changed without a restart, with a preview of their effect on
-  the current findings and a history of changes. A stored value wins over the ingest's
-  environment variable. New schema `analysis` in the audit database (created by
-  `ensure-databases`), new ingest variable `XOMTRA_ANALYSIS_SETTINGS_DB` (default
-  `audit`).
-- Admin GUI page *Findings* (ADR 060 point 6): a finding can be dismissed (the pair of
-  entities of a correlation, the entity of an anomaly or change point), for good or
-  until a date, and undone. The ingest flags matching findings `dismissed` after every
-  run; `get_findings` and the weekly summary hide them like the other flags.
-- Low-power indicator (ADR 067): every correlation run records its confidence in
-  `catalog.analysis_run`: `low` with fewer than 30 analysed series or less than 80 % of
-  the analysed entities in an HA area. `get_findings` returns it per window
-  (`confidence`, no entity names); the admin page *Findings* shows it with the analysed
-  entities that have no area. The thresholds are not tightened: on the synthetic
-  households a stricter q or |r| did not lower the false discovery rate, complete areas
-  did.
-- Usefulness of findings (ADR 062 point 9, ADR 068): every finding gets `strength`,
-  `evidence`, `nontriviality`, `action_category` and `usefulness` = R0 =
-  √(strength · evidence); findings are ranked by it within type and window. Trivial
-  relations (T1–T6: one device, one quantity twice, a helper and its source, one device
-  class twice in one area, known physics, a collection artefact) get the flag `trivial`
-  and are hidden by default. Categories come from the public, versioned rulebook
-  `hacore/rules/actionability.toml` (17 entity families). `get_findings` returns
-  `usefulness`, `action_category` and `trivial_rule`, and `ranking_version` in
-  `methods`; the admin page *Findings* shows them.
-- Analysis setting *Indirect and common-factor relations* (ADR 062 point 10,
-  `XOMTRA_CORRELATION_STRUCTURE_DISPLAY`): `hide` (default), `lower` or `show`. New
-  column `hidden` in `catalog.finding` decides what `get_findings`, the weekly summary
-  and the admin hide by default (older rows: any flag). The weekly summary orders by
-  usefulness.
-- Preregistration of the usefulness evaluation (`docs/evaluation/usefulness-prereg.md`)
-  and its metrics in `hacore.public.ratings`: Krippendorff's α (ordinal), weighted κ,
-  NDCG@10, precision@10, cluster bootstrap over households and the simulation that
-  fixes the human sample at 200 findings. `hacore.public.usefulness_sample` draws the
-  stratified sample of findings on public data (manual job `usefulness-sample` of the
-  validation workflow, CSV artifact kept 30 days, CC BY citation).
-- Rulebook 1.0.1: a gas or smoke detector (`binary_sensor`) is air quality, a gas meter
-  energy (both were air quality).
-- Validation on public data (ADR 065, Gate 1c point 6): `hacore.public` fetches the IDEAL
-  hourly readings with HTTP range requests (member list pinned, CRC-32 checked) and
-  measures the cross-household null of correlations and anomalies
-  (`python -m hacore.public.crosshouse`); `hacore.synthetic.benchmark` measures run time
-  and memory. The nightly workflow `validation.yml` runs both on amd64 and arm64 and
-  prints only aggregate metrics.
-
-### Changed
-
-- **Breaking: hammond is now xomtra (ADR 071).** The project moved to the organization
-  **xomtra** (repository `github.com/xomtra/xomtra`) and every name follows: images
-  `ghcr.io/xomtra/xomtra-{mcp,ingest,caddy}` and `xomtra-addon-{amd64,aarch64}`, Python
-  packages `xomtra_mcp` and `xomtra_ingest`, commands `xomtra-*`, environment variables
-  `XOMTRA_*`, compose project `xomtra` (containers and volumes), lake bucket `xomtra`,
-  Postgres roles `xomtra_ops`, `xomtra_audit` and `xomtra_audit_admin`, Entra roles
-  `xomtra.Admin` and `xomtra.Reader`, Home Assistant labels `xomtra_no_ingest` and
-  `xomtra_no_analysis`, personal tokens `xmt_…` and the add-on slug `xomtra`. Releases up
-  to 0.4.1 keep the image addresses of their `images.env`; signatures of new releases
-  name the new repository. Upgrade: put the `*_IMAGE` lines of the release's
-  `images.env` into `.env` (still under the old names) and run
-  `deploy/compose/migrate-from-hammond.sh`: it rewrites `.env`, copies the volumes,
-  renames the Postgres roles, copies the bucket and updates the DuckLake catalog,
-  keeping the old data until you remove it. Then add the Entra roles, rename the labels
-  in Home Assistant and issue new personal tokens (the old `hmd_…` tokens stop working).
-- Anomalies v2 (ADR 066): the scale of a series is at least a quarter of its 99th
-  percentile deviation in the baseline. Heavy-tailed series (appliances idling most
-  hours) were scaled by their idle noise, so their ordinary use saturated the z cap and
-  real episodes could not stand out (recall of planted episodes on the IDEAL homes was
-  about 0). Normal series are not affected.
-
-### Fixed
-
-- `compose.lite.yaml` defaulted to the ingest image 0.3.0, which has no `worker`;
-  `scripts/release.py` now keeps it at the release version like `compose.yaml`.
 
 Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md

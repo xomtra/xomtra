@@ -11,6 +11,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-26
+
 ### Added
 
 - Docker Compose installs with one command (ADR 077): `docker compose up -d` works
@@ -408,7 +410,8 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/xomtra/xomtra/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/xomtra/xomtra/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/xomtra/xomtra/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/xomtra/xomtra/compare/v0.5.1...v0.6.0

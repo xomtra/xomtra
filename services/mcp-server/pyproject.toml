@@ -1,6 +1,6 @@
 [project]
 name = "xomtra-mcp"
-version = "0.6.2"
+version = "0.7.0"
 description = "xomtra MCP server (FastMCP) with OAuth proxy to Microsoft Entra ID"
 readme = "README.md"
 requires-python = ">=3.13"
