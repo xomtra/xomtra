@@ -23,6 +23,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   `XOMTRA_WORKER_STOP_FREE_RATIO` (default 3 %) the worker pauses the stream and the
   writing jobs until there is space again, then catches up from Home Assistant's
   history; the retention still runs (ADR 072).
+- Home Assistant add-on: the overview and the documentation say that Home Assistant
+  backups do not include the lake (history and findings) and recommend xomtra on its
+  own virtual machine for backups of the whole history.
 - Tokens page: a picture of how a token connects an LLM agent with xomtra and that
   xomtra only reads Home Assistant, with the page's actions on it.
 

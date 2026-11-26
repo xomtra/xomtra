@@ -59,6 +59,8 @@ async def test_ingress_page_uses_the_ingress_path() -> None:
     assert "frame-ancestors 'self'" in csp
     assert resp.headers["x-frame-options"] == "SAMEORIGIN"
     assert root.status_code == 200
+    assert "Home Assistant backups do not include" in root.text  # the lake is excluded
+    assert "its own virtual machine" in root.text
     record = next(r for r in audit.records if r.tool == "admin:tokens")
     assert (record.subject, record.username, record.idp) == ("8f0c2a", "jana", "ha-ingress")
 

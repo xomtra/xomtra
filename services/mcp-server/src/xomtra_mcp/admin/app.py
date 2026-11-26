@@ -109,6 +109,20 @@ def _url_host(hostname: str) -> str:
 type Handler = Callable[[Request, dict[str, Any]], Awaitable[Response]]
 
 
+# The add-on keeps the lake out of Home Assistant backups (config.yaml backup_exclude).
+BACKUP_NOTE = (
+    "<h2 id=backups>Backups</h2>"
+    "<p class=warn>Home Assistant backups do not include xomtra's analytics. They keep "
+    "the tokens, the settings and the database of this add-on, but not the lake: the "
+    "history, the findings and the weekly summaries, which take tens of GB. After a "
+    "restore xomtra starts a new lake and loads the history again from Home "
+    "Assistant, only as far back as Home Assistant still keeps it.</p>"
+    "<p class=muted>For a robust setup with backups of the whole history, run xomtra "
+    "on its own virtual machine (Proxmox, VMware or Docker on Linux) and back up that "
+    "machine.</p>"
+)
+
+
 class AdminApp:
     def __init__(
         self,
@@ -452,6 +466,8 @@ class AdminApp:
             if drift
             else "<p class=muted>None.</p>"
         )
+        if self.ingress:
+            body += BACKUP_NOTE
         return HTMLResponse(page("Overview", body, user.get("username")))
 
     def _disk(self) -> tuple[tuple[str, Any, str], str] | None:

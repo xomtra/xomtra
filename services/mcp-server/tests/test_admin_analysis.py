@@ -227,6 +227,7 @@ async def test_overview_shows_free_disk(tmp_path: Any, monkeypatch: pytest.Monke
         )
         roomy = await client.get("/admin/")
     assert "Free disk" in full.text
+    assert "Backups" not in full.text  # the note is for the add-on only
     assert "collecting is paused" in full.text
     assert "2.0 GiB · 2%" in full.text
     assert "collecting is paused" not in roomy.text
