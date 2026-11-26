@@ -28,6 +28,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   line of work when the user mentions it (never to wealth or status), for the user as
   the occupant of the property; teasing the user only with tact; facts stay exact
   (ADR 073, 080).
+- Humour made personal and a bit politically incorrect: the assistant uses what it
+  already knows about the user from its own context (memory, profile, conversation),
+  never personal details inferred from the house data, never the user's clients or
+  employers by name, always within the core rules (ADR 080).
 - Core rules that always apply, also with the default style off and above a central
   theme: no jokes, irony or vulgarity about accidents, faults, outages, risky
   situations or threats to life or health; no sexist, racist, homophobic, xenophobic
