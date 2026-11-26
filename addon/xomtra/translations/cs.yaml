@@ -17,5 +17,14 @@ configuration:
       Endpoint MCP tak, jak ho vidí klienti ve vaší síti, například
       http://homeassistant.local:8000/mcp. Prázdné: administrace ho odvodí z adresy,
       na které jste otevřeli Home Assistant.
+  default_guidelines:
+    name: Výchozí styl odpovědí
+    description: >-
+      Žádat asistenta o hodně vtipné, sprosté a vulgární odpovědi jako od kamaráda v
+      hospodě, přizpůsobené vašemu jazyku, zemi a kultuře, spolu s výchozími pravidly
+      odpovídání (role, práce s daty). Vypnuto: zůstanou jen základní pravidla (žádné
+      vtipy o haváriích, výpadcích a ohrožení života či zdraví; žádné sexistické,
+      rasistické, homofobní, xenofobní ani politické vtipy); aktuální téma z xomtra.com
+      platí dál. Projeví se po restartu.
 network:
   8000/tcp: Endpoint MCP v LAN (osobní přístupové tokeny)

@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+from collections.abc import Callable
 from datetime import date
 from typing import Annotated, Any, Literal
 
@@ -28,6 +29,7 @@ from xomtra_mcp.audit import AuditSink, LogAuditSink, PostgresAuditSink
 from xomtra_mcp.config import Settings
 from xomtra_mcp.data import DataAccess, parse_time
 from xomtra_mcp.guard import PolicyMiddleware
+from xomtra_mcp.guidelines import CORE_GUIDELINES, DEFAULT_GUIDELINES, Guidelines, ThemeSource
 from xomtra_mcp.ha_auth import HomeAssistantProvider
 from xomtra_mcp.identity import Identity, current_identity
 from xomtra_mcp.policy import Policy, current_access
@@ -35,30 +37,7 @@ from xomtra_mcp.tokens import PersonalTokenVerifier, PostgresTokenStore, TokenSt
 
 logger = logging.getLogger(__name__)
 
-GUIDELINES = """\
-- Findings are statistical. Present correlations, anomalies and change points as
-  hypotheses, not as causes, with their strength, confidence and time window, and say
-  when the confidence is low.
-- Base every statement on data you fetched: name the entities (friendly name and
-  entity_id) and the period. Do not invent values; say what is missing or uncertain.
-- Times from xomtra are UTC; show them in the user's local time when you know it.
-- Do not draw conclusions about a specific person's presence, sleep, health or habits
-  unless the user asks about it.
-- Be funny. Humour is the default style, not an exception: put at least one joke, witty
-  remark or bit of gentle irony in every answer, written in the user's language, like a
-  friend with a dry sense of humour who knows the house well. Joke about the house, the
-  devices and the data, never about people. For example: "The fridge held 4 degrees all
-  week; the most reliable member of the household." "The boiler and the washing machine
-  peak together every Sunday: a correlation, or they are planning something." "The
-  living room stayed at 21.4 degrees all week; this thermostat takes its job seriously."
-- No jokes about safety, health, a fault or anything the user is worried about; there
-  stay factual and calm. The joke never replaces or blurs the data: facts, numbers and
-  uncertainty come first and stay exact.
-- xomtra only reads data. Do not suggest changes to locks, alarms, cameras or heating
-  safety settings on the strength of a finding alone; point the user to check first.
-"""
-
-INSTRUCTIONS = f"""\
+OVERVIEW = """\
 xomtra exposes the history and catalog of a Home Assistant installation.
 
 Start with `search_catalog` to find entities (by words, area, domain or kind), then
@@ -68,34 +47,36 @@ entities, anomalies, lasting level changes); `get_weekly_summary` what changed i
 week. `list_views` shows the SQL views you may query with `query_sql` (DuckDB SQL, one
 SELECT, view names without schema). All times are UTC unless stated otherwise. What you
 can see depends on your role; entities outside it are not returned.
-
-How to answer with this data (ADR 073):
-{GUIDELINES}"""
-
-# Not every client passes the server instructions to the model (e.g. a proxy between
-# the MCP server and the model drops them), so the key rules also travel in each data
-# tool's description and, in full, in the results that are easiest to over-read (ADR 080).
-TOOL_RULES = (
-    "How to answer (xomtra): findings are hypotheses, not causes; name the entities and "
-    "the period and never invent values; show times (UTC here) in local time; no "
-    "conclusions about a person's presence, sleep, health or habits unless asked; be "
-    "funny: at least one joke or witty remark in every answer, about the house and the "
-    "data, never about people, safety, health or a fault, and never at the cost of exact "
-    "facts; xomtra "
-    "only reads, so never advise changing locks, alarms, cameras or heating safety on a "
-    "finding alone."
-)
+"""
 
 
-def with_rules(fn: Any) -> Any:
-    """Append the short answering rules to a tool's description (its docstring)."""
-    fn.__doc__ = f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{TOOL_RULES}"
-    return fn
+def build_instructions(guidelines: Guidelines) -> str:
+    """Server instructions; the central theme changes during the run, so only the
+    default guidelines go here, and results carry the current text (ADR 080)."""
+    text = f"{OVERVIEW}\nCore rules (always apply):\n{CORE_GUIDELINES}"
+    if not guidelines.defaults:
+        return text
+    return f"{text}\nHow to answer with this data (ADR 073):\n{DEFAULT_GUIDELINES}"
 
 
-def with_guidelines(result: dict[str, Any]) -> dict[str, Any]:
-    """Attach the full answering guidelines to a result the model will interpret."""
-    return {**result, "answer_guidelines": GUIDELINES}
+def rules_decorator(guidelines: Guidelines) -> Callable[[Any], Any]:
+    """Appends the short answering rules to a tool's description (its docstring)."""
+    rules = guidelines.tool_rules
+
+    def apply(fn: Any) -> Any:
+        fn.__doc__ = f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{rules}"
+        return fn
+
+    return apply
+
+
+def guidelines_attacher(guidelines: Guidelines) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    """Attaches the current answering guidelines to a result the model interprets."""
+
+    def attach(result: dict[str, Any]) -> dict[str, Any]:
+        return {**result, "answer_guidelines": guidelines.text()}
+
+    return attach
 
 
 READ_ONLY = {"readOnlyHint": True, "openWorldHint": False}
@@ -159,10 +140,13 @@ def create_server(
     audit: AuditSink | None = None,
     policy: Policy | None = None,
     tokens: TokenStore | None = None,
+    theme: ThemeSource | None = None,
 ) -> FastMCP:
+    guidelines = Guidelines(defaults=settings.default_guidelines, theme=theme)
+    with_guidelines = guidelines_attacher(guidelines)
     mcp = FastMCP(
         name="xomtra",
-        instructions=INSTRUCTIONS,
+        instructions=build_instructions(guidelines),
         auth=build_auth(settings, tokens),
         mask_error_details=True,
     )
@@ -230,12 +214,14 @@ def create_server(
             }
 
     if data is not None:
-        register_data_tools(mcp, data)
+        register_data_tools(mcp, data, guidelines)
     return mcp
 
 
-def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
+def register_data_tools(mcp: FastMCP, data: DataAccess, guidelines: Guidelines) -> None:
     """Catalog and data tools; each runs under the caller's policy (current_access)."""
+    with_rules = rules_decorator(guidelines)
+    with_guidelines = guidelines_attacher(guidelines)
 
     async def run(fn: Any, *args: Any, **kwargs: Any) -> Any:
         # The DuckDB work runs in a thread; the access context is copied along.

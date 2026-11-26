@@ -93,15 +93,22 @@ def test_identity_from_flat_claims() -> None:
 
 async def test_instructions_carry_the_default_guardrails() -> None:
     """ADR 073: the client puts the server instructions in the model's context."""
-    text = create_server(dev_settings()).instructions or ""
+    text = " ".join((create_server(dev_settings()).instructions or "").split())
     assert "hypotheses, not as causes" in text
     assert "Do not invent values" in text
     assert "local time" in text
     assert "presence, sleep, health" in text
     assert "locks, alarms" in text
-    assert "Humour is the default style" in text
-    assert "at least one joke" in text
-    assert "No jokes about safety, health, a fault" in text
+    assert "occupant of the property" in text
+    assert "very funny, crude and vulgar" in text
+    assert "language, country, culture and locality of the installation" in text
+    assert "Never guess or play on the user's wealth or social status" in text
+    assert "guys in the pub" in text
+    assert "line of work, but only when the user mentioned it" in text
+    assert "Joke about the user only with tact" in text
+    assert "sexist, racist, homophobic, xenophobic or political jokes or innuendo" in text
+    assert "No jokes, irony or vulgarity about accidents, faults, outages" in text
+    assert "threatens life or health" in text
 
 
 async def test_guidelines_reach_the_model_without_instructions() -> None:
@@ -113,3 +120,46 @@ async def test_guidelines_reach_the_model_without_instructions() -> None:
         tools = {t.name: t for t in await client.list_tools()}
     assert "hypotheses, not as causes" in info["answer_guidelines"]
     assert "guidelines" in (tools["server_info"].description or "")
+
+
+async def test_default_guidelines_can_be_turned_off() -> None:
+    """ADR 080: the operator may turn the default answer style and rules off."""
+    from fastmcp import Client
+
+    settings = dev_settings().model_copy(update={"default_guidelines": False})
+    srv = create_server(settings)
+    assert "crude" not in (srv.instructions or "")
+    instructions = " ".join((srv.instructions or "").split())
+    assert "xenophobic or political jokes" in instructions
+    assert "threatens life or health" in instructions
+    async with Client(srv) as client:
+        info = (await client.call_tool("server_info", {})).data
+    # The core rules stay, the default style goes.
+    assert "xenophobic or political jokes" in info["answer_guidelines"]
+    assert "crude" not in info["answer_guidelines"]
+
+
+async def test_central_theme_takes_precedence_and_expires() -> None:
+    """ADR 080: a central theme (ADR 075) comes first and is forgotten after 24 hours."""
+    from datetime import UTC, datetime, timedelta
+
+    from xomtra_mcp.guidelines import Guidelines, Theme
+
+    now = datetime(2026, 12, 1, 12, tzinfo=UTC)
+    theme = Theme("Christmas: add a festive touch.", received_at=now)
+    guidelines = Guidelines(defaults=True, theme=lambda: theme)
+    text = guidelines.text(now) or ""
+    assert text.index("political jokes") < text.index("Christmas")
+    assert text.index("Christmas") < text.index("occupant of the property")
+    assert "never over the core" in " ".join(text.split())
+    assert "2026-12-02 12:00 UTC" in text
+    assert "Christmas" not in (guidelines.text(now + timedelta(hours=24)) or "")
+    # A longer validity from the centre does not extend the 24 hours.
+    long = Theme("x", received_at=now, valid_until=now + timedelta(days=7))
+    assert not long.active(now + timedelta(hours=25))
+    # The theme applies even with the default guidelines off.
+    off = Guidelines(defaults=False, theme=lambda: theme)
+    assert "political jokes" in off.tool_rules
+    assert "Christmas" in off.text(now)
+    assert "occupant" not in off.text(now)
+    assert "Christmas" not in off.text(now + timedelta(days=2))
