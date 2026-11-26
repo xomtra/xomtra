@@ -85,3 +85,7 @@ Claude then shows that the connector needs to be connected again. Nothing is los
   deactivated in HA keeps the connector until the session ends or an administrator
   disconnects it on the page Access.
 * Audit records carry `idp = ha`, the HA user id as subject and the HA display name.
+  Every sign-in of the connector is recorded as `connector:sign_in` (allowed or denied,
+  with `ha_token_revoked`), a refused session as `connector:session_refused`, role
+  changes and disconnects on the page Access as `admin:access_role` and
+  `admin:access_disconnect`.

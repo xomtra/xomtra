@@ -51,6 +51,7 @@ from xomtra_mcp.access import (
     AccessStoreError,
     SessionAccess,
 )
+from xomtra_mcp.audit import AuditError, AuditRecord, AuditSink
 
 logger = logging.getLogger(__name__)
 
@@ -257,9 +258,12 @@ class HomeAssistantTokenVerifier(TokenVerifier):
         require_mfa: bool = False,
         session_days: int = DEFAULT_SESSION_DAYS,
         directory: HAUserDirectory | None = None,
+        audit: AuditSink | None = None,
     ) -> None:
         super().__init__()
         self.directory = directory
+        self.audit = audit
+        self._ended: set[str] = set()
         self.ha_url = ha_url
         self.role_map = role_map
         self.allowed_users = allowed_users or []
@@ -279,11 +283,37 @@ class HomeAssistantTokenVerifier(TokenVerifier):
             sid = session_id(token) if self.store is not None else None
             state = await self._store_call(self._check, sid) if sid else None
             if state is not None:
-                return await self.session_claims(state)
+                try:
+                    return await self.session_claims(state)
+                except RefusedError as why:
+                    await self._session_ended(state, str(why))
+                    raise
             return await self.checked_claims(token)
         except RefusedError as why:
             logger.info("Home Assistant sign-in refused: %s", why)
             return None
+
+    async def _session_ended(self, state: SessionAccess, reason: str) -> None:
+        """Audit a refused connector session once per reason (per server process)."""
+        row = state.session
+        key = f"{row.id}|{reason}"
+        if self.audit is None or key in self._ended:
+            return
+        self._ended.add(key)
+        record = AuditRecord(
+            tool="connector:session_refused",
+            decision="denied",
+            outcome="denied",
+            arguments={"session": row.id},
+            subject=row.subject,
+            username=row.name,
+            idp=IDP,
+            error=reason,
+        )
+        try:
+            await self.audit.write(record)
+        except AuditError:
+            logger.warning("Could not audit a refused connector session")
 
     def _check(self, sid: str) -> SessionAccess | None:
         assert self.store is not None  # noqa: S101 - only called with a store
@@ -408,9 +438,11 @@ class HomeAssistantProvider(OAuthProxy):
         require_mfa: bool = True,
         session_days: int = DEFAULT_SESSION_DAYS,
         directory: HAUserDirectory | None = None,
+        audit: AuditSink | None = None,
     ) -> None:
         base = base_url.rstrip("/")
         self._ha_url = ha_url
+        self._audit = audit
         self._revoke_after_sign_in = store is not None
         self._verifier = HomeAssistantTokenVerifier(
             ha_url=ha_url,
@@ -420,6 +452,7 @@ class HomeAssistantProvider(OAuthProxy):
             require_mfa=require_mfa,
             session_days=session_days,
             directory=directory,
+            audit=audit,
         )
         super().__init__(
             upstream_authorization_endpoint=f"{ha_auth_url.rstrip('/')}/auth/authorize",
@@ -443,25 +476,60 @@ class HomeAssistantProvider(OAuthProxy):
     async def _extract_upstream_claims(self, idp_tokens: dict[str, Any]) -> dict[str, Any] | None:
         # Called when Claude exchanges its code: refuse users without a role here, so the
         # connector reports a failed sign-in instead of looping on 401.
+        claims: dict[str, Any] | None = None
+        reason: str | None = None
         try:
             claims = await self._verifier.checked_claims(str(idp_tokens.get("access_token", "")))
         except RefusedError as why:
             logger.info("Home Assistant sign-in refused: %s", why)
             reason = str(why)
-        else:
-            await self._drop_ha_token(idp_tokens)
+        revoked = await self._drop_ha_token(idp_tokens)
+        try:
+            await self._audit_sign_in(claims, reason, revoked)
+        except AuditError:
+            # Every sign-in is audited (ADR 040): without the audit, no sign-in.
+            reason = reason or "The audit is unavailable"
+            claims = None
+        if claims is not None:
             return claims
-        await self._drop_ha_token(idp_tokens)
         # Raised outside the handler: TokenError is frozen and cannot take a __cause__.
-        raise TokenError("invalid_grant", reason)
+        raise TokenError("invalid_grant", reason or "Sign-in refused")
 
-    async def _drop_ha_token(self, idp_tokens: dict[str, Any]) -> None:
-        """ADR 081: keep no HA token of the user once the sign-in is checked."""
+    async def _drop_ha_token(self, idp_tokens: dict[str, Any]) -> bool | None:
+        """ADR 081: keep no HA token of the user once the sign-in is checked.
+
+        True/False: revoked or not; None: nothing to revoke (no store or no token).
+        """
         refresh = idp_tokens.get("refresh_token")
         if not self._revoke_after_sign_in or not isinstance(refresh, str):
+            return None
+        if await revoke_ha_refresh_token(self._ha_url, refresh):
+            return True
+        logger.warning("Could not revoke the Home Assistant token of a connector sign-in")
+        return False
+
+    async def _audit_sign_in(
+        self, claims: dict[str, Any] | None, reason: str | None, revoked: bool | None
+    ) -> None:
+        if self._audit is None:
             return
-        if not await revoke_ha_refresh_token(self._ha_url, refresh):
-            logger.warning("Could not revoke the Home Assistant token of a connector sign-in")
+        arguments: dict[str, Any] = {"ha_token_revoked": revoked}
+        if claims and claims.get("sid"):
+            arguments["session"] = claims["sid"]
+            arguments["ends"] = claims.get("session_expires_at")
+        await self._audit.write(
+            AuditRecord(
+                tool="connector:sign_in",
+                decision="allowed" if claims else "denied",
+                outcome="ok" if claims else "denied",
+                arguments=arguments,
+                subject=(claims or {}).get("sub"),
+                username=(claims or {}).get("name"),
+                roles=list((claims or {}).get("roles") or []),
+                idp=IDP,
+                error=reason,
+            )
+        )
 
 
 @dataclass(slots=True)

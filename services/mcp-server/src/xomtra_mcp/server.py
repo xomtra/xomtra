@@ -87,6 +87,7 @@ def build_auth(
     settings: Settings,
     tokens: TokenStore | None = None,
     access: AccessStore | None = None,
+    audit: AuditSink | None = None,
 ) -> AuthProvider | None:
     if settings.auth_mode == "none":
         logger.warning("Authentication is DISABLED (local development only)")
@@ -121,6 +122,7 @@ def build_auth(
             require_mfa=settings.ha_require_mfa,
             session_days=settings.session_days,
             directory=HAUserDirectory(connection),
+            audit=audit or build_audit(settings),
         )
     client_id, tenant_id = settings.entra_client_id, settings.entra_tenant_id
     secret = settings.entra_client_secret
@@ -166,7 +168,7 @@ def create_server(
     mcp = FastMCP(
         name="xomtra",
         instructions=build_instructions(guidelines),
-        auth=build_auth(settings, tokens, access),
+        auth=build_auth(settings, tokens, access, audit),
         mask_error_details=True,
     )
     mcp.add_middleware(

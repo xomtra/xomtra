@@ -624,6 +624,7 @@ async def test_session_needs_no_ha_token_after_sign_in(
         role_map=RoleMap.parse(ha_auth.DEFAULT_ROLE_MAP),
         store=store,
         directory=directory,
+        audit=(audit := MemoryAuditSink()),
     )
     assert provider._fastmcp_access_token_expiry_seconds == 180 * 86400
     claims = await provider._extract_upstream_claims(
@@ -657,6 +658,21 @@ async def test_session_needs_no_ha_token_after_sign_in(
             {"access_token": VALID_TOKEN, "refresh_token": "ha-refresh-2"}
         )
     assert revoked == ["ha-refresh", "ha-refresh-2"]
+    # Audit: sign-ins with the revocation of the HA token, refused sessions once per reason.
+    signs = [r for r in audit.records if r.tool == "connector:sign_in"]
+    assert [(r.decision, r.arguments["ha_token_revoked"]) for r in signs] == [
+        ("allowed", True),
+        ("denied", True),
+    ]
+    assert signs[0].arguments["session"] == "rt-9"
+    assert signs[0].subject == "u2"
+    store.revoke_session("rt-9", "admin")
+    assert await verifier.verify_token("revoked-ha-token") is None
+    assert await verifier.verify_token("revoked-ha-token") is None
+    refused = [r.error for r in audit.records if r.tool == "connector:session_refused"]
+    # Removed from the access list, deactivated in HA, disconnected: each once.
+    assert len(refused) == 3
+    assert "has ended" in str(refused[-1])
 
 
 async def test_ha_user_directory(fake_ha: tuple[FakeHA, str]) -> None:

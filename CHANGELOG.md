@@ -40,7 +40,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - The Claude connector keeps no Home Assistant token of the user: it is revoked right
   after the sign-in (as the admin GUI already did). Requests are checked against the
   session, the access list and, with an administrator token in xomtra's HA connection,
-  HA's user directory.
+  HA's user directory. Audit records `connector:sign_in` (with `ha_token_revoked`) and
+  `connector:session_refused`.
 
 ### Fixed
 
