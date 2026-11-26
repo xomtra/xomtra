@@ -53,6 +53,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   and the missed jobs both created the `bronze` schema, one failed on the DuckLake
   transaction conflict and the stream reconnected. The worker now creates the lake's
   schemas and tables once before the stream and the jobs start.
+- Admin GUI behind Home Assistant Ingress: forms (issuing a token, settings) were still
+  refused with "Cross-site request refused" when Home Assistant is opened over plain
+  `http://` in the LAN. Browsers send `Sec-Fetch-Site` only to https origins, and the
+  Origin does not match the forwarded host that reaches the add-on. Behind Ingress the
+  forms now carry a token bound to the Home Assistant user and the Ingress session;
+  `Sec-Fetch-Site: cross-site` or `same-site` is still refused.
 - Postgres no longer logs DuckLake's commit retries ("duplicate key value violates
   unique constraint ducklake_snapshot_pkey") as errors: the stream and the jobs write
   at the same time and DuckLake retries such a commit by design. Errors of the catalog

@@ -15,6 +15,8 @@ HA Ingress instead: Home Assistant signs the user in, see :class:`RequestView`.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import ipaddress
 import json
 import logging
@@ -124,6 +126,10 @@ BACKUP_NOTE = (
 )
 
 
+# Opening tag of a POST form in the GUI's HTML (the CSRF field goes right after it).
+_POST_FORM = re.compile(rb"<form\b[^>]*\bmethod=[\"']?post\b[^>]*>", re.IGNORECASE)
+
+
 class AdminApp:
     def __init__(
         self,
@@ -142,6 +148,7 @@ class AdminApp:
         key = settings.admin_session_key
         secret = key.get_secret_value() if key else "dev-only-session-key-not-for-production"
         self.sessions = Signer(secret, "session")
+        self._csrf_key = hashlib.sha256(f"csrf:{secret}".encode()).digest()
         self.transactions = Signer(secret, "login")
         self.secure = str(settings.base_url or "").startswith("https://")
         if oidc is None and settings.auth_mode == "entra":
@@ -268,7 +275,13 @@ class AdminApp:
                 return self._ingress_refused()
             if user is None:
                 return RedirectResponse(f"{prefix()}/login", status_code=303)
-            if request.method == "POST" and not self._same_origin(request):
+            if request.method == "POST" and not await self._post_allowed(request, user):
+                logger.warning(
+                    "Refused POST %s: Sec-Fetch-Site %r, Origin %r",
+                    request.url.path,
+                    request.headers.get("sec-fetch-site"),
+                    request.headers.get("origin"),
+                )
                 return Response("Cross-site request refused", status_code=403)
             if audit:
                 try:
@@ -279,9 +292,37 @@ class AdminApp:
                     )
             resp = await handler(request, user)
             resp.headers.update(self.headers)
+            if self.ingress and isinstance(resp, HTMLResponse):
+                self._add_csrf(resp, self._csrf_token(request, user))
             return resp
 
         return endpoint
+
+    # ---- cross-site requests ---------------------------------------------------------
+
+    def _csrf_token(self, request: Request, user: dict[str, Any]) -> str:
+        """Form token of this HA user in this Ingress session (X-Ingress-Path)."""
+        msg = f"{user.get('sub')}|{request.headers.get('x-ingress-path', '')}"
+        return hmac.new(self._csrf_key, msg.encode(), hashlib.sha256).hexdigest()
+
+    @staticmethod
+    def _add_csrf(resp: HTMLResponse, token: str) -> None:
+        field = f"<input type=hidden name=csrf value={token}>".encode()
+        body = _POST_FORM.sub(lambda m: m.group(0) + field, bytes(resp.body))
+        resp.body = body
+        resp.headers["content-length"] = str(len(body))
+
+    async def _post_allowed(self, request: Request, user: dict[str, Any]) -> bool:
+        if not self.ingress:
+            return self._same_origin(request)
+        # Behind HA Ingress neither header is reliable: browsers send Sec-Fetch-* only to
+        # https (and localhost) origins, and HA is mostly opened over plain http in the
+        # LAN, while the Origin need not match the X-Forwarded-Host that reaches the
+        # add-on. Forms carry a token of the user and the Ingress session instead.
+        if request.headers.get("sec-fetch-site") in {"cross-site", "same-site"}:
+            return False
+        sent = (await self._form(request)).get("csrf", "")
+        return hmac.compare_digest(sent.encode(), self._csrf_token(request, user).encode())
 
     def _same_origin(self, request: Request) -> bool:
         # Sec-Fetch-Site is set by the browser and cannot be set by a page. It decides
@@ -397,10 +438,11 @@ class AdminApp:
         return HTMLResponse(page("Sign-in failed", body, None), status_code, headers=self.headers)
 
     async def logout(self, request: Request) -> Response:
+        if self.ingress:
+            # Nothing to sign out of behind Ingress (Home Assistant holds the session).
+            return RedirectResponse(f"{prefix()}/", status_code=303)
         if not self._same_origin(request):
             return Response("Cross-site request refused", status_code=403)
-        if self.ingress:
-            return RedirectResponse(f"{prefix()}/", status_code=303)
         resp = RedirectResponse(f"{prefix()}/login", status_code=303)
         resp.delete_cookie(SESSION_COOKIE, path=prefix())
         return resp

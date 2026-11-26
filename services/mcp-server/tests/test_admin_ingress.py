@@ -119,18 +119,25 @@ async def test_allowed_users_apply_to_ingress() -> None:
     assert petr.status_code == 200
 
 
+async def _csrf(client: Any, headers: dict[str, str]) -> str:
+    page = await client.get("/tokens", headers=headers)
+    assert page.status_code == 200
+    return str(page.text.split("name=csrf value=", 1)[1].split(">", 1)[0])
+
+
 async def test_tokens_behind_ingress() -> None:
     app, _, store = make_app()
     form = {"owner": "Petr", "description": "laptop", "role": "xomtra.Reader", "days": "90"}
     async with client_for(app) as client:
-        cross = await client.post(
-            "/tokens/issue", data=form, headers={**HA, "origin": "https://evil.example"}
-        )
-        issued = await client.post(
+        token = await _csrf(client, HA)
+        missing = await client.post(
             "/tokens/issue", data=form, headers={**HA, "origin": f"http://{HA_HOST}"}
         )
+        forged = await client.post("/tokens/issue", data={**form, "csrf": "0" * 64}, headers=HA)
+        issued = await client.post("/tokens/issue", data={**form, "csrf": token}, headers=HA)
         mcpb = await client.get("/connect/xomtra.mcpb", headers=HA)
-    assert cross.status_code == 403
+    assert missing.status_code == 403
+    assert forged.status_code == 403
     assert issued.status_code == 200
     token = issued.text.split("value='", 1)[1].split("'", 1)[0]
     info = store.verify(token_hash(token))
@@ -144,22 +151,43 @@ async def test_tokens_behind_ingress() -> None:
     assert manifest["user_config"]["url"]["default"] == endpoint
 
 
-async def test_fetch_metadata_decides_same_origin() -> None:
-    """Behind a reverse proxy in front of Home Assistant the browser's Origin differs from
-    X-Forwarded-Host; Sec-Fetch-Site (set by the browser only) still tells a form of
-    the page itself from another site's."""
+async def test_forms_behind_ingress_over_plain_http() -> None:
+    """HA opened over http in the LAN: the browser sends no Sec-Fetch-* (not a secure
+    context) and an Origin unlike the X-Forwarded-Host that reaches the add-on. The
+    form token decides; it belongs to one user and one Ingress session."""
+    app, _, _ = make_app()
+    form = {"owner": "Petr", "description": "laptop", "role": "xomtra.Reader", "days": "90"}
+    lan = {**HA, "origin": "http://homeassistant.lan:8123"}
+    other_session = {**HA, "x-ingress-path": "/api/hassio_ingress/other"}
+    other_user = {**HA, "x-remote-user-id": "1d2e3f"}
+    async with client_for(app) as client:
+        token = await _csrf(client, HA)
+        own = await client.post("/tokens/issue", data={**form, "csrf": token}, headers=lan)
+        session = await client.post(
+            "/tokens/issue", data={**form, "csrf": token}, headers=other_session
+        )
+        user = await client.post("/tokens/issue", data={**form, "csrf": token}, headers=other_user)
+    assert own.status_code == 200
+    assert session.status_code == 403
+    assert user.status_code == 403
+
+
+async def test_fetch_metadata_refuses_other_sites() -> None:
+    """Where the browser sends Sec-Fetch-Site (https), another site is refused even
+    with a valid form token."""
     app, _, _ = make_app()
     form = {"owner": "Petr", "description": "laptop", "role": "xomtra.Reader", "days": "90"}
     proxied = {**HA, "origin": "https://ha.example.org"}
     async with client_for(app) as client:
+        data = {**form, "csrf": await _csrf(client, HA)}
         own = await client.post(
-            "/tokens/issue", data=form, headers={**proxied, "sec-fetch-site": "same-origin"}
+            "/tokens/issue", data=data, headers={**proxied, "sec-fetch-site": "same-origin"}
         )
         other = await client.post(
-            "/tokens/issue", data=form, headers={**proxied, "sec-fetch-site": "cross-site"}
+            "/tokens/issue", data=data, headers={**proxied, "sec-fetch-site": "cross-site"}
         )
         sibling = await client.post(
-            "/tokens/issue", data=form, headers={**proxied, "sec-fetch-site": "same-site"}
+            "/tokens/issue", data=data, headers={**proxied, "sec-fetch-site": "same-site"}
         )
     assert own.status_code == 200
     assert other.status_code == 403
