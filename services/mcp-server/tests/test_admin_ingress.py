@@ -264,6 +264,11 @@ async def test_tokens_page_explains_the_flow_with_actions() -> None:
     assert f"href='{INGRESS}/connect/xomtra.mcpb' download" in resp.text
     assert "href='#issue'" in resp.text
     assert "<form id=issue " in resp.text
+    # Readable without the stylesheet too (a stale cache): every shape has its own
+    # colours and only the wide picture shows.
+    assert "<svg class='tall' display='none'" in resp.text
+    assert "<rect class='box' fill='none'" in resp.text
+    assert "<path class='ln req' fill='none'" in resp.text
 
 
 def test_values_are_formatted_for_the_locale() -> None:

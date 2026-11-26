@@ -334,6 +334,12 @@ def cards(items: Iterable[tuple[str, Any, str]]) -> str:
     )
 
 
+# Presentation attributes the stylesheet overrides; they keep the picture readable in
+# both themes when the stylesheet is missing or stale (an SVG shape is black by default).
+_FB = "#959cab"
+_FB_LINE = f"fill='none' stroke='{_FB}' stroke-width='1.5'"
+
+
 def _defs(p: str) -> str:
     """Arrow heads; ids per picture, a marker in a hidden SVG does not render."""
     return (
@@ -341,7 +347,7 @@ def _defs(p: str) -> str:
         + "".join(
             f"<marker id='{p}{n}' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' "
             f"markerHeight='7' orient='auto-start-reverse'><path class='{cls}' "
-            "d='M0 0L10 5L0 10z'/></marker>"
+            f"fill='{_FB}' d='M0 0L10 5L0 10z'/></marker>"
             for n, cls in (("a", "hd"), ("b", "hd req"))
         )
         + "</defs>"
@@ -360,22 +366,33 @@ def _box(
     mono: str = "",
 ) -> str:
     out = (
-        f"<rect class='box{' us' if us else ''}' x='{x}' y='{y}' width='{w}' height='{h}' rx='12'/>"
+        f"<rect class='box{' us' if us else ''}' {_FB_LINE} x='{x}' y='{y}' width='{w}' "
+        f"height='{h}' rx='12'/>"
     )
-    out += f"<text class='t' x='{x + 18}' y='{y + 32}'>{escape(title)}</text>"
+    out += f"<text class='t' fill='{_FB}' x='{x + 18}' y='{y + 32}'>{escape(title)}</text>"
     for i, line in enumerate(lines):
-        out += f"<text class='s' x='{x + 18}' y='{y + 56 + i * 18}'>{escape(line)}</text>"
+        y_line = y + 56 + i * 18
+        out += f"<text class='s' fill='{_FB}' x='{x + 18}' y='{y_line}'>{escape(line)}</text>"
     if mono:
-        out += f"<text class='m' x='{x + 18}' y='{y + h - 16}'>{escape(mono)}</text>"
+        out += f"<text class='m' fill='{_FB}' x='{x + 18}' y='{y + h - 16}'>{escape(mono)}</text>"
     return out
+
+
+def _line(cls: str, marker: str, d: str) -> str:
+    return f"<path class='{cls}' {_FB_LINE} marker-end='url(#{marker})' d='{d}'/>"
+
+
+def _label(x: int, y: int, text: str) -> str:
+    return f"<text class='a' fill='{_FB}' x='{x}' y='{y}'>{escape(text)}</text>"
 
 
 def _hotspot(x: int, y: int, w: int, href: str, label: str, *, download: bool = False) -> str:
     """A clickable pill on the picture (an SVG link, no script)."""
     return (
         f"<a class='hot' href='{escape(href)}'{' download' if download else ''}>"
-        f"<rect x='{x}' y='{y}' width='{w}' height='30' rx='15'/>"
-        f"<text x='{x + w // 2}' y='{y + 20}' text-anchor='middle'>{escape(label)}</text></a>"
+        f"<rect fill='#7d8bff' x='{x}' y='{y}' width='{w}' height='30' rx='15'/>"
+        f"<text fill='#0b0c0f' x='{x + w // 2}' y='{y + 20}' text-anchor='middle'>"
+        f"{escape(label)}</text></a>"
     )
 
 
@@ -413,18 +430,22 @@ def token_flow(prefix: str, mcpb: str) -> str:
         + _box(686, 40, 270, 150, title=HA[0], lines=HA[1], mono=HA[2])
         + get
         + issue
-        + "<path class='ln req' marker-end='url(#wb)' d='M278 88H339'/>"
-        "<text class='a' x='280' y='24'>1 request</text>"
-        "<text class='a' x='280' y='38'>+ Bearer token</text>"
-        "<path class='ln' marker-end='url(#wa)' d='M341 142H282'/>"
-        "<text class='a' x='280' y='212'>2 answer: data,</text>"
-        "<text class='a' x='280' y='226'>findings</text>"
-        "<path class='ln ro' marker-end='url(#wa)' d='M682 115H621'/>"
-        "<text class='a' x='621' y='24'>3 reads</text>"
-        "<text class='a' x='621' y='38'>continuously</text></svg>"
+        + _line("ln req", "wb", "M278 88H339")
+        + _label(280, 24, "1 request")
+        + _label(280, 38, "+ Bearer token")
+        + _line("ln", "wa", "M341 142H282")
+        + _label(280, 212, "2 answer: data,")
+        + _label(280, 226, "findings")
+        + _line("ln ro", "wa", "M682 115H621")
+        + _label(621, 24, "3 reads")
+        + _label(621, 38, "continuously")
+        + "</svg>"
     )
+    # Hidden by attribute as well as by the stylesheet, so that only one picture shows
+    # without it.
     tall = (
-        "<svg class='tall' viewBox='0 0 330 560' role='img' aria-labelledby='flow-t2'>"
+        "<svg class='tall' display='none' viewBox='0 0 330 560' role='img' "
+        "aria-labelledby='flow-t2'>"
         "<title id='flow-t2'>LLM agent, xomtra and Home Assistant</title>"
         + _defs("t")
         + _box(20, 0, 290, 130, title=AGENT[0], lines=AGENT[1], mono=AGENT[2])
@@ -432,13 +453,14 @@ def token_flow(prefix: str, mcpb: str) -> str:
         + _box(20, 440, 290, 120, title=HA[0], lines=HA[1], mono=HA[2])
         + get_t
         + issue_t
-        + "<path class='ln req' marker-end='url(#tb)' d='M110 134V204'/>"
-        "<text class='a' x='120' y='165'>1 request</text>"
-        "<text class='a' x='120' y='180'>+ token</text>"
-        "<path class='ln' marker-end='url(#ta)' d='M230 206V138'/>"
-        "<text class='a' x='238' y='165'>2 answer</text>"
-        "<path class='ln ro' marker-end='url(#ta)' d='M165 436V366'/>"
-        "<text class='a' x='175' y='405'>3 reads</text></svg>"
+        + _line("ln req", "tb", "M110 134V204")
+        + _label(120, 165, "1 request")
+        + _label(120, 180, "+ token")
+        + _line("ln", "ta", "M230 206V138")
+        + _label(238, 165, "2 answer")
+        + _line("ln ro", "ta", "M165 436V366")
+        + _label(175, 405, "3 reads")
+        + "</svg>"
     )
     return (
         f"<figure class='flow'>{wide}{tall}<figcaption>Issue a token and paste it into the "
