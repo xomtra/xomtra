@@ -11,6 +11,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Changed
+
+- The admin GUI has the look of xomtra.com: the xomtra mark and wordmark, Geist and
+  Geist Mono (bundled, no external requests), graphite and indigo colours, and a light
+  variant. Behind Home Assistant Ingress it follows Home Assistant's light or dark mode,
+  elsewhere the browser's. The add-on has an icon and a logo for the add-on store.
+
 ## [0.5.0] - 2026-11-25
 
 ### Added

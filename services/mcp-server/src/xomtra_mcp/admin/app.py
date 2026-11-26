@@ -21,6 +21,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
@@ -67,6 +68,14 @@ HEADERS = {
     "'self' https://login.microsoftonline.com",
     "Cache-Control": "no-store",
     "X-Frame-Options": "DENY",
+}
+# Fonts, icon and theme script of the GUI (xomtra.com look); a fixed allowlist.
+STATIC = Path(__file__).parent / "static"
+STATIC_TYPES = {
+    "Geist-Variable.woff2": "font/woff2",
+    "GeistMono-Variable.woff2": "font/woff2",
+    "favicon.svg": "image/svg+xml",
+    "theme.js": "text/javascript",
 }
 TOKEN_ROLES = ("xomtra.Reader", "xomtra.Admin")
 TOKEN_DAYS = (30, 90, 365, 0)
@@ -1156,6 +1165,16 @@ class AdminApp:
         async def css(_: Request) -> Response:
             return Response(CSS, media_type="text/css", headers={"Cache-Control": "max-age=3600"})
 
+        async def asset(request: Request) -> Response:
+            name = request.path_params.get("name") or request.url.path.rsplit("/", 1)[-1]
+            if name not in STATIC_TYPES:
+                return Response("Not found", status_code=404)
+            return Response(
+                (STATIC / name).read_bytes(),
+                media_type=STATIC_TYPES[name],
+                headers={"Cache-Control": "max-age=86400"},
+            )
+
         async def healthz(_: Request) -> Response:
             return JSONResponse({"status": "ok"})
 
@@ -1202,6 +1221,9 @@ class AdminApp:
             Route(f"{PREFIX}/connect", p("connect", self.connect_page)),
             Route(f"{PREFIX}/connect/{MCPB_FILENAME}", p("download_mcpb", self.mcpb)),
             Route(f"{PREFIX}/static.css", css),
+            Route(f"{PREFIX}/fonts/{{name}}", asset),
+            Route(f"{PREFIX}/favicon.svg", asset),
+            Route(f"{PREFIX}/theme.js", asset),
             Route(f"{PREFIX}/login", self.login),
             Route(f"{PREFIX}/auth/callback", self.callback),
             Route(f"{PREFIX}/auth/check", self.check),

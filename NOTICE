@@ -2,3 +2,7 @@ xomtra
 Copyright 2026 The xomtra Authors
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The admin GUI bundles the Geist and Geist Mono fonts, Copyright (c) 2023 Vercel, in
+collaboration with basement.studio, licensed under the SIL Open Font License 1.1 (see
+services/mcp-server/src/xomtra_mcp/admin/static/OFL-Geist.txt).

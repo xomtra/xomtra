@@ -171,3 +171,30 @@ def test_peer_address_comparison() -> None:
     assert not _same_address("::ffff:172.30.32.9", "172.30.32.2")
     assert not _same_address("172.30.32.2", "not-an-address")
     assert _same_address("testclient", "testclient")
+
+
+async def test_ingress_page_has_the_xomtra_look() -> None:
+    app, _, _ = make_app()
+    async with client_for(app) as client:
+        resp = await client.get("/tokens", headers=HA)
+        css = await client.get("/static.css", headers=HA)
+        font = await client.get("/fonts/Geist-Variable.woff2", headers=HA)
+        theme = await client.get("/theme.js", headers=HA)
+        icon = await client.get("/favicon.svg", headers=HA)
+        missing = await client.get("/fonts/..%2Fapp.py", headers=HA)
+    assert f'<script src="{INGRESS}/theme.js"></script>' in resp.text
+    assert f'href="{INGRESS}/favicon.svg"' in resp.text
+    assert '<a href="' + INGRESS + '/tokens" aria-current=page>Tokens</a>' in resp.text
+    assert "<b>xomtra</b><small>admin</small>" in resp.text
+    # Fonts resolve relative to the stylesheet, so they work under the Ingress path too.
+    assert 'url("fonts/Geist-Variable.woff2")' in css.text
+    assert "prefers-color-scheme: dark" in css.text
+    assert ":root[data-theme=dark]" in css.text
+    assert font.status_code == 200
+    assert font.headers["content-type"] == "font/woff2"
+    assert font.content[:4] == b"wOF2"
+    assert theme.status_code == 200
+    assert "darkMode" in theme.text
+    assert icon.status_code == 200
+    assert icon.headers["content-type"] == "image/svg+xml"
+    assert missing.status_code == 404
