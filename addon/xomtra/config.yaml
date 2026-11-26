@@ -5,7 +5,7 @@ name: xomtra
 version: "0.5.1"
 slug: xomtra
 description: History and analyses of your Home Assistant for Claude (MCP server)
-url: https://github.com/xomtra/xomtra
+url: https://xomtra.com
 arch:
   - amd64
   - aarch64

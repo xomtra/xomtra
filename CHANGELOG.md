@@ -35,6 +35,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   Geist Mono (bundled, no external requests), graphite and indigo colours. It is dark
   by default; behind Home Assistant Ingress it turns light when Home Assistant is in
   light mode. The add-on has an icon and a logo for the add-on store.
+- The add-on's website link in Home Assistant points to https://xomtra.com instead of
+  the GitHub repository.
 
 ## [0.5.1] - 2026-11-26
 
