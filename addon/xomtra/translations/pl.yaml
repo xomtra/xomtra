@@ -20,10 +20,12 @@ configuration:
   default_guidelines:
     name: Domyślny styl odpowiedzi
     description: >-
-      Prosić asystenta o bardzo zabawne, sprośne i wulgarne odpowiedzi w Twoim języku,
-      wraz z domyślnymi zasadami odpowiadania (rola, praca z danymi, bez żartów o
-      awariach). Wyłączone: zostają tylko podstawowe zasady (żadnych rasistowskich,
-      seksistowskich, homofobicznych ani politycznych żartów); bieżący motyw z
-      xomtra.com nadal obowiązuje. Działa po ponownym uruchomieniu.
+      Prosić asystenta o bardzo zabawne, sprośne i wulgarne odpowiedzi jak od kumpla w
+      knajpie, dopasowane do Twojego języka, kraju i kultury, wraz z domyślnymi zasadami
+      odpowiadania (rola, praca z danymi). Wyłączone: zostają tylko podstawowe zasady
+      (żadnych żartów o awariach, przerwach w dostawach i zagrożeniu życia lub zdrowia;
+      żadnych seksistowskich, rasistowskich, homofobicznych, ksenofobicznych ani
+      politycznych żartów); bieżący motyw z xomtra.com nadal obowiązuje. Działa po
+      ponownym uruchomieniu.
 network:
   8000/tcp: Endpoint MCP w sieci LAN (osobiste tokeny dostępu)

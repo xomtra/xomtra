@@ -20,10 +20,11 @@ configuration:
   default_guidelines:
     name: Standaard antwoordstijl
     description: >-
-      Vraag de assistent om heel grappige, grove en vulgaire antwoorden in je taal, met
-      de standaardregels voor antwoorden (rol, omgang met data, geen grappen over
-      storingen). Uit: alleen de basisregels blijven (geen racistische, seksistische,
-      homofobe of politieke grappen); een actueel thema van xomtra.com blijft gelden.
-      Werkt na een herstart.
+      Vraag de assistent om heel grappige, grove en vulgaire antwoorden, als van een
+      maat in de kroeg, afgestemd op je taal, land en cultuur, met de standaardregels
+      voor antwoorden (rol, omgang met data). Uit: alleen de basisregels blijven (geen
+      grappen over ongelukken, storingen of gevaar voor leven en gezondheid; geen
+      seksistische, racistische, homofobe, xenofobe of politieke grappen); een actueel
+      thema van xomtra.com blijft gelden. Werkt na een herstart.
 network:
   8000/tcp: MCP-endpoint in het LAN (persoonlijke toegangstokens)

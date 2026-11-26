@@ -20,10 +20,12 @@ configuration:
   default_guidelines:
     name: Standard-Antwortstil
     description: >-
-      Den Assistenten um sehr witzige, derbe und vulgäre Antworten in Ihrer Sprache
-      bitten, mit den Standardregeln für Antworten (Rolle, Umgang mit Daten, keine Witze
-      über Störungen). Aus: Es bleiben nur die Grundregeln (keine rassistischen,
-      sexistischen, homophoben oder politischen Witze); ein aktuelles Thema von
-      xomtra.com gilt weiter. Wirkt nach einem Neustart.
+      Den Assistenten um sehr witzige, derbe und vulgäre Antworten bitten, wie von einem
+      Kumpel in der Kneipe, passend zu Ihrer Sprache, Ihrem Land und Ihrer Kultur, mit
+      den Standardregeln für Antworten (Rolle, Umgang mit Daten). Aus: Es bleiben nur
+      die Grundregeln (keine Witze über Unfälle, Ausfälle oder Gefahr für Leben und
+      Gesundheit; keine sexistischen, rassistischen, homophoben, fremdenfeindlichen oder
+      politischen Witze); ein aktuelles Thema von xomtra.com gilt weiter. Wirkt nach
+      einem Neustart.
 network:
   8000/tcp: MCP-Endpunkt im LAN (persönliche Zugriffstokens)

@@ -101,11 +101,14 @@ async def test_instructions_carry_the_default_guardrails() -> None:
     assert "locks, alarms" in text
     assert "occupant of the property" in text
     assert "very funny, crude and vulgar" in text
-    assert "language and country of the installation" in text
-    assert "Never guess or play on the user's wealth, social status" in text
+    assert "language, country, culture and locality of the installation" in text
+    assert "Never guess or play on the user's wealth or social status" in text
+    assert "guys in the pub" in text
+    assert "line of work, but only when the user mentioned it" in text
     assert "Joke about the user only with tact" in text
-    assert "racist, sexist, homophobic or political jokes" in text
-    assert "No jokes and no vulgarity about accidents, faults" in text
+    assert "sexist, racist, homophobic, xenophobic or political jokes or innuendo" in text
+    assert "No jokes, irony or vulgarity about accidents, faults, outages" in text
+    assert "threatens life or health" in text
 
 
 async def test_guidelines_reach_the_model_without_instructions() -> None:
@@ -126,11 +129,13 @@ async def test_default_guidelines_can_be_turned_off() -> None:
     settings = dev_settings().model_copy(update={"default_guidelines": False})
     srv = create_server(settings)
     assert "crude" not in (srv.instructions or "")
-    assert "racist, sexist, homophobic or political" in (srv.instructions or "")
+    instructions = " ".join((srv.instructions or "").split())
+    assert "xenophobic or political jokes" in instructions
+    assert "threatens life or health" in instructions
     async with Client(srv) as client:
         info = (await client.call_tool("server_info", {})).data
     # The core rules stay, the default style goes.
-    assert "racist, sexist, homophobic or political" in info["answer_guidelines"]
+    assert "xenophobic or political jokes" in info["answer_guidelines"]
     assert "crude" not in info["answer_guidelines"]
 
 

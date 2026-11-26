@@ -283,7 +283,8 @@ async def test_rules_travel_with_data_tools(data: DataAccess) -> None:
         assert "findings are hypotheses, not causes" in tools[name], name
         assert "presence, sleep, health" in tools[name], name
         assert "crude and vulgar" in tools[name], name
-        assert "no racist, sexist, homophobic or political jokes" in tools[name], name
+        assert "racist, homophobic, xenophobic or political" in tools[name], name
+        assert "threats to life or health" in tools[name], name
     assert "\n\nHow to answer (xomtra)" in tools["get_findings"]
     findings = await call(srv, "get_findings")
     summary = await call(srv, "get_weekly_summary")
