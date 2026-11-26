@@ -157,3 +157,18 @@ def test_main_writes_the_sample(tmp_path: Path, capsys: pytest.CaptureFixture[st
         rows = list(csv.DictReader(f))
     assert 0 < len(rows) <= 40
     assert set(rows[0]) == set(us.COLUMNS)
+
+
+def test_pilot_is_calibration_outside_the_sample() -> None:
+    frame = (
+        frame_rows(300, "correlation|kept|savings", "calibration")
+        + frame_rows(50, "anomaly|kept|none", "calibration")
+        + frame_rows(30, "anomaly|kept|fault", "validation")
+        + frame_rows(30, "anomaly|kept|none", "test")
+    )
+    sample = us.stratified_sample(frame, total=100, min_per_cell=20, human_per_set=10)
+    pilot = us.pilot_sample(frame, sample, 20)
+    assert len(pilot) == 20
+    assert {r["split"] for r in pilot} == {"calibration"}
+    assert not {r["sample_id"] for r in pilot} & {r["sample_id"] for r in sample}
+    assert {r["cell"] for r in pilot} == {"correlation|kept|savings", "anomaly|kept|none"}
