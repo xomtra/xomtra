@@ -1058,7 +1058,7 @@ wheels = [
 
 [[package]]
 name = "hacore"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "packages/hacore" }
 dependencies = [
     { name = "duckdb" },
@@ -3564,7 +3564,7 @@ wheels = [
 
 [[package]]
 name = "xomtra-ingest"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "services/ingest" }
 dependencies = [
     { name = "dagster" },
@@ -3589,7 +3589,7 @@ requires-dist = [
 
 [[package]]
 name = "xomtra-mcp"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "services/mcp-server" }
 dependencies = [
     { name = "fastmcp" },
