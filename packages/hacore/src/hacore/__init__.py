@@ -17,6 +17,7 @@ from hacore.registry import (
     RegistrySnapshot,
     fetch_registries,
 )
+from hacore.secretstore import load_env as _load_env
 
 __all__ = [
     "Area",
@@ -34,3 +35,6 @@ __all__ = [
     "fetch_registries",
     "websocket_url",
 ]
+
+# Compose edition: internal secrets come from the secrets volume (ADR 077).
+_load_env()

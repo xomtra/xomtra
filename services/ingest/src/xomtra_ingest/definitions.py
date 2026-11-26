@@ -182,6 +182,10 @@ def restate_after_catchup(context: SensorEvaluationContext) -> SensorResult | Sk
     )
 
 
+def ha_connected(_context: object = None) -> bool:
+    return IngestSettings().ha_resolver().get() is not None
+
+
 def build_definitions(settings: IngestSettings | None = None) -> Definitions:
     tz = (settings or IngestSettings()).timezone
     return Definitions(
@@ -200,6 +204,8 @@ def build_definitions(settings: IngestSettings | None = None) -> Definitions:
                 cron_schedule="7 * * * *",
                 execution_timezone=tz,
                 default_status=DefaultScheduleStatus.RUNNING,
+                # No failed runs before Home Assistant is connected (ADR 077).
+                should_execute=ha_connected,
             ),
             ScheduleDefinition(
                 job=retention_daily,

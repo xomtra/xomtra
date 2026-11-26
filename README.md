@@ -34,7 +34,7 @@ docker run -d --name ha -p 127.0.0.1:8123:8123 \
   -v "$PWD/packages/hacore/tests/contract/ha-config:/config" homeassistant/home-assistant:stable
 XOMTRA_CONTRACT_HA_URL=http://127.0.0.1:8123 uv run pytest -m contract
 
-cp deploy/compose/.env.example deploy/compose/.env   # then edit the values
+# No .env needed (ADR 077); the setup link is in `docker compose logs admin`.
 docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.dev.yaml up -d --build
 ```
 
@@ -49,6 +49,9 @@ only allowed when it listens on a loopback address (local development).
 
 Or add `https://github.com/xomtra/xomtra` under Settings → Add-ons → Add-on store → ⋮ →
 Repositories.
+
+**Docker Compose** on any Linux machine: `docker compose up -d` in `deploy/compose`, then
+connect Home Assistant in the browser, see [docs/setup/docker.md](docs/setup/docker.md).
 
 Releases follow Semantic Versioning; each one lists its images pinned by digest and the
 changes in [CHANGELOG.md](CHANGELOG.md). Install and upgrade from a release tag as
