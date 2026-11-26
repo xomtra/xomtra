@@ -11,6 +11,14 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Changed
+
+- The documentation and the Claude Desktop extension now say precisely what "read only"
+  means: xomtra only reads and never calls Home Assistant services, and the assistant
+  gets read-only tools over xomtra's own data. Home Assistant has no read-only tokens,
+  so this is guaranteed by xomtra's code; the Docker guide explains why a separate
+  non-admin user is still recommended (access can be revoked at any time).
+
 ## [0.6.2] - 2026-11-26
 
 ### Fixed
