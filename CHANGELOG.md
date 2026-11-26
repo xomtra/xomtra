@@ -24,6 +24,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Fixed
 
+- Admin GUI: Safari saved the Claude Desktop extension as `xomtra.zip`. It is now
+  sent as `application/octet-stream` with a plain file name and saves as
+  `xomtra.mcpb`.
 - Admin GUI after an upgrade: the browser kept the previous version's stylesheet and
   script (cached for an hour or a day) and showed the new pages half unstyled. Their
   URLs now carry a version (also the tips and the icon), so an upgrade loads the new

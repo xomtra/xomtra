@@ -418,8 +418,9 @@ def _label(x: int, y: int, text: str) -> str:
 
 def _hotspot(x: int, y: int, w: int, href: str, label: str, *, download: bool = False) -> str:
     """A clickable pill on the picture (an SVG link, no script)."""
+    dl = f" download='{escape(href.rsplit('/', 1)[-1])}'" if download else ""
     return (
-        f"<a class='hot' href='{escape(href)}'{' download' if download else ''}>"
+        f"<a class='hot' href='{escape(href)}'{dl}>"
         f"<rect fill='#7d8bff' x='{x}' y='{y}' width='{w}' height='30' rx='15'/>"
         f"<text fill='#0b0c0f' x='{x + w // 2}' y='{y + 20}' text-anchor='middle'>"
         f"{escape(label)}</text></a>"

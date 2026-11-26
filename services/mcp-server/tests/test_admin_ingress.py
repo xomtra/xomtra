@@ -152,6 +152,9 @@ async def test_tokens_behind_ingress() -> None:
     with zipfile.ZipFile(io.BytesIO(mcpb.content)) as archive:
         manifest = json.loads(archive.read("manifest.json"))
     assert manifest["user_config"]["url"]["default"] == endpoint
+    # Safari saves an application/zip download as .zip whatever the file name says.
+    assert mcpb.headers["content-type"] == "application/octet-stream"
+    assert 'filename="xomtra.mcpb"' in mcpb.headers["content-disposition"]
 
 
 async def test_forms_behind_ingress_over_plain_http() -> None:

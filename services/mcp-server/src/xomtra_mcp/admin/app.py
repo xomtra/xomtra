@@ -1256,7 +1256,8 @@ class AdminApp:
         )
         return (
             "<h2>Claude Desktop</h2><ol>"
-            f"<li>Download <a href='{prefix()}/connect/{MCPB_FILENAME}'>{MCPB_FILENAME}</a> "
+            f"<li>Download <a href='{prefix()}/connect/{MCPB_FILENAME}' "
+            f"download='{MCPB_FILENAME}'>{MCPB_FILENAME}</a> "
             f"(address <code>{e(url)}</code> is filled in) and open it: Claude Desktop "
             "shows the extension and asks for the token.</li>"
             + (
@@ -1299,8 +1300,12 @@ class AdminApp:
         data = build_mcpb(self._endpoint())
         return Response(
             data,
-            media_type="application/zip",
-            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(MCPB_FILENAME)}"},
+            # Not application/zip: Safari then saves it as .zip.
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{MCPB_FILENAME}"; '
+                f"filename*=UTF-8''{quote(MCPB_FILENAME)}"
+            },
         )
 
     # ---- app -----------------------------------------------------------------------
