@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.7.1 - 2026-11-26
+
+### Added
+
+- Option to turn off the default answer style (add-on option `default_guidelines`,
+  `XOMTRA_DEFAULT_GUIDELINES=false` elsewhere), with a note on the admin pages for
+  tokens and clients (ADR 080).
+- Place for a central theme from xomtra.com (ADR 075, e.g. Christmas, Easter,
+  Halloween): when one is active it comes first in `answer_guidelines` and takes
+  precedence over the default style. It cannot be turned off, is forgotten 24 hours
+  after it was received and never overrides the core rules.
+
+### Changed
+
+- Default answer style: very funny, crude and vulgar, like a mate in the pub, fitted to
+  the language, country, culture and locality of the installation and to the owner's
+  line of work when the user mentions it (never to wealth or status), for the user as
+  the occupant of the property; teasing the user only with tact; facts stay exact
+  (ADR 073, 080).
+- Humour made personal and a bit politically incorrect: the assistant uses what it
+  already knows about the user from its own context (memory, profile, conversation),
+  never personal details inferred from the house data, never the user's clients or
+  employers by name, always within the core rules (ADR 080).
+- Core rules that always apply, also with the default style off and above a central
+  theme: no jokes, irony or vulgarity about accidents, faults, outages, risky
+  situations or threats to life or health; no sexist, racist, homophobic, xenophobic
+  or political jokes or innuendo and no slurs against any group.
+
 ## 0.7.0 - 2026-11-26
 
 ### Added
@@ -138,27 +166,5 @@
   unique constraint ducklake_snapshot_pkey") as errors: the stream and the jobs write
   at the same time and DuckLake retries such a commit by design. Errors of the catalog
   database are left to the services, which log them.
-
-## 0.5.1 - 2026-11-26
-
-### Fixed
-
-- Home Assistant add-on: it did not start ("expected url" for `mcp_url`). The empty
-  default of the optional option failed the Supervisor's check of `url?`; optional
-  options now have no default, and a test keeps the defaults in line with the schema.
-- `migrate-from-hammond.sh` stopped at its first step: `docker compose -p hammond down`
-  read the new `compose.yaml` with the old `.env` and failed on the missing `XOMTRA_*`
-  variables. It now stops and removes the old containers and networks by their compose
-  labels.
-- Postgres (add-on and compose) logs errors without the failed statement. DuckLake
-  retries a commit when another writer took its snapshot id, and the statement filled
-  the add-on log with Home Assistant data.
-- Claude Desktop extension downloaded from the admin GUI: for a plain `http://` address
-  (the add-on in the LAN) *Allow unencrypted http://* is checked by default; before, the
-  extension refused the add-on's endpoint until the user found the checkbox.
-- Admin GUI behind Home Assistant Ingress: every form (issuing a token, settings) was
-  refused with 403 when Home Assistant is opened through another address than its own
-  host, e.g. behind a reverse proxy. The cross-site check now trusts the browser's
-  `Sec-Fetch-Site` header and compares the Origin only where that header is missing.
 
 Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md
