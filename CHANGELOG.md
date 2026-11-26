@@ -11,6 +11,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Fixed
+
+- Home Assistant add-on: after a restore from a backup (which leaves the lake out) it
+  failed on Parquet files the catalog still named. It now detects the missing lake,
+  starts a new one and loads the history from Home Assistant again; tokens, audit and
+  analysis settings stay.
+
 ## [0.5.1] - 2026-11-26
 
 ### Fixed

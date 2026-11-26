@@ -57,6 +57,13 @@ full edition does not exist here. Without the `mcp_url` option, the connect page
 | `/data/lake` | Parquet files of the lake (tens of GB in large installations) | no |
 | `/data/secrets.env` | generated internal secrets | yes |
 
+A restore without the lake (another machine, a new disk) is detected on start: the
+catalog names Parquet files, but `/data/lake` is empty. The add-on then drops the
+databases derived from the lake (`ducklake`, `sqlmesh`, `ops`), starts a new lake and
+loads the history again from what Home Assistant still holds (states for the recorder's
+`purge_keep_days`, long-term statistics in full). Tokens, audit and analysis settings
+(database `audit`) stay.
+
 Requirements: SSD, at least 4 GB RAM and 20 GB of free space. Home Assistant Green
 (32 GB eMMC) and SD cards are not supported; for state retention over one year use the
 virtual appliance.
