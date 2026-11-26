@@ -8,6 +8,22 @@ until pg_isready -q -h 127.0.0.1; do
   [ "$i" -lt 60 ] || { echo "Postgres did not start" >&2; exit 1; }
   sleep 1
 done
+# Home Assistant backups leave the lake out (backup_exclude). After a restore without it
+# (a new machine, a lost disk) the catalog names Parquet files that are gone: start the
+# lake and its derived state anew, like a first start, and let the worker load the
+# history from Home Assistant again. Tokens, audit and analysis settings (database
+# audit) stay.
+LAKE=/data/lake
+if [ -z "$(ls -A "$LAKE" 2>/dev/null)" ] && PGPASSWORD=$POSTGRES_PASSWORD psql -qtA \
+  -h 127.0.0.1 -U postgres -d ducklake \
+  -c "SELECT 1 FROM ducklake_data_file LIMIT 1" 2>/dev/null | grep -q 1; then
+  echo "The lake is missing (restored from a backup without it): starting a new lake;" \
+    "the history is loaded from Home Assistant again." >&2
+  for db in ducklake sqlmesh ops; do
+    PGPASSWORD=$POSTGRES_PASSWORD psql -v ON_ERROR_STOP=1 -q -h 127.0.0.1 -U postgres \
+      -d postgres -c "DROP DATABASE IF EXISTS $db WITH (FORCE)"
+  done
+fi
 PGPASSWORD=$POSTGRES_PASSWORD \
 DUCKLAKE_DB=ducklake DUCKLAKE_USER=ducklake DUCKLAKE_PASSWORD=$DUCKLAKE_PG_PASSWORD \
 OPS_USER=xomtra_ops OPS_PASSWORD=$OPS_PG_PASSWORD DAGSTER_DB=dagster SQLMESH_DB=sqlmesh \

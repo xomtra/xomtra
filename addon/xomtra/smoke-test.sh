@@ -64,9 +64,23 @@ docker exec "$NAME" test -s /data/secrets.env
 docker exec "$NAME" test -s /data/postgres/PG_VERSION
 test "$(docker exec "$NAME" stat -c %a /data/secrets.env)" = 600
 
-# A restart keeps the generated secrets (the catalog stays readable).
+# psql as the cluster's superuser inside the add-on; prints the bare result.
+psql_q() { # DB SQL
+  docker exec "$NAME" sh -c '. /data/secrets.env && PGPASSWORD=$POSTGRES_PASSWORD psql -qtA -h 127.0.0.1 -U postgres -d "$1" -c "$2"' sh "$1" "$2"
+}
+
+# A restart keeps the generated secrets (the catalog stays readable). The restart also
+# plays a restore from a Home Assistant backup, which leaves the lake out
+# (backup_exclude): one Parquet file in the catalog, an empty /data/lake.
+docker exec "$NAME" sh -c '. xomtra-env && s6-setuidgid xomtra python3 -c "
+from hacore.lake import LakeSettings, connect
+connect(LakeSettings.from_env()).execute(\"CREATE TABLE lake.smoke_restore AS SELECT 1 AS x\")"'
+test "$(psql_q ducklake 'SELECT count(*) > 0 FROM ducklake_data_file')" = t
+audit_oid=$(psql_q postgres "SELECT oid FROM pg_database WHERE datname = 'audit'")
 before=$(docker exec "$NAME" md5sum /data/secrets.env)
-docker restart "$NAME" >/dev/null
+docker stop "$NAME" >/dev/null
+docker run --rm -v "$DATA:/data" --entrypoint find "$IMAGE" /data/lake -mindepth 1 -delete
+docker start "$NAME" >/dev/null
 i=0
 until curl -fsS http://127.0.0.1:18000/healthz >/dev/null 2>&1; do
   i=$((i + 1))
@@ -74,6 +88,11 @@ until curl -fsS http://127.0.0.1:18000/healthz >/dev/null 2>&1; do
   sleep 2
 done
 test "$before" = "$(docker exec "$NAME" md5sum /data/secrets.env)"
+# The lost lake was started anew; the audit database (tokens, settings) is the same one.
+docker logs "$NAME" 2>&1 | grep -q 'The lake is missing'
+test "$(psql_q ducklake 'SELECT count(*) FROM ducklake_data_file')" = 0
+test "$(psql_q postgres "SELECT oid FROM pg_database WHERE datname = 'audit'")" = "$audit_oid"
+echo "Restore without the lake starts a new lake and keeps the audit database"
 
 # Memory at rest (target <= 2 GiB, plan 1c.2 PR 9): every service has started and
 # answered once; the lake is empty here, so this is the floor, not a measurement with
