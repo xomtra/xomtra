@@ -252,6 +252,6 @@ function main() {
   });
 }
 
-if (require.main === module) main();
-
-module.exports = { Bridge, config, sseEvents };
+// Always start: Claude Desktop runs the extension in its built-in Node (an Electron
+// utility process), where require.main is not this module.
+main();

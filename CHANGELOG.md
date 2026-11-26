@@ -25,6 +25,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Fixed
 
+- Claude Desktop extension did not start in Claude Desktop's built-in Node.js
+  ("Unable to connect to extension server"): the bridge only started when run as the
+  main script. It now always starts.
 - Claude Desktop extension: a server it cannot connect to (wrong address, or on macOS
   Claude not allowed in Local Network) now gives an error with a hint within 10 s
   instead of Claude Desktop's "Unable to connect to extension server" after a minute.

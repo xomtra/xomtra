@@ -351,13 +351,17 @@ def run_bridge(
     lines: list[dict[str, Any]],
     wait_for: int,
     env: dict[str, str] | None = None,
+    *,
+    required: bool = False,
 ) -> list[Any]:
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is not installed")
     script = Path(desktop.__file__).parent / "server" / "index.js"
+    # required: loaded by another module, as Claude Desktop's built-in Node does.
+    args = [node, "-e", f"require({json.dumps(str(script))})"] if required else [node, str(script)]
     proc = subprocess.Popen(  # noqa: S603 - test runs our own script
-        [node, str(script)],
+        args,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -405,6 +409,16 @@ def test_desktop_bridge_end_to_end(running_local_server: tuple[str, str, Any]) -
     who = by_id[3]["result"]["structuredContent"]
     assert who["username"] == "jana"
     assert who["identity_provider"] == "token"
+
+
+def test_desktop_bridge_starts_when_another_module_loads_it(
+    running_local_server: tuple[str, str, Any],
+) -> None:
+    """Claude Desktop's built-in Node loads the script from its own loader, where
+    require.main is not the script; the bridge must answer there too."""
+    url, token, _ = running_local_server
+    replies = run_bridge(url, token, [INIT], wait_for=1, required=True)
+    assert replies[0]["result"]["serverInfo"]["name"] == "xomtra"
 
 
 def test_desktop_bridge_reports_a_refused_token(
