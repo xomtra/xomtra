@@ -105,6 +105,7 @@ async def test_instructions_carry_the_default_guardrails() -> None:
     assert "never guess the user's wealth or social status" in text
     assert "guys in the pub" in text
     assert "a bit politically incorrect" in text
+    assert "property owner's line of work" in text
     assert "from your own context (your memory, their profile, this conversation)" in text
     assert "Never infer personal details from the house data" in text
     assert "Never name the user's clients or employers" in text
