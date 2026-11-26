@@ -100,19 +100,31 @@ async def test_instructions_carry_the_default_guardrails() -> None:
     assert "presence, sleep, health" in text
     assert "locks, alarms" in text
     assert "occupant of the property" in text
+    # Default style: friendly with light humour; the pub style is an option.
+    assert "friendly and warm" in text
+    assert "crude" not in text
+    assert "Joke about the user only with tact" in text
+    assert "sexist, racist, homophobic or xenophobic jokes or innuendo" in text
+    assert "no politically or religiously tinged jokes" in text
+    assert "No jokes, irony or vulgarity about accidents, faults, outages" in text
+    assert "threatens life or health" in text
+
+
+async def test_pub_style_is_an_option() -> None:
+    """ADR 080: the crude pub style, personal humour included, only when chosen."""
+    settings = dev_settings().model_copy(update={"answer_style": "pub"})
+    text = " ".join((create_server(settings).instructions or "").split())
     assert "very funny, crude, vulgar and a bit politically incorrect" in text
+    assert "never in the areas of the core rules" in text
     assert "language, country, culture and locality of the installation" in text
     assert "never guess the user's wealth or social status" in text
     assert "guys in the pub" in text
-    assert "a bit politically incorrect" in text
     assert "property owner's line of work" in text
     assert "from your own context (your memory, their profile, this conversation)" in text
     assert "Never infer personal details from the house data" in text
     assert "Never name the user's clients or employers" in text
-    assert "Joke about the user only with tact" in text
-    assert "sexist, racist, homophobic, xenophobic or political jokes or innuendo" in text
-    assert "No jokes, irony or vulgarity about accidents, faults, outages" in text
-    assert "threatens life or health" in text
+    assert "no politically or religiously tinged jokes" in text
+    assert "friendly and warm" not in text
 
 
 async def test_guidelines_reach_the_model_without_instructions() -> None:
@@ -134,12 +146,12 @@ async def test_default_guidelines_can_be_turned_off() -> None:
     srv = create_server(settings)
     assert "crude" not in (srv.instructions or "")
     instructions = " ".join((srv.instructions or "").split())
-    assert "xenophobic or political jokes" in instructions
+    assert "politically or religiously tinged" in instructions
     assert "threatens life or health" in instructions
     async with Client(srv) as client:
         info = (await client.call_tool("server_info", {})).data
     # The core rules stay, the default style goes.
-    assert "xenophobic or political jokes" in info["answer_guidelines"]
+    assert "politically or religiously tinged" in " ".join(info["answer_guidelines"].split())
     assert "crude" not in info["answer_guidelines"]
 
 
@@ -153,7 +165,7 @@ async def test_central_theme_takes_precedence_and_expires() -> None:
     theme = Theme("Christmas: add a festive touch.", received_at=now)
     guidelines = Guidelines(defaults=True, theme=lambda: theme)
     text = guidelines.text(now) or ""
-    assert text.index("political jokes") < text.index("Christmas")
+    assert text.index("religiously tinged") < text.index("Christmas")
     assert text.index("Christmas") < text.index("occupant of the property")
     assert "never over the core" in " ".join(text.split())
     assert "2026-12-02 12:00 UTC" in text
@@ -163,7 +175,7 @@ async def test_central_theme_takes_precedence_and_expires() -> None:
     assert not long.active(now + timedelta(hours=25))
     # The theme applies even with the default guidelines off.
     off = Guidelines(defaults=False, theme=lambda: theme)
-    assert "political jokes" in off.tool_rules
+    assert "politically or religiously tinged" in off.tool_rules
     assert "Christmas" in off.text(now)
     assert "occupant" not in off.text(now)
     assert "Christmas" not in off.text(now + timedelta(days=2))

@@ -11,6 +11,25 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Answer style option (add-on option `answer_style`, `XOMTRA_ANSWER_STYLE`): `friendly`
+  (default) or `pub`, the crude style of 0.7.x with personal humour (ADR 080).
+
+### Changed
+
+- Default answer style is friendly with light humour; the crude pub style is an option.
+- Core rules also forbid politically or religiously tinged jokes and innuendo, in every
+  style and theme.
+- **Upgrade note:** with Home Assistant sign-in, only Home Assistant administrators get
+  in by default (`XOMTRA_HA_ROLE_MAP=admin=xomtra.Admin,user=`). To let other users
+  read, set `user=xomtra.Reader`.
+- Personal tokens expire after at most a year (30, 90 or 365 days, 90 by default); the
+  option "never" is gone. Existing tokens keep their expiry.
+- Admin GUI: the note on AI assistants says plainly that claude.ai needs an installation
+  on its own virtual machine with a public address and that ChatGPT and other cloud
+  assistants are not supported yet.
+
 ## [0.7.1] - 2026-11-26
 
 ### Added

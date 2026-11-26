@@ -218,7 +218,7 @@ services:
       # Sign-in with a Home Assistant account (XOMTRA_AUTH_MODE=ha, ADR 053).
       XOMTRA_HA_AUTH_URL: ${XOMTRA_HA_AUTH_URL:-}
       XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
-      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=xomtra.Reader}
+      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=}
       XOMTRA_ENTRA_REQUIRED_SCOPES: ${XOMTRA_ENTRA_REQUIRED_SCOPES:-mcp.access}
       # Optional: Home Assistant is normally entered in the admin GUI (ADR 077).
       XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
@@ -232,6 +232,7 @@ services:
       XOMTRA_QUERY_TIMEOUT_SECONDS: ${XOMTRA_QUERY_TIMEOUT_SECONDS:-30}
       # Default answer style and rules for the assistant (ADR 073, 080).
       XOMTRA_DEFAULT_GUIDELINES: ${XOMTRA_DEFAULT_GUIDELINES:-true}
+      XOMTRA_ANSWER_STYLE: ${XOMTRA_ANSWER_STYLE:-friendly}
       # DuckDB of query_sql/get_timeseries; spills to /data beyond the memory limit.
       XOMTRA_DUCKDB_MEMORY_LIMIT: ${XOMTRA_MCP_DUCKDB_MEMORY_LIMIT:-768MB}
       XOMTRA_DUCKDB_THREADS: ${XOMTRA_DUCKDB_THREADS:-2}
@@ -346,7 +347,7 @@ services:
       # Sign-in with a Home Assistant account (XOMTRA_AUTH_MODE=ha, ADR 053).
       XOMTRA_HA_AUTH_URL: ${XOMTRA_HA_AUTH_URL:-}
       XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
-      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=xomtra.Reader}
+      XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=}
       # MCP endpoint shown with new personal tokens (local access); default <base_url>/mcp.
       XOMTRA_MCP_URL: ${XOMTRA_MCP_URL:-}
       XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}

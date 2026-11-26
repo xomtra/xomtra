@@ -18,14 +18,20 @@ configuration:
       http://homeassistant.local:8000/mcp. Puste: panel administracyjny ustali go z
       adresu, pod którym otwarto Home Assistant.
   default_guidelines:
-    name: Domyślny styl odpowiedzi
+    name: Zasady odpowiadania
     description: >-
-      Prosić asystenta o bardzo zabawne, sprośne i wulgarne odpowiedzi jak od kumpla w
-      knajpie, dopasowane do Twojego języka, kraju i kultury, wraz z domyślnymi zasadami
-      odpowiadania (rola, praca z danymi). Wyłączone: zostają tylko podstawowe zasady
-      (żadnych żartów o awariach, przerwach w dostawach i zagrożeniu życia lub zdrowia;
-      żadnych seksistowskich, rasistowskich, homofobicznych, ksenofobicznych ani
-      politycznych żartów); bieżący motyw z xomtra.com nadal obowiązuje. Działa po
+      Wysyłać asystentowi domyślne zasady odpowiadania (rola, praca z danymi, takt) w
+      wybranym stylu. Wyłączone: zostają tylko podstawowe zasady (żadnych żartów o
+      awariach, przerwach w dostawach i zagrożeniu życia lub zdrowia; żadnych
+      seksistowskich, rasistowskich, homofobicznych, ksenofobicznych, politycznych ani
+      religijnych żartów); bieżący motyw z xomtra.com nadal obowiązuje. Działa po
       ponownym uruchomieniu.
+  answer_style:
+    name: Styl odpowiedzi
+    description: >-
+      friendly: przyjazne odpowiedzi z lekkim humorem (domyślnie). pub: bardzo zabawne,
+      sprośne i wulgarne odpowiedzi jak od kumpla w knajpie, dopasowane do Twojego
+      języka, kraju i kultury i osobiste według tego, co asystent o Tobie wie;
+      podstawowe zasady nadal obowiązują. Działa po ponownym uruchomieniu.
 network:
   8000/tcp: Endpoint MCP w sieci LAN (osobiste tokeny dostępu)
