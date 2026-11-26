@@ -8,7 +8,8 @@ import uvicorn
 
 from hacore.lake import LakeSettings
 from xomtra_mcp.admin.app import AdminApp
-from xomtra_mcp.admin.config import AdminSettings
+from xomtra_mcp.admin.config import PREFIX, AdminSettings
+from xomtra_mcp.admin.setup import log_setup_link
 from xomtra_mcp.audit import AuditSink, LogAuditSink, PostgresAuditSink
 from xomtra_mcp.data import DataAccess
 
@@ -29,6 +30,7 @@ def main() -> None:
     dsn = settings.audit_dsn
     audit: AuditSink = PostgresAuditSink(dsn) if dsn else LogAuditSink()
     app = AdminApp(settings, data=data, audit=audit).build()
+    _announce_setup(settings)
     uvicorn.run(
         app,
         host=settings.host,
@@ -40,6 +42,16 @@ def main() -> None:
         log_level=settings.log_level.lower(),
         server_header=False,
     )
+
+
+def _announce_setup(settings: AdminSettings) -> None:
+    """Prints the one-time setup link while Home Assistant is not connected (ADR 077)."""
+    resolver = settings.ha_resolver()
+    key = settings.admin_session_key
+    if not resolver.storable or key is None or resolver.get() is not None:
+        return
+    base = str(settings.base_url or "https://<address-of-this-server>")
+    log_setup_link(base, PREFIX, key.get_secret_value())
 
 
 if __name__ == "__main__":

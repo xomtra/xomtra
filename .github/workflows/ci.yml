@@ -136,6 +136,11 @@ jobs:
       AUDIT_PG_PASSWORD: ci-audit-'quote
       AUDIT_ADMIN_PG_PASSWORD: ci-audit-admin
       XOMTRA_ADMIN_SESSION_KEY: ci-dummy-admin-session-key-at-least-32-chars
+      # The steps below run the public mode with Entra and the values above, which
+      # secrets-init takes over like an existing .env (ADR 077); the zero-config step
+      # at the end starts without any of them.
+      XOMTRA_ACCESS_MODE: public
+      XOMTRA_AUTH_MODE: entra
       ADMIN_CIDR: 192.0.2.0/24
       XOMTRA_HA_URL: http://ha:8123
       S3_ACCESS_KEY: ci-access
@@ -385,7 +390,7 @@ jobs:
         run: |
           services=$(docker compose config --services | sort | tr '\n' ' ')
           echo "$services"
-          [ "$services" = "admin caddy ducklake-init mcp postgres postgres-init worker " ]
+          [ "$services" = "admin caddy ducklake-init mcp postgres postgres-init secrets-init worker " ]
           docker compose up -d --wait --wait-timeout 180 mcp
           docker compose up --no-start worker
           docker network connect xomtra-lite_egress ha
@@ -408,12 +413,74 @@ jobs:
           assert files
           PY
           docker compose exec -T mcp python -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8000/healthz').read())"
+      - name: Smoke test zero-config install (no .env, setup page, ADR 077)
+        working-directory: deploy/compose
+        env:
+          COMPOSE_PROJECT_NAME: xomtra-fresh
+        run: |
+          ha_token=$XOMTRA_HA_TOKEN
+          # Nothing from the job environment: like `docker compose up -d` on a new machine.
+          unset POSTGRES_PASSWORD DUCKLAKE_PG_PASSWORD OPS_PG_PASSWORD AUDIT_PG_PASSWORD \
+            AUDIT_ADMIN_PG_PASSWORD S3_ACCESS_KEY S3_SECRET_KEY XOMTRA_ADMIN_SESSION_KEY \
+            XOMTRA_JWT_SIGNING_KEY XOMTRA_HA_URL XOMTRA_HA_TOKEN XOMTRA_BASE_URL \
+            XOMTRA_ENTRA_TENANT_ID XOMTRA_ENTRA_CLIENT_ID XOMTRA_ENTRA_CLIENT_SECRET \
+            XOMTRA_PUBLIC_HOST ACME_EMAIL CLOUDFLARE_API_TOKEN CLAUDE_IP_RANGES ADMIN_CIDR \
+            XOMTRA_ACCESS_MODE XOMTRA_AUTH_MODE
+          docker compose up -d --wait --wait-timeout 180 admin mcp
+          docker compose logs secrets-init | tee /tmp/secrets-init.log
+          grep -q "XOMTRA_SETTINGS_KEY: generated" /tmp/secrets-init.log
+          if grep -q "taken over" /tmp/secrets-init.log; then exit 1; fi
+          code=$(docker compose logs admin | grep -o 'code=[A-Z0-9-]*' | tail -n 1 | cut -d= -f2)
+          test -n "$code"
+          docker network connect xomtra-fresh_egress ha
+          docker compose up -d ingest-stream
+          # The stream must wait for the connection, not fail, before the setup.
+          for i in $(seq 1 30); do
+            docker compose logs ingest-stream | grep -q "Waiting for the Home Assistant connection" && break
+            sleep 2
+          done
+          docker compose logs ingest-stream | grep -q "Waiting for the Home Assistant connection"
+          docker compose exec -T -e CODE="$code" -e HA_TOKEN="$ha_token" admin python - <<'PY'
+          import os, urllib.error, urllib.parse, urllib.request
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+
+          base = "http://127.0.0.1:8100/admin"
+          opener = urllib.request.build_opener(NoRedirect)
+          try:
+              opener.open(base + "/login")
+              raise SystemExit("sign-in answered before the setup")
+          except urllib.error.HTTPError as err:
+              assert err.code == 303 and err.headers["location"].endswith("/admin/setup"), err
+          form = urllib.parse.urlencode(
+              {"code": os.environ["CODE"], "url": "http://ha:8123", "token": os.environ["HA_TOKEN"]}
+          ).encode()
+          page = urllib.request.urlopen(base + "/setup", data=form).read().decode()
+          assert "Home Assistant is connected." in page, page
+          try:
+              opener.open(base + "/setup?code=" + os.environ["CODE"])
+              raise SystemExit("the setup code still works")
+          except urllib.error.HTTPError as err:
+              assert err.code == 303, err.code
+          print("setup ok")
+          PY
+          docker compose exec -T mcp python -c "from xomtra_mcp.config import Settings; c = Settings().ha_resolver().get(); assert c and c.url == 'http://ha:8123', c"
+          docker compose exec -T postgres psql -U postgres -d audit -tAc \
+            "SELECT count(*) FROM audit.tool_call WHERE tool = 'admin:setup' AND idp = 'setup'" | grep -qx 1
+          for i in $(seq 1 30); do
+            docker compose logs ingest-stream | grep -q "Home Assistant connection found" && break
+            sleep 2
+          done
+          docker compose logs ingest-stream | grep -q "Home Assistant connection found"
       - name: Compose logs on failure
         if: failure()
         working-directory: deploy/compose
         run: |
           docker compose logs --no-color || true
           docker compose -p xomtra-lite -f compose.yaml -f compose.lite.yaml logs --no-color || true
+          docker compose -p xomtra-fresh logs --no-color || true
 
   # Home Assistant add-on (lite edition in one container): build, scan and start it like
   # the Supervisor would. Publishing (amd64 + aarch64, signed) comes with the releases.

@@ -1061,6 +1061,7 @@ name = "hacore"
 version = "0.6.2"
 source = { editable = "packages/hacore" }
 dependencies = [
+    { name = "cryptography" },
     { name = "duckdb" },
     { name = "numpy" },
     { name = "websockets" },
@@ -1068,6 +1069,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=46" },
     { name = "duckdb", specifier = ">=1.4" },
     { name = "numpy", specifier = ">=2.2" },
     { name = "websockets", specifier = ">=15.0" },

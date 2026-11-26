@@ -20,10 +20,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import signal
 import sys
+import time
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from hacore import lake
@@ -34,8 +37,37 @@ from xomtra_ingest.settings import IngestSettings
 logger = logging.getLogger("xomtra_ingest")
 
 
+def wait_for_ha(
+    settings: IngestSettings,
+    *,
+    poll: float = 15.0,
+    sleep: Callable[[float], None] = time.sleep,
+) -> tuple[str, str]:
+    """URL and token of Home Assistant; waits until the admin GUI has them (ADR 077)."""
+    resolver = settings.ha_resolver()
+    waited = 0.0
+    while True:
+        found = resolver.get()
+        if found is not None:
+            if waited:
+                logger.info("Home Assistant connection found (%s), starting", found.url)
+            return found.url, found.token
+        if waited % 600 == 0:
+            logger.warning(
+                "Waiting for the Home Assistant connection: enter its URL and token in the "
+                "admin GUI (the setup link is in `docker compose logs admin`)"
+            )
+        # Healthy while waiting: the container works as intended (healthcheck).
+        if settings.heartbeat_file is not None:
+            with contextlib.suppress(OSError):
+                settings.heartbeat_file.touch()
+        sleep(poll)
+        waited += poll
+        resolver.invalidate()
+
+
 def _make_stream(settings: IngestSettings) -> StateStream:
-    url, token = settings.require_ha()
+    url, token = wait_for_ha(settings)
     lake_settings = lake.LakeSettings.from_env()
     return StateStream(
         url,

@@ -15,6 +15,7 @@ HA Ingress instead: Home Assistant signs the user in, see :class:`RequestView`.
 from __future__ import annotations
 
 import asyncio
+import functools
 import hashlib
 import hmac
 import ipaddress
@@ -39,7 +40,9 @@ from starlette.routing import Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from hacore.analysis_settings import BY_KEY, SPECS, Spec, Value
-from xomtra_mcp.admin import i18n, status, view
+from hacore.ha_connection import HAConnection, StoreError, normalize_url
+from hacore.ha_connection import save as save_connection
+from xomtra_mcp.admin import i18n, setup, status, view
 from xomtra_mcp.admin.analysis import (
     FINDING_TYPES,
     PREVIEW_KEYS,
@@ -178,14 +181,11 @@ class AdminApp:
                 redirect_uri=settings.redirect_uri,
             )
         self.oidc = oidc
-        if ha_login is None and settings.auth_mode == "ha":
-            ha_login = HomeAssistantLogin(
-                ha_url=settings.ha_url or "",
-                ha_auth_url=settings.ha_auth_url or settings.ha_url or "",
-                client_id=settings.client_id,
-                redirect_uri=settings.redirect_uri,
-            )
-        self.ha_login = ha_login
+        # Home Assistant: from the environment, or entered on the setup page (ADR 077).
+        self.ha = settings.ha_resolver()
+        self._session_key = key.get_secret_value() if key else None
+        self.ha_login = ha_login  # fixed (tests); else built from the current connection
+        self._ha_login_built: tuple[tuple[str, str], HomeAssistantLogin] | None = None
         dsn = settings.audit_dsn
         if tokens is None and settings.access_mode == "local" and dsn:
             tokens = PostgresTokenStore(dsn)
@@ -202,11 +202,36 @@ class AdminApp:
             )
             self.headers["X-Frame-Options"] = "SAMEORIGIN"
         elif ha_login is not None:
-            origin = urlparse(ha_login.ha_auth_url)
-            self.headers["Content-Security-Policy"] = (
-                "default-src 'self'; frame-ancestors 'none'; form-action 'self' "
-                f"{origin.scheme}://{origin.netloc}"
+            self._allow_form_action(ha_login.ha_auth_url)
+
+    def _allow_form_action(self, ha_auth_url: str) -> None:
+        # Sign-out posts a form whose redirects end at Home Assistant's sign-in page.
+        origin = urlparse(ha_auth_url)
+        self.headers["Content-Security-Policy"] = (
+            "default-src 'self'; frame-ancestors 'none'; form-action 'self' "
+            f"{origin.scheme}://{origin.netloc}"
+        )
+
+    async def _ha_login(self) -> HomeAssistantLogin | None:
+        """Sign-in through Home Assistant with the current connection (None: not yet)."""
+        if self.settings.auth_mode != "ha":
+            return None
+        if self.ha_login is not None:
+            return self.ha_login
+        conn = await asyncio.to_thread(self.ha.get)
+        if conn is None:
+            return None
+        urls = (conn.url, self.settings.ha_auth_url or conn.url)
+        if self._ha_login_built is None or self._ha_login_built[0] != urls:
+            login = HomeAssistantLogin(
+                ha_url=urls[0],
+                ha_auth_url=urls[1],
+                client_id=self.settings.client_id,
+                redirect_uri=self.settings.redirect_uri,
             )
+            self._ha_login_built = (urls, login)
+            self._allow_form_action(urls[1])
+        return self._ha_login_built[1]
 
     # ---- session -------------------------------------------------------------------
 
@@ -371,9 +396,14 @@ class AdminApp:
     async def login(self, request: Request) -> Response:
         if self.ingress:
             return RedirectResponse(f"{prefix()}/", status_code=303)
-        if self.ha_login is not None:
+        ha_login = await self._ha_login()
+        if ha_login is None and self.settings.auth_mode == "ha":
+            if self.ha.storable:
+                return RedirectResponse(f"{prefix()}{setup.PATH}", status_code=303)
+            return self._login_failed("Home Assistant is not configured.", 503)
+        if ha_login is not None:
             tx = LoginTransaction.new()
-            resp = RedirectResponse(self.ha_login.authorize_url(tx.state), status_code=303)
+            resp = RedirectResponse(ha_login.authorize_url(tx.state), status_code=303)
             self._cookie(resp, TX_COOKIE, self.transactions.dumps({"state": tx.state}, 600), 600)
             return resp
         if self.oidc is None:
@@ -387,13 +417,14 @@ class AdminApp:
         return resp
 
     async def callback(self, request: Request) -> Response:
-        if self.ingress or (self.oidc is None and self.ha_login is None):
+        ha_login = await self._ha_login()
+        if self.ingress or (self.oidc is None and ha_login is None):
             return RedirectResponse(f"{prefix()}/", status_code=303)
         tx_data = self.transactions.loads(request.cookies.get(TX_COOKIE))
         state, code = request.query_params.get("state"), request.query_params.get("code")
         if tx_data is None or not state or state != tx_data.get("state") or not code:
             return self._login_failed("The sign-in expired or was not started here.")
-        if self.ha_login is not None or self.oidc is None:
+        if ha_login is not None or self.oidc is None:
             return await self._ha_callback(code)
         tx = LoginTransaction(tx_data["state"], tx_data["nonce"], tx_data["verifier"])
         try:
@@ -418,10 +449,11 @@ class AdminApp:
         return await self._start_session(user)
 
     async def _ha_callback(self, code: str) -> Response:
-        if self.ha_login is None:
+        ha_login = await self._ha_login()
+        if ha_login is None:
             return self._login_failed("Sign-in is not configured.")
         try:
-            ha_user = await self.ha_login.exchange(code)
+            ha_user = await ha_login.exchange(code)
         except HALoginError as err:
             return self._login_failed(str(err))
         s = self.settings
@@ -479,10 +511,8 @@ class AdminApp:
         return HTMLResponse(page(title, body, user.get("username")))
 
     async def overview(self, request: Request, user: dict[str, Any]) -> Response:
-        token = self.settings.ha_token
-        ha = await status.ha_status(
-            self.settings.ha_url, token.get_secret_value() if token else None
-        )
+        conn = await asyncio.to_thread(self.ha.get)
+        ha = await status.ha_status(conn.url if conn else None, conn.token if conn else None)
         lake: dict[str, Any] = {}
         if self.data is not None:
             lake = await asyncio.to_thread(status.lake_overview, self.data)
@@ -509,6 +539,11 @@ class AdminApp:
         )
         if ha.get("error"):
             body += f"<p class=bad>{e(ha['error'])}</p>"
+        if self.ha.storable:
+            body += (
+                f"<p class=muted><a href='{prefix()}{setup.PATH}'>Change the Home Assistant "
+                "URL or token</a></p>"
+            )
         if disk and disk[1]:
             body += disk[1]
         kinds = lake.get("kinds") or []
@@ -1327,6 +1362,145 @@ class AdminApp:
 
     # ---- app -----------------------------------------------------------------------
 
+    # ---- first-start setup (ADR 077) ---------------------------------------------------
+
+    def _setup_form(self, code: str, current: HAConnection | None, error: str | None) -> str:
+        url = current.url if current else ""
+        keep = "<p class=muted>Leave the token empty to keep the stored one.</p>" if current else ""
+        return (
+            (f"<p class=bad>{e(error)}</p>" if error else "")
+            + "<p>xomtra reads your Home Assistant with a long-lived access token of its own"
+            " user. In Home Assistant, create a user for xomtra (it does not need to be an"
+            " administrator), sign in as that user and create a long-lived access token on"
+            " its profile page (Security tab).</p>"
+            f"<form class=filters method=post action='{prefix()}{setup.PATH}'>"
+            + (f"<input type=hidden name=code value='{e(code)}'>" if code else "")
+            + "<label>Home Assistant URL <input name=url required maxlength=300 size=40 "
+            f"placeholder='http://homeassistant.local:8123' value='{e(url)}'></label>"
+            "<label>Long-lived access token <input name=token type=password maxlength=1000 "
+            f"size=40 autocomplete=off{'' if current else ' required'}></label>"
+            "<button>Connect</button></form>"
+            + keep
+            + "<p class=muted>The address must be reachable from this server (not only from"
+            " your browser). The token is stored encrypted in xomtra's database.</p>"
+        )
+
+    def _setup_actor(self, user: dict[str, Any] | None) -> dict[str, Any]:
+        return user or {"sub": "setup-code", "username": "setup", "roles": [], "idp": "setup"}
+
+    async def setup_page(self, request: Request) -> Response:  # noqa: PLR0911 - one exit per case
+        title = "Connect Home Assistant"
+        if self.ingress or not (self.ha.storable or self.ha.from_env):
+            return Response("Not found", status_code=404)
+        user = self.user(request)
+        who = user.get("username") if user else None
+        if self.ha.from_env:
+            body = (
+                "<p>The Home Assistant connection is set in the environment "
+                "(<code>XOMTRA_HA_URL</code>, <code>XOMTRA_HA_TOKEN</code> in .env). Change "
+                "it there and restart xomtra.</p>"
+            )
+            return HTMLResponse(page(title, body, who), headers=self.headers)
+        current = await asyncio.to_thread(self.ha.get)
+        form = await self._form(request) if request.method == "POST" else {}
+        code = form.get("code") or request.query_params.get("code", "")
+        by_code = bool(
+            current is None
+            and code
+            and self._session_key
+            and setup.code_matches(self._session_key, code)
+        )
+        if user is None and not by_code:
+            if current is not None:
+                return RedirectResponse(f"{prefix()}/login", status_code=303)
+            if code:
+                await asyncio.sleep(1)  # slows down guessing
+            body = (
+                ("<p class=bad>This setup code is not valid.</p>" if code else "")
+                + "<p>xomtra is not connected to Home Assistant yet. Open the setup link from "
+                "the log of the admin container, or enter its code here:</p>"
+                "<pre>docker compose logs admin</pre>"
+                f"<form class=filters method=get action='{prefix()}{setup.PATH}'>"
+                "<input name=code required maxlength=40 size=24 placeholder='XXXX-XXXX-XXXX-XXXX'"
+                " autocomplete=off><button>Continue</button></form>"
+            )
+            return HTMLResponse(page(title, body, None), 403 if code else 200, headers=self.headers)
+        if request.method == "POST":
+            if not self._same_origin(request):
+                return Response("Cross-site request refused", status_code=403)
+            return await self._setup_save(form, user, code if by_code else "", current)
+        body = self._setup_form(code if by_code else "", current, None)
+        return HTMLResponse(page(title, body, who), headers=self.headers)
+
+    async def _setup_save(
+        self,
+        form: dict[str, str],
+        user: dict[str, Any] | None,
+        code: str,
+        current: HAConnection | None,
+    ) -> Response:
+        title = "Connect Home Assistant"
+        who = user.get("username") if user else None
+        token = form.get("token", "") or (current.token if current else "")
+        try:
+            url = normalize_url(form.get("url", ""))
+        except ValueError as err:
+            body = self._setup_form(code, current, str(err))
+            return HTMLResponse(page(title, body, who), 400, headers=self.headers)
+        if not token:
+            body = self._setup_form(code, current, "Enter the access token.")
+            return HTMLResponse(page(title, body, who), 400, headers=self.headers)
+        ha = await status.ha_status(url, token)
+        if not ha.get("ok"):
+            error = f"Home Assistant did not accept the connection: {ha.get('error')}"
+            body = self._setup_form(code, current, error)
+            return HTMLResponse(page(title, body, who), 400, headers=self.headers)
+        actor = self._setup_actor(user)
+        dsn, key = self.settings.audit_dsn, self._settings_key()
+        try:
+            await self._audit("setup", actor, arguments={"url": url, "ha_version": ha["version"]})
+            await asyncio.to_thread(
+                functools.partial(
+                    save_connection,
+                    str(dsn),
+                    str(key),
+                    url,
+                    token,
+                    ha_version=ha["version"],
+                    by=str(actor["username"]),
+                )
+            )
+        except (AuditError, StoreError) as err:
+            logger.warning("Setup not saved: %s", err)
+            body = self._setup_form(code, current, "Not saved: the database is unavailable.")
+            return HTMLResponse(page(title, body, who), 503, headers=self.headers)
+        self.ha.invalidate()
+        logger.info(
+            "Home Assistant %s connected at %s by %s", ha["version"], url, actor["username"]
+        )
+        next_step = (
+            f"<p><a href='{prefix()}/'>Back to the overview</a></p>"
+            if user
+            else "<p>Now sign in with your Home Assistant administrator account: "
+            f"<a href='{prefix()}/login'>Sign in</a></p>"
+        )
+        body = (
+            "<p class=ok>Home Assistant is connected.</p>"
+            + cards(
+                [
+                    ("Home Assistant", ha["version"], "ok"),
+                    ("Entities in HA", ha.get("entities"), ""),
+                ]
+            )
+            + "<p>xomtra starts loading the history now; the first findings come after the "
+            "next nightly run.</p>" + next_step
+        )
+        return HTMLResponse(page(title, body, who), headers=self.headers)
+
+    def _settings_key(self) -> str | None:
+        key = self.settings.settings_key
+        return key.get_secret_value() if key else None
+
     def build(self) -> ASGIApp:
         async def css(_: Request) -> Response:
             return Response(CSS, media_type="text/css", headers={"Cache-Control": "max-age=3600"})
@@ -1392,6 +1566,7 @@ class AdminApp:
             Route(f"{PREFIX}/ui.js", asset),
             Route(f"{PREFIX}/tips.json", asset),
             Route(f"{PREFIX}/login", self.login),
+            Route(f"{PREFIX}{setup.PATH}", self.setup_page, methods=["GET", "POST"]),
             Route(f"{PREFIX}/auth/callback", self.callback),
             Route(f"{PREFIX}/auth/check", self.check),
             Route(f"{PREFIX}/logout", self.logout, methods=["POST"]),

@@ -24,6 +24,11 @@ COPY services ./services
 RUN uv sync --locked --no-dev --no-editable --package xomtra-ingest
 # DuckDB extensions are downloaded at build time (no internet access at runtime).
 RUN /app/.venv/bin/python -m hacore.lake install-extensions
+# Compose edition (ADR 077): every Python process (also the Dagster CLI, whose instance
+# config reads the Postgres password from the environment before any xomtra code is
+# imported) loads its secrets file first, when XOMTRA_SECRETS_FILE is set.
+RUN echo "import os; os.environ.get('XOMTRA_SECRETS_FILE') and __import__('hacore.secretstore').secretstore.load_env()" \
+      > "$(/app/.venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')/xomtra_secrets.pth"
 COPY services/ingest/dagster /app/dagster
 
 FROM ${PYTHON_IMAGE} AS runtime

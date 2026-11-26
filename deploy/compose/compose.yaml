@@ -1,29 +1,31 @@
 # xomtra stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
 # + Postgres (DuckLake catalog, Dagster and SQLMesh state) + SeaweedFS (S3).
-# Usage: ./init-env.sh (generates .env with all internal secrets, ADR 061), check the
-# few values it asks about, then docker compose up -d
-# Access (ADR 056): XOMTRA_ACCESS_MODE=public (Claude connector on a public host,
-# OAuth) or local (LAN only, personal tokens, Caddy's local CA).
+# Usage (ADR 077): docker compose up -d, then open the setup link from
+# `docker compose logs admin` and enter the Home Assistant URL and token there. No .env is
+# needed: the one-shot service secrets-init generates every internal password and key
+# into the volume "secrets" (back it up with the data). An optional .env only overrides
+# defaults (.env.example).
+# Access (ADR 056): XOMTRA_ACCESS_MODE=local (default: LAN only, personal tokens, Caddy's
+# local CA, the server's LAN address) or public (Claude connector on a public host,
+# OAuth; needs .env, see docs/setup/claude-connector.md).
 # Only Caddy is published (HTTPS); the MCP server is reachable only through it and
 # audits every tool call into the Postgres DB "audit" (INSERT-only role). The
 # Dagster UI is published on loopback only (SSH tunnel, see docs/setup/ingest.md).
 
 name: xomtra
 
+# Passwords and keys are not here: each service reads them from its file in the
+# secrets volume (XOMTRA_SECRETS_FILE, written by secrets-init).
 x-lake-env: &lake-env
   XOMTRA_LAKE_PG_HOST: postgres
   XOMTRA_LAKE_PG_DB: ${DUCKLAKE_PG_DB:-ducklake}
   XOMTRA_LAKE_PG_USER: ${DUCKLAKE_PG_USER:-ducklake}
-  XOMTRA_LAKE_PG_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
   XOMTRA_S3_ENDPOINT: seaweedfs:8333
-  XOMTRA_S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env}
-  XOMTRA_S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env}
   XOMTRA_S3_BUCKET: ${S3_BUCKET:-xomtra}
 
 x-ops-env: &ops-env
   XOMTRA_OPS_PG_HOST: postgres
   XOMTRA_OPS_PG_USER: ${OPS_PG_USER:-xomtra_ops}
-  XOMTRA_OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
   XOMTRA_DAGSTER_PG_DB: ${DAGSTER_PG_DB:-dagster}
   XOMTRA_SQLMESH_PG_DB: ${SQLMESH_PG_DB:-sqlmesh}
   XOMTRA_WORKER_PG_DB: ${WORKER_PG_DB:-ops}
@@ -32,6 +34,8 @@ x-ops-env: &ops-env
 
 x-ingest-env: &ingest-env
   <<: [*lake-env, *ops-env]
+  XOMTRA_SECRETS_FILE: /secrets/ingest.env
+  # Optional: Home Assistant is normally entered in the admin GUI (ADR 077).
   XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
   XOMTRA_HA_TOKEN: ${XOMTRA_HA_TOKEN:-}
   XOMTRA_STATES_RETENTION_DAYS: ${XOMTRA_STATES_RETENTION_DAYS:-365}
@@ -66,6 +70,40 @@ x-hardening: &hardening
     options: { max-size: "10m", max-file: "5" }
 
 services:
+  # Every `up`: generates the internal passwords and keys on the first start (or takes
+  # them over from an existing .env), keeps them afterwards, and writes each service its
+  # own file in the volume "secrets" (ADR 077). Runs in the host network only to find
+  # the server's LAN address for the local access mode; it sends nothing.
+  secrets-init:
+    image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.6.2}
+    entrypoint: ["python", "-m", "hacore.secrets_init"]
+    user: "0:0"
+    network_mode: host
+    environment:
+      # Taken over on the first start if set (installations before ADR 077), then ignored.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      DUCKLAKE_PG_PASSWORD: ${DUCKLAKE_PG_PASSWORD:-}
+      OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:-}
+      AUDIT_PG_PASSWORD: ${AUDIT_PG_PASSWORD:-}
+      AUDIT_ADMIN_PG_PASSWORD: ${AUDIT_ADMIN_PG_PASSWORD:-}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      XOMTRA_JWT_SIGNING_KEY: ${XOMTRA_JWT_SIGNING_KEY:-}
+      XOMTRA_ADMIN_SESSION_KEY: ${XOMTRA_ADMIN_SESSION_KEY:-}
+      # Address of the server: from .env, else its LAN address (local access).
+      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-local}
+      XOMTRA_LOCAL_HOST: ${XOMTRA_LOCAL_HOST:-}
+      XOMTRA_PUBLIC_HOST: ${XOMTRA_PUBLIC_HOST:-}
+      XOMTRA_BASE_URL: ${XOMTRA_BASE_URL:-}
+    volumes:
+      - secrets:/secrets
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    # Gives each file to the user of its service (chown) and sets its mode.
+    cap_add: [CHOWN, FOWNER]
+    security_opt: ["no-new-privileges:true"]
+
   postgres:
     <<: *hardening
     image: postgres:17-trixie@sha256:223efeb196329b55b3b9a13db144956411dbc18e727e59f681c3e0aede6475cf
@@ -73,12 +111,12 @@ services:
     # writer took, and the statement would put Home Assistant data into the log.
     command: ["postgres", "-c", "log_min_error_statement=panic"]
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      DUCKLAKE_DB: ${DUCKLAKE_PG_DB:-ducklake}
-      DUCKLAKE_USER: ${DUCKLAKE_PG_USER:-ducklake}
-      DUCKLAKE_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
+      POSTGRES_PASSWORD_FILE: /secrets/postgres.password
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - secrets:/secrets:ro
+    depends_on:
+      secrets-init: { condition: service_completed_successfully }
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 10s
@@ -88,27 +126,27 @@ services:
 
   postgres-init:
     image: postgres:17-trixie@sha256:223efeb196329b55b3b9a13db144956411dbc18e727e59f681c3e0aede6475cf
-    entrypoint: ["/bin/sh", "/ensure-databases.sh"]
+    # Passwords from its file in the secrets volume.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - set -a && . /secrets/postgres-init.env && set +a && exec /bin/sh /ensure-databases.sh
     user: "999:999"
     environment:
       PGHOST: postgres
-      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       DUCKLAKE_DB: ${DUCKLAKE_PG_DB:-ducklake}
       DUCKLAKE_USER: ${DUCKLAKE_PG_USER:-ducklake}
-      DUCKLAKE_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
       OPS_USER: ${OPS_PG_USER:-xomtra_ops}
-      OPS_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
       DAGSTER_DB: ${DAGSTER_PG_DB:-dagster}
       SQLMESH_DB: ${SQLMESH_PG_DB:-sqlmesh}
       OPS_DB: ${WORKER_PG_DB:-ops}
       AUDIT_DB: ${AUDIT_PG_DB:-audit}
       AUDIT_USER: ${AUDIT_PG_USER:-xomtra_audit}
-      AUDIT_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD in .env}
       AUDIT_ADMIN_USER: ${AUDIT_ADMIN_PG_USER:-xomtra_audit_admin}
-      AUDIT_ADMIN_PASSWORD: ${AUDIT_ADMIN_PG_PASSWORD:?set AUDIT_ADMIN_PG_PASSWORD in .env}
       AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-90}
     volumes:
       - ./postgres/ensure-databases.sh:/ensure-databases.sh:ro
+      - secrets:/secrets:ro
     depends_on:
       postgres: { condition: service_healthy }
     restart: "no"
@@ -120,13 +158,15 @@ services:
   seaweedfs:
     <<: *hardening
     image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
-    entrypoint: ["/bin/sh", "/start.sh"]
-    environment:
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY in .env}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env}
+    # S3 keys from its file in the secrets volume.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - set -a && . /secrets/seaweedfs.env && set +a && exec /bin/sh /start.sh
     volumes:
       - seaweedfs-data:/data
       - ./seaweedfs/start.sh:/start.sh:ro
+      - secrets:/secrets:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:8333/healthz"]
       interval: 10s
@@ -150,7 +190,11 @@ services:
   ducklake-init:
     image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.6.2}
     entrypoint: ["python", "-m", "hacore.lake", "init"]
-    environment: *lake-env
+    environment:
+      <<: *lake-env
+      XOMTRA_SECRETS_FILE: /secrets/ingest.env
+    volumes:
+      - secrets:/secrets:ro
     depends_on:
       postgres-init: { condition: service_completed_successfully }
       seaweedfs-init: { condition: service_completed_successfully }
@@ -164,8 +208,9 @@ services:
     image: ${XOMTRA_MCP_IMAGE:-ghcr.io/xomtra/xomtra-mcp:0.6.2}
     environment:
       <<: *lake-env
-      XOMTRA_AUTH_MODE: ${XOMTRA_AUTH_MODE:-entra}
-      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-public}
+      XOMTRA_SECRETS_FILE: /secrets/mcp.env
+      XOMTRA_AUTH_MODE: ${XOMTRA_AUTH_MODE:-ha}
+      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-local}
       XOMTRA_BASE_URL: ${XOMTRA_BASE_URL:-}
       XOMTRA_ENTRA_TENANT_ID: ${XOMTRA_ENTRA_TENANT_ID:-}
       XOMTRA_ENTRA_CLIENT_ID: ${XOMTRA_ENTRA_CLIENT_ID:-}
@@ -175,14 +220,13 @@ services:
       XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
       XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=xomtra.Reader}
       XOMTRA_ENTRA_REQUIRED_SCOPES: ${XOMTRA_ENTRA_REQUIRED_SCOPES:-mcp.access}
-      XOMTRA_JWT_SIGNING_KEY: ${XOMTRA_JWT_SIGNING_KEY:-}
+      # Optional: Home Assistant is normally entered in the admin GUI (ADR 077).
       XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
       XOMTRA_HA_TOKEN: ${XOMTRA_HA_TOKEN:-}
       # Audit of every tool call (INSERT-only role, ADR 040).
       XOMTRA_AUDIT_PG_HOST: postgres
       XOMTRA_AUDIT_PG_DB: ${AUDIT_PG_DB:-audit}
       XOMTRA_AUDIT_PG_USER: ${AUDIT_PG_USER:-xomtra_audit}
-      XOMTRA_AUDIT_PG_PASSWORD: ${AUDIT_PG_PASSWORD:?set AUDIT_PG_PASSWORD in .env}
       XOMTRA_POLICY_FILE: ${XOMTRA_POLICY_FILE:-}
       XOMTRA_TIMEZONE: ${XOMTRA_TIMEZONE:-UTC}
       XOMTRA_QUERY_TIMEOUT_SECONDS: ${XOMTRA_QUERY_TIMEOUT_SECONDS:-30}
@@ -194,6 +238,7 @@ services:
     mem_limit: ${XOMTRA_MCP_MEM_LIMIT:-1536m}
     volumes:
       - mcp-data:/data
+      - secrets:/secrets:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -211,6 +256,8 @@ services:
       XOMTRA_DUCKDB_MEMORY_LIMIT: ${XOMTRA_STREAM_DUCKDB_MEMORY_LIMIT:-512MB}
     # Hard caps per container: a runaway query is killed here, not the whole VM.
     mem_limit: ${XOMTRA_STREAM_MEM_LIMIT:-1g}
+    volumes:
+      - secrets:/secrets:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -239,6 +286,7 @@ services:
     mem_limit: ${XOMTRA_DAGSTER_MEM_LIMIT:-3g}
     volumes:
       - ingest-data:/data
+      - secrets:/secrets:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -263,6 +311,7 @@ services:
       - "${XOMTRA_DAGSTER_BIND:-127.0.0.1}:3000:3000"
     volumes:
       - ingest-data:/data
+      - secrets:/secrets:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -285,8 +334,9 @@ services:
     entrypoint: ["xomtra-admin"]
     environment:
       <<: *lake-env
-      XOMTRA_AUTH_MODE: ${XOMTRA_AUTH_MODE:-entra}
-      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-public}
+      XOMTRA_SECRETS_FILE: /secrets/admin.env
+      XOMTRA_AUTH_MODE: ${XOMTRA_AUTH_MODE:-ha}
+      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-local}
       XOMTRA_BASE_URL: ${XOMTRA_BASE_URL:-}
       XOMTRA_ENTRA_TENANT_ID: ${XOMTRA_ENTRA_TENANT_ID:-}
       XOMTRA_ENTRA_CLIENT_ID: ${XOMTRA_ENTRA_CLIENT_ID:-}
@@ -295,7 +345,6 @@ services:
       XOMTRA_HA_AUTH_URL: ${XOMTRA_HA_AUTH_URL:-}
       XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
       XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=xomtra.Reader}
-      XOMTRA_ADMIN_SESSION_KEY: ${XOMTRA_ADMIN_SESSION_KEY:?set XOMTRA_ADMIN_SESSION_KEY in .env}
       # MCP endpoint shown with new personal tokens (local access); default <base_url>/mcp.
       XOMTRA_MCP_URL: ${XOMTRA_MCP_URL:-}
       XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
@@ -304,7 +353,6 @@ services:
       XOMTRA_AUDIT_PG_HOST: postgres
       XOMTRA_AUDIT_PG_DB: ${AUDIT_PG_DB:-audit}
       XOMTRA_AUDIT_ADMIN_USER: ${AUDIT_ADMIN_PG_USER:-xomtra_audit_admin}
-      XOMTRA_AUDIT_ADMIN_PASSWORD: ${AUDIT_ADMIN_PG_PASSWORD:?set AUDIT_ADMIN_PG_PASSWORD in .env}
       XOMTRA_STATES_RETENTION_DAYS: ${XOMTRA_STATES_RETENTION_DAYS:-365}
       XOMTRA_STATISTICS_5MIN_RETENTION_DAYS: ${XOMTRA_STATISTICS_5MIN_RETENTION_DAYS:-365}
       XOMTRA_STATISTICS_HOUR_RETENTION_DAYS: ${XOMTRA_STATISTICS_HOUR_RETENTION_DAYS:-1825}
@@ -313,6 +361,8 @@ services:
       XOMTRA_DUCKDB_THREADS: "1"
       XOMTRA_DUCKDB_TEMP_DIR: /tmp/duckdb
     mem_limit: ${XOMTRA_ADMIN_MEM_LIMIT:-512m}
+    volumes:
+      - secrets:/secrets:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -331,19 +381,23 @@ services:
     image: ${XOMTRA_CADDY_IMAGE:-ghcr.io/xomtra/xomtra-caddy:0.6.2}
     # The image checks the values its access mode needs at start (deploy/caddy/start.sh).
     environment:
-      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-public}
+      # XOMTRA_LOCAL_HOST: from .env, else the LAN address found by secrets-init.
+      XOMTRA_SECRETS_FILE: /secrets/caddy.env
+      XOMTRA_ACCESS_MODE: ${XOMTRA_ACCESS_MODE:-local}
       XOMTRA_PUBLIC_HOST: ${XOMTRA_PUBLIC_HOST:-}
       ACME_EMAIL: ${ACME_EMAIL:-}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       CLAUDE_IP_RANGES: ${CLAUDE_IP_RANGES:-}
       XOMTRA_LOCAL_HOST: ${XOMTRA_LOCAL_HOST:-}
       LAN_CIDR: ${LAN_CIDR:-10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7}
-      ADMIN_CIDR: ${ADMIN_CIDR:?set ADMIN_CIDR in .env}
+      # Admin GUI from private networks unless narrowed in .env (sign-in still required).
+      ADMIN_CIDR: ${ADMIN_CIDR:-10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7}
     ports:
       - "${XOMTRA_HTTPS_BIND:-0.0.0.0}:443:8443"
     volumes:
       - caddy-data:/data
       - caddy-config:/config
+      - secrets:/secrets:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -353,6 +407,8 @@ services:
     networks: [frontend, admin]
 
 volumes:
+  # Internal passwords and keys (secrets-init); back it up with the data volumes.
+  secrets:
   caddy-data:
   caddy-config:
   postgres-data:

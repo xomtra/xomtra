@@ -11,8 +11,28 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Docker Compose installs with one command (ADR 077): `docker compose up -d` works
+  without a `.env`. The new one-shot service `secrets-init` generates every internal
+  password and key into the Docker volume `secrets` (one file per service, readable
+  only by its user) and finds the server's LAN address for the local access mode.
+- Setup page in the admin GUI (`/admin/setup`): the Home Assistant URL and token are
+  entered in the browser after the first start, checked against Home Assistant and
+  stored encrypted in Postgres. Until then a one-time link is printed to
+  `docker compose logs admin`; the stream and the hourly ingest wait for the connection.
+  Signed-in administrators can change the URL or token later on the same page.
+- Guide [docs/setup/docker.md](docs/setup/docker.md).
+
 ### Changed
 
+- Compose defaults: `XOMTRA_ACCESS_MODE=local`, `XOMTRA_AUTH_MODE=ha`, `ADMIN_CIDR` all
+  private ranges; no variable is required any more. Public access still needs its
+  values in `.env`.
+- `init-env.sh` is an optional guide and no longer writes internal passwords.
+  **Upgrade note:** an existing `.env` with passwords keeps working; on the first start
+  `secrets-init` takes them over into the volume `secrets`, after which they can be
+  removed from `.env`. Back up the volume `secrets` together with the data volumes.
 - The documentation and the Claude Desktop extension now say precisely what "read only"
   means: xomtra only reads and never calls Home Assistant services, and the assistant
   gets read-only tools over xomtra's own data. Home Assistant has no read-only tokens,

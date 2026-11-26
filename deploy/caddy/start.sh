@@ -4,6 +4,12 @@
 #   XOMTRA_ACCESS_MODE=public (default): public host, ACME DNS-01, Claude IP filter.
 #   XOMTRA_ACCESS_MODE=local: LAN only, Caddy's local CA, no internet exposure.
 set -eu
+# Compose edition (ADR 077): values derived at start (the server's LAN address).
+if [ -n "${XOMTRA_SECRETS_FILE:-}" ] && [ -r "$XOMTRA_SECRETS_FILE" ]; then
+  set -a
+  . "$XOMTRA_SECRETS_FILE"
+  set +a
+fi
 mode=${XOMTRA_ACCESS_MODE:-public}
 need() {
   for name in "$@"; do

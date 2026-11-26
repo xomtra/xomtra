@@ -187,5 +187,29 @@ REVOKE ALL ON FUNCTION analysis.active_dismissals() FROM PUBLIC;
 SELECT format('GRANT SELECT, INSERT ON analysis.finding_dismissal TO %I', :'adm') \gexec
 SELECT format('GRANT UPDATE (revoked_at, revoked_by) ON analysis.finding_dismissal TO %I', :'adm') \gexec
 SELECT format('GRANT EXECUTE ON FUNCTION analysis.active_dismissals() TO %I, %I', :'adm', :'ops') \gexec
+
+-- Home Assistant connection entered in the admin GUI (compose edition, ADR 077): an
+-- append-only history, the latest row is the connection. The token is encrypted with
+-- XOMTRA_SETTINGS_KEY of the secrets volume. The admin GUI reads and appends; the MCP
+-- server and the ingest may only call setup.ha_connection().
+CREATE SCHEMA IF NOT EXISTS setup AUTHORIZATION postgres;
+CREATE TABLE IF NOT EXISTS setup.ha_connection_change (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  url        text NOT NULL,
+  token_enc  text NOT NULL,
+  ha_version text,
+  changed_at timestamptz NOT NULL DEFAULT now(),
+  changed_by text
+);
+CREATE OR REPLACE FUNCTION setup.ha_connection()
+RETURNS TABLE (url text, token_enc text, changed_at timestamptz, changed_by text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $f$
+  SELECT c.url, c.token_enc, c.changed_at, c.changed_by
+  FROM setup.ha_connection_change c ORDER BY c.id DESC LIMIT 1
+$f$;
+REVOKE ALL ON FUNCTION setup.ha_connection() FROM PUBLIC;
+SELECT format('GRANT USAGE ON SCHEMA setup TO %I, %I, %I', :'adm', :'usr', :'ops') \gexec
+SELECT format('GRANT SELECT, INSERT ON setup.ha_connection_change TO %I', :'adm') \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION setup.ha_connection() TO %I, %I, %I', :'adm', :'usr', :'ops') \gexec
 SQL
 echo "Postgres roles and databases are in place."

@@ -13,25 +13,14 @@ needs the [public access mode](claude-connector.md) instead.
 
 ```bash
 cd deploy/compose
-./init-env.sh          # generates every internal password and key (ADR 061)
 docker compose up -d
+docker compose logs admin    # one-time setup link: connect Home Assistant in the browser
 ```
 
-`init-env.sh` asks only for what it cannot know (answers can also be passed as
-environment variables, see the script header):
-
-| Question | Example | Written to `.env` |
-| --- | --- | --- |
-| Access mode | `local` | `XOMTRA_ACCESS_MODE` |
-| Name or IP of this server | `xomtra.lan` or `192.168.1.20` | `XOMTRA_LOCAL_HOST`, `XOMTRA_BASE_URL` |
-| Sign-in | `ha` | `XOMTRA_AUTH_MODE` ([Home Assistant account](ha-login.md)) |
-| Network of the admin GUI | `192.168.1.0/24` | `ADMIN_CIDR` |
-| Home Assistant URL and token | `http://homeassistant.local:8123` | `XOMTRA_HA_URL`, `XOMTRA_HA_TOKEN` ([ingest](ingest.md)) |
-
-The Postgres, S3, OAuth and session secrets are generated, stored only in `.env`
-(mode 600) and never need to be typed or copied. After an update, `./init-env.sh --fill`
-adds settings that are new in the template and generates missing secrets; it never
-changes existing values.
+Nothing has to be prepared (ADR 077): the internal passwords and keys are generated
+into the Docker volume `secrets`, the server uses its LAN address, and the Home
+Assistant URL and token are entered on the setup page. Details, optional settings and
+backups: [Docker Compose install](docker.md).
 
 `LAN_CIDR` (default: all private ranges) limits who may reach the MCP endpoint.
 
