@@ -13,6 +13,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Fixed
 
+- Admin GUI after an upgrade: the browser kept the previous version's stylesheet and
+  script (cached for an hour or a day) and showed the new pages half unstyled. Their
+  URLs now carry a version, so an upgrade loads the new ones.
 - Home Assistant add-on: the update dialog said "No changelog found". The add-on now
   ships its own `CHANGELOG.md` with the last five released versions;
   `scripts/release.py prepare` writes it and `check` refuses a tag without it.

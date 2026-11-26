@@ -10,6 +10,7 @@ from pydantic import SecretStr
 
 from xomtra_mcp.admin.app import AdminApp, _same_address
 from xomtra_mcp.admin.config import AdminSettings
+from xomtra_mcp.admin.html import ASSET_VERSION
 from xomtra_mcp.audit import MemoryAuditSink
 from xomtra_mcp.tokens import MemoryTokenStore, token_hash
 
@@ -49,7 +50,8 @@ async def test_ingress_page_uses_the_ingress_path() -> None:
         root = await client.get("/", headers=HA)
     assert resp.status_code == 200
     assert f'href="{INGRESS}/catalog"' in resp.text
-    assert f'href="{INGRESS}/static.css"' in resp.text
+    # Versioned, so that an upgrade does not show new pages with a cached old stylesheet.
+    assert f'href="{INGRESS}/static.css?v={ASSET_VERSION}"' in resp.text
     assert f"action='{INGRESS}/tokens/issue'" in resp.text
     assert "/admin/" not in resp.text
     assert "Dagster" not in resp.text  # no Dagster UI in the add-on
@@ -235,7 +237,7 @@ async def test_ingress_page_has_the_xomtra_look() -> None:
         tips = await client.get("/tips.json", headers=HA)
         icon = await client.get("/favicon.svg", headers=HA)
         missing = await client.get("/fonts/..%2Fapp.py", headers=HA)
-    assert f'<script src="{INGRESS}/ui.js"></script>' in resp.text
+    assert f'<script src="{INGRESS}/ui.js?v={ASSET_VERSION}"></script>' in resp.text
     assert f'href="{INGRESS}/favicon.svg"' in resp.text
     assert '<a href="' + INGRESS + '/tokens" aria-current=page>Tokens</a>' in resp.text
     assert "<b>xomtra</b><small>admin</small>" in resp.text

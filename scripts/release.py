@@ -245,8 +245,8 @@ def check(version: Version) -> None:
     except ReleaseError as err:
         problems.append(str(err))
     if not version.prerelease:
-        path = ROOT / ADDON_CHANGELOG
-        found = path.read_text(encoding="utf-8") if path.exists() else ""
+        addon_file = ROOT / ADDON_CHANGELOG
+        found = addon_file.read_text(encoding="utf-8") if addon_file.exists() else ""
         if found != addon_changelog(_read(CHANGELOG)):
             problems.append(f"{ADDON_CHANGELOG}: not the last versions of {CHANGELOG}")
     if problems:

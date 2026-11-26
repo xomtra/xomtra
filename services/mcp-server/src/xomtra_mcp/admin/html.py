@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Iterable, Sequence
@@ -173,6 +174,11 @@ form:target { outline:2px solid var(--accent); outline-offset:6px; border-radius
 TIPS: dict[str, dict[str, str]] = json.loads(
     (Path(__file__).parent / "static" / "tips.json").read_text(encoding="utf-8")
 )
+# Version of the stylesheet and script in their URLs: browsers keep them cached (Cache-
+# Control max-age), and after an upgrade the new pages would otherwise get the old CSS.
+ASSET_VERSION = hashlib.sha256(
+    CSS.encode() + (Path(__file__).parent / "static" / "ui.js").read_bytes()
+).hexdigest()[:12]
 # Columns holding a share in [0, 1], shown as a percentage.
 PERCENT = frozenset({"numeric_share", "missing_share", "with area"})
 _ISO = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
@@ -233,8 +239,8 @@ def page(title: str, body: str, user: str | None) -> str:
         '<meta name=viewport content="width=device-width, initial-scale=1">'
         f"<title>{shown} · xomtra admin</title>"
         f'<link rel=icon href="{v.prefix}/favicon.svg" type="image/svg+xml">'
-        f'<script src="{v.prefix}/ui.js"></script>'
-        f'<link rel=stylesheet href="{v.prefix}/static.css"></head><body>'
+        f'<script src="{v.prefix}/ui.js?v={ASSET_VERSION}"></script>'
+        f'<link rel=stylesheet href="{v.prefix}/static.css?v={ASSET_VERSION}"></head><body>'
         f'<header><a class=brand href="{v.prefix}/">{MARK}<b>xomtra</b><small>admin</small></a>'
         f"<nav>{links}</nav>{logout}</header>"
         f"<main><h1>{shown}</h1>{body}</main></body></html>",
