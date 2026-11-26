@@ -1,0 +1,21 @@
+configuration:
+  log_level:
+    name: Log-Level
+    description: Log-Level der xomtra-Dienste.
+  states_retention_days:
+    name: Zustandsverlauf (Tage)
+    description: Wie viele Tage Zustandsverlauf im Lake bleiben.
+  statistics_5min_retention_days:
+    name: 5-Minuten-Statistiken (Tage)
+    description: Wie viele Tage 5-Minuten-Statistiken im Lake bleiben.
+  statistics_hour_retention_days:
+    name: Stündliche Statistiken (Tage)
+    description: Wie viele Tage stündliche Statistiken im Lake bleiben.
+  mcp_url:
+    name: MCP-Adresse
+    description: >-
+      MCP-Endpunkt, wie Clients in Ihrem Netz ihn erreichen, zum Beispiel
+      http://homeassistant.local:8000/mcp. Leer: Die Verwaltung leitet ihn aus der
+      Adresse ab, unter der Sie Home Assistant geöffnet haben.
+network:
+  8000/tcp: MCP-Endpunkt im LAN (persönliche Zugriffstokens)

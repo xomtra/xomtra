@@ -253,3 +253,23 @@ def test_values_are_formatted_for_the_locale() -> None:
     assert 'data-tip="missing_share"' in html
     assert "data-tip" not in html.split("nothing")[0].rsplit("<th", 1)[-1]
     assert all(set(TIPS[lang]) == set(TIPS["en"]) for lang in TIPS)
+
+
+async def test_gui_follows_the_language_cookie_and_accept_language() -> None:
+    app, _, _ = make_app()
+    async with client_for(app) as client:
+        cs = await client.get("/", headers={**HA, "cookie": "xomtra_lang=cs"})
+        tokens = await client.get("/tokens", headers={**HA, "cookie": "xomtra_lang=cs"})
+        de = await client.get("/", headers={**HA, "accept-language": "de-AT,de;q=0.9"})
+        en = await client.get("/", headers={**HA, "accept-language": "fr-FR"})
+    assert "<html lang=cs>" in cs.text
+    assert "<h1>Přehled</h1>" in cs.text
+    assert "Zálohy Home Assistantu neobsahují analytiku xomtra" in cs.text
+    assert "Home Assistant backups do not include" not in cs.text
+    assert ">Vydat token</button>" in tokens.text
+    assert "placeholder='pro koho'" in tokens.text
+    assert "<title>Tokeny · xomtra admin</title>" in tokens.text
+    assert "<html lang=de>" in de.text
+    assert "<h1>Übersicht</h1>" in de.text
+    assert "<html lang=en>" in en.text
+    assert "<h1>Overview</h1>" in en.text

@@ -1,0 +1,21 @@
+configuration:
+  log_level:
+    name: Úroveň logování
+    description: Úroveň logování služeb xomtra.
+  states_retention_days:
+    name: Historie stavů (dny)
+    description: Kolik dní historie stavů se drží v lake.
+  statistics_5min_retention_days:
+    name: 5minutové statistiky (dny)
+    description: Kolik dní 5minutových statistik se drží v lake.
+  statistics_hour_retention_days:
+    name: Hodinové statistiky (dny)
+    description: Kolik dní hodinových statistik se drží v lake.
+  mcp_url:
+    name: Adresa MCP
+    description: >-
+      Endpoint MCP tak, jak ho vidí klienti ve vaší síti, například
+      http://homeassistant.local:8000/mcp. Prázdné: administrace ho odvodí z adresy,
+      na které jste otevřeli Home Assistant.
+network:
+  8000/tcp: Endpoint MCP v LAN (osobní přístupové tokeny)

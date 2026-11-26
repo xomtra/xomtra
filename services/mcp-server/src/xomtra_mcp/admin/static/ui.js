@@ -13,6 +13,25 @@
   } catch (e) {
     hass = null; // not framed by Home Assistant
   }
+  // The server translates the pages (i18n.py); tell it Home Assistant's language once.
+  var want = String((hass && ((hass.locale && hass.locale.language) || hass.language)) ||
+    navigator.language || "en").toLowerCase().split("-")[0];
+  if (LANGS.indexOf(want) < 0) want = "en";
+  if (want !== document.documentElement.lang) {
+    var me = document.currentScript;
+    var path = me ? new URL(me.src, location.href).pathname.replace(/\/ui\.js$/, "") : "";
+    try {
+      document.cookie = "xomtra_lang=" + want + "; path=" + (path || "/") +
+        "; max-age=31536000; SameSite=Strict";
+      if (sessionStorage.getItem("xomtra_lang") !== want) {
+        sessionStorage.setItem("xomtra_lang", want);
+        location.reload();
+        return;
+      }
+    } catch (e) {
+      /* no cookies or storage: stay in the server's language */
+    }
+  }
   var dark = hass && hass.themes && hass.themes.darkMode;
   if (dark === false) document.documentElement.dataset.theme = "light";
 

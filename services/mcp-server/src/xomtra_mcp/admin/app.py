@@ -21,7 +21,10 @@ import logging
 import re
 import shutil
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from http.cookies import CookieError, SimpleCookie
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
@@ -34,7 +37,7 @@ from starlette.routing import Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from hacore.analysis_settings import BY_KEY, SPECS, Spec, Value
-from xomtra_mcp.admin import status, view
+from xomtra_mcp.admin import i18n, status, view
 from xomtra_mcp.admin.analysis import (
     FINDING_TYPES,
     PREVIEW_KEYS,
@@ -1333,6 +1336,17 @@ class AdminApp:
         return RequestView(Starlette(routes=routes), self.settings)
 
 
+def _lang(scope: Scope) -> str:
+    if scope["type"] != "http":
+        return "en"
+    headers = Headers(scope=scope)
+    cookies = SimpleCookie()
+    with suppress(CookieError):
+        cookies.load(headers.get("cookie", ""))
+    cookie = cookies.get(i18n.COOKIE)
+    return i18n.pick(cookie.value if cookie else None, headers.get("accept-language"))
+
+
 class RequestView:
     """Sets the per-request :class:`View`; behind Ingress also guards the entry.
 
@@ -1348,8 +1362,9 @@ class RequestView:
         self.base = View(dagster=settings.dagster_ui and not self.ingress)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        lang = _lang(scope)
         if scope["type"] != "http" or not self.ingress or scope["path"] == "/healthz":
-            token = view.current.set(self.base)
+            token = view.current.set(replace(self.base, lang=lang))
             try:
                 await self.app(scope, receive, send)
             finally:
@@ -1371,7 +1386,13 @@ class RequestView:
         hostname = urlparse(f"//{host}").hostname if host else None
         endpoint = f"http://{_url_host(hostname)}:{MCP_PORT}/mcp" if hostname else None
         token = view.current.set(
-            View(prefix=ingress_path, dagster=False, sign_out=False, endpoint=endpoint)
+            View(
+                prefix=ingress_path,
+                dagster=False,
+                sign_out=False,
+                endpoint=endpoint,
+                lang=lang,
+            )
         )
         try:
             await self.app(scope, receive, send)
