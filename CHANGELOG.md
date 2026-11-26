@@ -15,6 +15,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 - Analysis settings: "Reset all to defaults" sets every changed setting back to its
   default in one step (confirmed with a tick box, recorded in the history and audit).
+- Admin GUI: explanations of the columns and cards on hover or focus, in the language of
+  Home Assistant (English, Czech, German, Polish, Dutch); numbers with digit grouping,
+  shares as percentages, dates and times in Home Assistant's number, date and time
+  format and time zone (outside Home Assistant the browser's).
+- Tokens page: a picture of how a token connects an LLM agent with xomtra and that
+  xomtra only reads Home Assistant, with the page's actions on it.
 
 ### Changed
 

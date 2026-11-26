@@ -179,10 +179,11 @@ async def test_ingress_page_has_the_xomtra_look() -> None:
         resp = await client.get("/tokens", headers=HA)
         css = await client.get("/static.css", headers=HA)
         font = await client.get("/fonts/Geist-Variable.woff2", headers=HA)
-        theme = await client.get("/theme.js", headers=HA)
+        theme = await client.get("/ui.js", headers=HA)
+        tips = await client.get("/tips.json", headers=HA)
         icon = await client.get("/favicon.svg", headers=HA)
         missing = await client.get("/fonts/..%2Fapp.py", headers=HA)
-    assert f'<script src="{INGRESS}/theme.js"></script>' in resp.text
+    assert f'<script src="{INGRESS}/ui.js"></script>' in resp.text
     assert f'href="{INGRESS}/favicon.svg"' in resp.text
     assert '<a href="' + INGRESS + '/tokens" aria-current=page>Tokens</a>' in resp.text
     assert "<b>xomtra</b><small>admin</small>" in resp.text
@@ -198,6 +199,7 @@ async def test_ingress_page_has_the_xomtra_look() -> None:
     assert icon.status_code == 200
     assert icon.headers["content-type"] == "image/svg+xml"
     assert missing.status_code == 404
+    assert set(tips.json()) == {"en", "cs", "de", "pl", "nl"}
 
 
 async def test_tokens_page_explains_the_flow_with_actions() -> None:
@@ -208,3 +210,22 @@ async def test_tokens_page_explains_the_flow_with_actions() -> None:
     assert f"href='{INGRESS}/connect/xomtra.mcpb' download" in resp.text
     assert "href='#issue'" in resp.text
     assert "<form id=issue " in resp.text
+
+
+def test_values_are_formatted_for_the_locale() -> None:
+    from datetime import UTC, datetime
+
+    from xomtra_mcp.admin.html import TIPS, fmt, table
+
+    assert fmt(31204118) == '<data class="n" value="31204118">31,204,118</data>'
+    assert fmt(0.9812, pct=True) == '<data class="p" value="0.9812">98.1%</data>'
+    assert fmt(datetime(2026, 11, 26, 7, 20, tzinfo=UTC)) == (
+        '<time datetime="2026-11-26T07:20:00Z">2026-11-26 07:20 UTC</time>'
+    )
+    assert 'datetime="2026-11-26T07:20:00Z"' in fmt("2026-11-26 07:20:00")  # naive = UTC
+    assert fmt(True) == "True"
+    html = table(["missing_share", "nothing"], [[0.5, "x"]], {0})
+    assert '<data class="p" value="0.5">50.0%</data>' in html
+    assert 'data-tip="missing_share"' in html
+    assert "data-tip" not in html.split("nothing")[0].rsplit("<th", 1)[-1]
+    assert all(set(TIPS[lang]) == set(TIPS["en"]) for lang in TIPS)

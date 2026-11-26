@@ -75,7 +75,8 @@ STATIC_TYPES = {
     "Geist-Variable.woff2": "font/woff2",
     "GeistMono-Variable.woff2": "font/woff2",
     "favicon.svg": "image/svg+xml",
-    "theme.js": "text/javascript",
+    "tips.json": "application/json",
+    "ui.js": "text/javascript",
 }
 TOKEN_ROLES = ("xomtra.Reader", "xomtra.Admin")
 TOKEN_DAYS = (30, 90, 365, 0)
@@ -418,8 +419,8 @@ class AdminApp:
             [
                 ha_card,
                 ("Entities in HA", ha.get("entities"), ""),
-                ("Last state in lake (UTC)", last_state, fresh_cls),
-                ("Last statistic (UTC)", lake.get("last_statistic"), ""),
+                ("Last state in lake", last_state, fresh_cls),
+                ("Last statistic", lake.get("last_statistic"), ""),
             ]
         )
         if ha.get("error"):
@@ -503,7 +504,7 @@ class AdminApp:
             "<code>.env</code> and restart the ingest containers.</p>"
         )
         body += table(
-            ["data", "variable", "days", "deleted before (UTC)"],
+            ["data", "variable", "days", "deleted before"],
             [(n, v, d, (now - timedelta(days=d)).date().isoformat()) for n, v, d in periods],
             {2},
         )
@@ -871,11 +872,11 @@ class AdminApp:
                     r["reasons"],
                     r["series"],
                     r["entities"],
-                    None if r["group_coverage"] is None else f"{r['group_coverage']:.0%}",
+                    r["group_coverage"],
                 ]
                 for r in runs
             ],
-            {0, 4, 5},
+            {0, 4, 5, 6},
         )
         ungrouped = sorted({e for r in runs for e in (r.get("ungrouped") or [])})
         if any(r["confidence"] == "low" for r in runs):
@@ -1263,7 +1264,8 @@ class AdminApp:
             Route(f"{PREFIX}/static.css", css),
             Route(f"{PREFIX}/fonts/{{name}}", asset),
             Route(f"{PREFIX}/favicon.svg", asset),
-            Route(f"{PREFIX}/theme.js", asset),
+            Route(f"{PREFIX}/ui.js", asset),
+            Route(f"{PREFIX}/tips.json", asset),
             Route(f"{PREFIX}/login", self.login),
             Route(f"{PREFIX}/auth/callback", self.callback),
             Route(f"{PREFIX}/auth/check", self.check),

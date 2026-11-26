@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Iterable, Sequence
+from datetime import UTC, date, datetime
 from html import escape
+from pathlib import Path
 from typing import Any
 
 from xomtra_mcp.admin import view
 
 # Colours, type and components follow the xomtra.com web (graphite, indigo accent,
 # amber signal, Geist / Geist Mono). Dark by default like the web; the light variant
-# only when Home Assistant is in light mode (theme.js sets data-theme).
+# only when Home Assistant is in light mode (ui.js sets data-theme).
 DARK = {
     "bg": "#0b0c0f",
     "surface": "#121419",
@@ -130,6 +134,12 @@ details { border-top:1px solid var(--line); border-bottom:1px solid var(--line);
 summary { cursor:pointer; font-weight:500; }
 ol, ul { padding-left:22px; }
 li { margin-bottom:4px; }
+[data-tip] { cursor:help; text-underline-offset:3px;
+  text-decoration:underline dotted color-mix(in srgb, var(--muted) 60%, transparent); }
+.tip { position:fixed; z-index:20; max-width:320px; padding:9px 12px; border-radius:9px;
+  background:var(--raise); color:var(--ink); border:1px solid var(--line);
+  font:400 13px/1.45 var(--sans); letter-spacing:0; text-transform:none;
+  box-shadow:0 12px 30px -12px rgba(0,0,0,.5); pointer-events:none; }
 figure.flow { margin:0 0 18px; background:var(--surface); border:1px solid var(--line);
   border-radius:12px; padding:16px; }
 figure.flow svg { display:block; width:100%; height:auto; }
@@ -157,6 +167,15 @@ form:target { outline:2px solid var(--accent); outline-offset:6px; border-radius
   header form, header .who { margin-left:0; } }
 """
 )
+
+# Explanations of the columns and cards, in the languages of xomtra.com; ui.js shows the
+# one of Home Assistant's language on hover or focus, the English one is the fallback.
+TIPS: dict[str, dict[str, str]] = json.loads(
+    (Path(__file__).parent / "static" / "tips.json").read_text(encoding="utf-8")
+)
+# Columns holding a share in [0, 1], shown as a percentage.
+PERCENT = frozenset({"numeric_share", "missing_share", "with area"})
+_ISO = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
 
 # xomtra mark (as on xomtra.com): two time series crossing; the amber dot is where they
 # correlate. Colours come from the theme tokens.
@@ -213,12 +232,59 @@ def page(title: str, body: str, user: str | None) -> str:
         '<meta name=viewport content="width=device-width, initial-scale=1">'
         f"<title>{escape(title)} · xomtra admin</title>"
         f'<link rel=icon href="{v.prefix}/favicon.svg" type="image/svg+xml">'
-        f'<script src="{v.prefix}/theme.js"></script>'
+        f'<script src="{v.prefix}/ui.js"></script>'
         f'<link rel=stylesheet href="{v.prefix}/static.css"></head><body>'
         f'<header><a class=brand href="{v.prefix}/">{MARK}<b>xomtra</b><small>admin</small></a>'
         f"<nav>{links}</nav>{logout}</header>"
         f"<main><h1>{escape(title)}</h1>{body}</main></body></html>"
     )
+
+
+def _tip(label: str) -> str:
+    text = TIPS["en"].get(label)
+    return f' data-tip="{escape(label)}" title="{escape(text)}" tabindex=0' if text else ""
+
+
+def _num(value: float, pct: bool) -> str:
+    """A number with digit grouping; ui.js reformats it in Home Assistant's locale."""
+    if pct:
+        shown = f"{value:.1%}"
+    elif isinstance(value, int):
+        shown = f"{value:,}"
+    elif abs(value) >= 1000:
+        shown = f"{value:,.0f}"
+    else:
+        shown = f"{value:.4g}"
+    kind = "p" if pct else "n"
+    return f'<data class="{kind}" value="{value!r}">{escape(shown)}</data>'
+
+
+def _when(value: datetime | date) -> str:
+    """A time in UTC; ui.js shows it in Home Assistant's time zone and date format."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        iso = value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+        shown = value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    else:
+        iso = shown = value.isoformat()
+    return f'<time datetime="{iso}">{escape(shown)}</time>'
+
+
+def fmt(value: Any, *, pct: bool = False) -> str:
+    """A value for a table cell or card: numbers grouped, shares as %, times as <time>."""
+    if isinstance(value, bool) or value is None:
+        return e(value)
+    if isinstance(value, (int, float)):
+        return _num(value, pct)
+    if isinstance(value, (datetime, date)):
+        return _when(value)
+    if isinstance(value, str) and _ISO.match(value):
+        try:
+            return _when(datetime.fromisoformat(value))
+        except ValueError:
+            pass
+    return e(value)
 
 
 def table(
@@ -231,13 +297,16 @@ def table(
     """``trusted_html``: columns holding markup built by the app itself (not escaped)."""
     numeric, trusted = numeric or set(), trusted_html or set()
 
+    pct = {i for i, c in enumerate(columns) if c in PERCENT}
+
     def cell(i: int, v: Any) -> str:
         if i in trusted:
             return f"<td>{v}</td>"
-        return f'<td class="num">{e(v)}</td>' if i in numeric else f"<td>{e(v)}</td>"
+        shown = fmt(v, pct=i in pct)
+        return f'<td class="num">{shown}</td>' if i in numeric else f"<td>{shown}</td>"
 
     head = "".join(
-        f'<th class="num">{escape(c)}</th>' if i in numeric else f"<th>{escape(c)}</th>"
+        f"<th{' class="num"' if i in numeric else ''}{_tip(c)}>{escape(c)}</th>"
         for i, c in enumerate(columns)
     )
     body = "".join("<tr>" + "".join(cell(i, v) for i, v in enumerate(r)) + "</tr>" for r in rows)
@@ -249,8 +318,8 @@ def cards(items: Iterable[tuple[str, Any, str]]) -> str:
     return (
         '<div class="cards">'
         + "".join(
-            f'<div class="card"><div class="muted">{escape(label)}</div>'
-            f'<div class="v {escape(cls)}">{e(value)}</div></div>'
+            f'<div class="card"><div class="muted"><span{_tip(label)}>{escape(label)}</span></div>'
+            f'<div class="v {escape(cls)}">{fmt(value)}</div></div>'
             for label, value, cls in items
         )
         + "</div>"
