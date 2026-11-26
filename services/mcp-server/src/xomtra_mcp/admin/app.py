@@ -113,10 +113,11 @@ type Handler = Callable[[Request, dict[str, Any]], Awaitable[Response]]
 BACKUP_NOTE = (
     "<h2 id=backups>Backups</h2>"
     "<p class=warn>Home Assistant backups do not include xomtra's analytics. They keep "
-    "the tokens, the settings and the database of this add-on, but not the lake: the "
+    "the tokens, the settings and the dismissed findings, but not the lake: the "
     "history, the findings and the weekly summaries, which take tens of GB. After a "
     "restore xomtra starts a new lake and loads the history again from Home "
-    "Assistant, only as far back as Home Assistant still keeps it.</p>"
+    "Assistant, only as far back as Home Assistant still keeps it, and computes the "
+    "findings again.</p>"
     "<p class=muted>For a robust setup with backups of the whole history, run xomtra "
     "on its own virtual machine (Proxmox, VMware or Docker on Linux) and back up that "
     "machine.</p>"

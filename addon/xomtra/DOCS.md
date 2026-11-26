@@ -25,9 +25,10 @@ catches up from Home Assistant's history.
 ## Backups
 
 Home Assistant backups do not include xomtra's analytics. They keep the tokens, the
-settings and the add-on's database, but not the lake (the history, the findings and the
+settings and the dismissed findings, but not the lake (the history, the findings and the
 weekly summaries, tens of GB). After a restore xomtra starts a new lake and loads the
-history again from Home Assistant, only as far back as Home Assistant still keeps it.
+history again from Home Assistant, only as far back as Home Assistant still keeps it,
+and computes the findings again.
 
 For a robust setup with backups of the whole history, run xomtra on its own virtual
 machine (Proxmox, VMware or Docker on Linux) and back up that machine.
