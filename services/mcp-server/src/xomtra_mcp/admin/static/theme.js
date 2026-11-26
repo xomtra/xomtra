@@ -1,5 +1,5 @@
 // Follow Home Assistant's light/dark mode when shown in its Ingress iframe (same origin);
-// otherwise the stylesheet follows the browser (prefers-color-scheme).
+// otherwise the GUI stays dark like xomtra.com.
 (function () {
   try {
     if (window.parent === window) return;

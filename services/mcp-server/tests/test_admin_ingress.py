@@ -188,8 +188,8 @@ async def test_ingress_page_has_the_xomtra_look() -> None:
     assert "<b>xomtra</b><small>admin</small>" in resp.text
     # Fonts resolve relative to the stylesheet, so they work under the Ingress path too.
     assert 'url("fonts/Geist-Variable.woff2")' in css.text
-    assert "prefers-color-scheme: dark" in css.text
-    assert ":root[data-theme=dark]" in css.text
+    assert "prefers-color-scheme" not in css.text  # dark unless Home Assistant is light
+    assert ":root[data-theme=light]" in css.text
     assert font.status_code == 200
     assert font.headers["content-type"] == "font/woff2"
     assert font.content[:4] == b"wOF2"

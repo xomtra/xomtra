@@ -9,8 +9,8 @@ from typing import Any
 from xomtra_mcp.admin import view
 
 # Colours, type and components follow the xomtra.com web (graphite, indigo accent,
-# amber signal, Geist / Geist Mono). The web is dark only; the GUI adds a light variant
-# and follows Home Assistant's mode (theme.js) or else the browser's.
+# amber signal, Geist / Geist Mono). Dark by default like the web; the light variant
+# only when Home Assistant is in light mode (theme.js sets data-theme).
 DARK = {
     "bg": "#0b0c0f",
     "surface": "#121419",
@@ -51,11 +51,9 @@ CSS = (
   format("woff2"); font-weight:100 900; font-display:swap; }
 :root { --sans:"Geist","Segoe UI",system-ui,sans-serif;
   --mono:"Geist Mono",ui-monospace,Menlo,monospace; """
+    + _tokens(DARK, "dark")
+    + "}\n:root[data-theme=light] { "
     + _tokens(LIGHT, "light")
-    + "}\n@media (prefers-color-scheme: dark) { :root:not([data-theme=light]) { "
-    + _tokens(DARK, "dark")
-    + "} }\n:root[data-theme=dark] { "
-    + _tokens(DARK, "dark")
     + "}\n"
     + """
 * { box-sizing:border-box; }
