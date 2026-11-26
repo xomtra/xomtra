@@ -4,7 +4,7 @@
   "display_name": "xomtra",
   "version": "0.0.0",
   "description": "History, catalog and findings of your Home Assistant, from your xomtra server in the LAN.",
-  "long_description": "Connects Claude Desktop to a xomtra server on your local network. Issue a personal token in the xomtra admin GUI (Tokens) and enter it here. Read-only: xomtra never changes anything in Home Assistant.",
+  "long_description": "Connects Claude Desktop to a xomtra server on your local network. Issue a personal token in the xomtra admin GUI (Tokens) and enter it here. xomtra only reads data and never changes anything in Home Assistant; Claude gets read-only tools over xomtra's own copy of the data, not access to controlling your home.",
   "author": {
     "name": "xomtra contributors",
     "url": "https://github.com/xomtra/xomtra"

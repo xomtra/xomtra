@@ -33,6 +33,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   **Upgrade note:** an existing `.env` with passwords keeps working; on the first start
   `secrets-init` takes them over into the volume `secrets`, after which they can be
   removed from `.env`. Back up the volume `secrets` together with the data volumes.
+- The documentation and the Claude Desktop extension now say precisely what "read only"
+  means: xomtra only reads and never calls Home Assistant services, and the assistant
+  gets read-only tools over xomtra's own data. Home Assistant has no read-only tokens,
+  so this is guaranteed by xomtra's code; the Docker guide explains why a separate
+  non-admin user is still recommended (access can be revoked at any time).
 
 ## [0.6.2] - 2026-11-26
 
