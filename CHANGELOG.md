@@ -11,6 +11,22 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Option to turn off the default answer style and rules (add-on option
+  `default_guidelines`, `XOMTRA_DEFAULT_GUIDELINES=false` elsewhere), with a note on the
+  admin pages for tokens and clients (ADR 080).
+- Place for a central theme from xomtra.com (ADR 075): when one is active it comes
+  first in `answer_guidelines` and takes precedence; it is forgotten 24 hours after it
+  was received, and it applies even with the default guidelines off.
+
+### Changed
+
+- Default answer style: very funny, crude and vulgar, fitted to the language and
+  country of the installation (never to the user's wealth or status), for the user as
+  the occupant of the property. No jokes about accidents, faults or risky states;
+  teasing the user only with tact; facts stay exact (ADR 073, 080).
+
 ## [0.7.0] - 2026-11-26
 
 ### Added

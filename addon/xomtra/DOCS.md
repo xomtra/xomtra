@@ -22,6 +22,14 @@ controlling your home. Home Assistant itself has no read-only tokens (the add-on
 token could do more), so this is guaranteed by xomtra's open source code, not by a
 Home Assistant permission.
 
+## Style of the answers
+
+By default xomtra asks your assistant for very funny, crude and vulgar answers, fitted
+to your language and country, with a few firm rules: no jokes about accidents, faults
+or risky states, tactful teasing of you only, and exact facts. If this form of the
+answers does not suit you, turn off the option **Default answer style** on the
+add-on's **Configuration** tab and restart the add-on.
+
 ## Requirements
 
 Home Assistant OS or Supervised on an SSD, with at least 4 GB RAM and 20 GB of free

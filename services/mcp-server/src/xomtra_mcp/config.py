@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     query_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     # Time zone of daily buckets in get_timeseries.
     timezone: str = "UTC"
+    # Default guidelines for answering (tone, role, data rules; ADR 073, 080). The
+    # operator may turn them off; a central theme (ADR 075) still applies.
+    default_guidelines: bool = True
 
     # Audit database (ADR 040). Required with Entra auth: every call must be audited.
     audit_pg_host: str | None = None

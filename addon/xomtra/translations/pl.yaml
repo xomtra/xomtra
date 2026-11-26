@@ -17,5 +17,12 @@ configuration:
       Endpoint MCP tak, jak widzą go klienci w Twojej sieci, na przykład
       http://homeassistant.local:8000/mcp. Puste: panel administracyjny ustali go z
       adresu, pod którym otwarto Home Assistant.
+  default_guidelines:
+    name: Domyślny styl odpowiedzi
+    description: >-
+      Prosić asystenta o bardzo zabawne, sprośne i wulgarne odpowiedzi w Twoim języku,
+      wraz z domyślnymi zasadami odpowiadania (rola, praca z danymi, bez żartów o
+      awariach). Wyłączone: xomtra nie wysyła stylu ani zasad; bieżący motyw z
+      xomtra.com nadal obowiązuje. Działa po ponownym uruchomieniu.
 network:
   8000/tcp: Endpoint MCP w sieci LAN (osobiste tokeny dostępu)
