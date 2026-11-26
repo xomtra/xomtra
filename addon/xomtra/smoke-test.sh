@@ -11,7 +11,7 @@ NAME=xomtra-addon-smoke
 NET=xomtra-smoke-hassio
 cat >"$DATA/options.json" <<'JSON'
 {"log_level": "info", "states_retention_days": 90, "statistics_5min_retention_days": 90,
- "statistics_hour_retention_days": 1825, "mcp_url": ""}
+ "statistics_hour_retention_days": 1825}
 JSON
 cleanup() {
   docker logs "$NAME" 2>&1 | tail -80

@@ -308,6 +308,14 @@ def test_mcpb_contents() -> None:
     assert manifest["user_config"]["token"]["sensitive"] is True
     assert manifest["server"]["mcp_config"]["env"]["XOMTRA_TOKEN"] == "${user_config.token}"
     assert "xmt_" not in json.dumps(manifest["user_config"]["url"])
+    assert manifest["user_config"]["allow_http"]["default"] is False
+
+
+def test_mcpb_for_an_http_endpoint_allows_http() -> None:
+    """The add-on serves MCP on plain http in the LAN; its download must work as is."""
+    plain = desktop.manifest("http://homeassistant.local:8000/mcp")
+    assert plain["user_config"]["allow_http"]["default"] is True
+    assert desktop.manifest()["user_config"]["allow_http"]["default"] is False
 
 
 @pytest.fixture

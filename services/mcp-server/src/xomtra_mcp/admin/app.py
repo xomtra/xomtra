@@ -258,6 +258,12 @@ class AdminApp:
         return endpoint
 
     def _same_origin(self, request: Request) -> bool:
+        # Sec-Fetch-Site is set by the browser and cannot be set by a page. It decides
+        # where present: behind proxies (Home Assistant Ingress behind a reverse proxy,
+        # Nabu Casa, the companion app) the Origin need not match any forwarded host.
+        fetch_site = request.headers.get("sec-fetch-site")
+        if fetch_site:
+            return fetch_site in {"same-origin", "none"}
         origin = request.headers.get("origin")
         if not origin:
             return True
@@ -1114,6 +1120,9 @@ class AdminApp:
                 f"server, also download <a href='{e(ca)}'>xomtra-ca.crt</a> and select it "
                 "as <em>Certificate of the server</em>.</li></ol>"
                 if tls
+                else "<li>Paste the token. The address uses plain http://, so "
+                "<em>Allow unencrypted http://</em> is checked; keep it.</li></ol>"
+                if origin.scheme == "http"
                 else "<li>Paste the token.</li></ol>"
             )
             + "<h2>Claude Code</h2>"

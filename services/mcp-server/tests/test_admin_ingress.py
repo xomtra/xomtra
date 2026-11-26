@@ -142,6 +142,28 @@ async def test_tokens_behind_ingress() -> None:
     assert manifest["user_config"]["url"]["default"] == endpoint
 
 
+async def test_fetch_metadata_decides_same_origin() -> None:
+    """Behind a reverse proxy in front of Home Assistant the browser's Origin differs from
+    X-Forwarded-Host; Sec-Fetch-Site (set by the browser only) still tells a form of
+    the page itself from another site's."""
+    app, _, _ = make_app()
+    form = {"owner": "Petr", "description": "laptop", "role": "xomtra.Reader", "days": "90"}
+    proxied = {**HA, "origin": "https://ha.example.org"}
+    async with client_for(app) as client:
+        own = await client.post(
+            "/tokens/issue", data=form, headers={**proxied, "sec-fetch-site": "same-origin"}
+        )
+        other = await client.post(
+            "/tokens/issue", data=form, headers={**proxied, "sec-fetch-site": "cross-site"}
+        )
+        sibling = await client.post(
+            "/tokens/issue", data=form, headers={**proxied, "sec-fetch-site": "same-site"}
+        )
+    assert own.status_code == 200
+    assert other.status_code == 403
+    assert sibling.status_code == 403
+
+
 async def test_mcp_url_setting_wins_over_the_guess() -> None:
     app, _, _ = make_app(mcp_url="https://ha.example.org:8443/mcp")
     async with client_for(app) as client:
