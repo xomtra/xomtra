@@ -11,6 +11,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Fixed
+
+- Home Assistant add-on: the update dialog said "No changelog found". The add-on now
+  ships its own `CHANGELOG.md` with the last five released versions;
+  `scripts/release.py prepare` writes it and `check` refuses a tag without it.
+
 ## [0.6.0] - 2026-11-26
 
 ### Added

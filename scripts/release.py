@@ -41,6 +41,10 @@ IMAGES = ("xomtra-mcp", "xomtra-ingest", "xomtra-caddy")
 ADDON_CONFIG = "addon/xomtra/config.yaml"
 REGISTRY = "ghcr.io/xomtra"
 CHANGELOG = "CHANGELOG.md"
+# Home Assistant shows the add-on's own CHANGELOG.md with an update; it holds the last
+# released versions of CHANGELOG.md.
+ADDON_CHANGELOG = "addon/xomtra/CHANGELOG.md"
+ADDON_CHANGELOG_VERSIONS = 5
 REPO_URL = "https://github.com/xomtra/xomtra"
 
 _SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta|rc)\.([1-9]\d*))?$")
@@ -167,6 +171,21 @@ def _move_unreleased(changelog: str, version: Version, today: dt.date) -> str:
     return changelog + "\n\n" + "\n".join([*links, *old_links]) + "\n"
 
 
+def addon_changelog(changelog: str) -> str:
+    """The add-on's changelog: the last released sections of ``changelog``."""
+    released = [
+        (match.group(1), match.group(2).strip())
+        for match in _SECTION.finditer(changelog)
+        if match.group(1) != "Unreleased"
+    ][:ADDON_CHANGELOG_VERSIONS]
+    sections = _sections(changelog)
+    parts = ["# Changelog"]
+    for name, rest in released:
+        parts.append(f"## {name} {rest}".rstrip() + "\n\n" + sections[name])
+    parts.append(f"Older versions: {REPO_URL}/blob/main/CHANGELOG.md")
+    return "\n\n".join(parts) + "\n"
+
+
 def prepare(version: Version, *, today: dt.date | None = None, lock: bool = True) -> list[str]:
     """Set the release version everywhere; returns the changed files."""
     changed = []
@@ -194,6 +213,8 @@ def prepare(version: Version, *, today: dt.date | None = None, lock: bool = True
     if not version.prerelease:
         _write(CHANGELOG, _move_unreleased(_read(CHANGELOG), version, today or dt.date.today()))
         changed.append(CHANGELOG)
+        _write(ADDON_CHANGELOG, addon_changelog(_read(CHANGELOG)))
+        changed.append(ADDON_CHANGELOG)
     if lock:
         uv = shutil.which("uv")
         if uv is None:
@@ -223,6 +244,11 @@ def check(version: Version) -> None:
         notes(version)
     except ReleaseError as err:
         problems.append(str(err))
+    if not version.prerelease:
+        path = ROOT / ADDON_CHANGELOG
+        found = path.read_text(encoding="utf-8") if path.exists() else ""
+        if found != addon_changelog(_read(CHANGELOG)):
+            problems.append(f"{ADDON_CHANGELOG}: not the last versions of {CHANGELOG}")
     if problems:
         raise ReleaseError(
             f"tree is not release {version.semver} "

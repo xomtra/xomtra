@@ -115,6 +115,12 @@ def test_prepare_then_check(tree: Path) -> None:
     )
     assert "Intro with a [link](https://example.org)" in changelog
     assert release.notes(version) == "### Added\n\n- Something new."
+    assert (tree / release.ADDON_CHANGELOG).read_text() == (
+        "# Changelog\n\n"
+        "## 0.2.0 - 2026-12-01\n\n### Added\n\n- Something new.\n\n"
+        "## 0.1.0 - 2026-11-23\n\n### Added\n\n- First.\n\n"
+        "Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md\n"
+    )
     # A released version cannot be prepared twice, and Unreleased is now empty.
     with pytest.raises(release.ReleaseError):
         release.prepare(version, lock=False)
@@ -146,6 +152,29 @@ def test_main_exit_codes(tree: Path, capsys: pytest.CaptureFixture[str]) -> None
     assert capsys.readouterr().out.split() == ["0.2.0-rc.1", "beta"]
     assert release.main(["check", "v9.9.9"]) == 1
     assert "tree is not release 9.9.9" in capsys.readouterr().err
+
+
+def test_check_needs_the_addon_changelog(tree: Path) -> None:
+    version = release.Version.parse("0.2.0")
+    release.prepare(version, today=dt.date(2026, 12, 1), lock=False)
+    (tree / release.ADDON_CHANGELOG).write_text("# Changelog\n", encoding="utf-8")
+    with pytest.raises(release.ReleaseError, match=re.escape("addon/xomtra/CHANGELOG.md")):
+        release.check(version)
+
+
+def test_addon_changelog_keeps_the_last_versions() -> None:
+    sections = "".join(f"## [0.{i}.0] - 2026-11-{i:02d}\n\n- v{i}\n\n" for i in range(9, 0, -1))
+    text = release.addon_changelog(f"# Changelog\n\n## [Unreleased]\n\n- next\n\n{sections}")
+    assert "## 0.9.0 - 2026-11-09\n\n- v9" in text
+    assert "## 0.5.0" in text
+    assert "## 0.4.0" not in text
+    assert "next" not in text
+
+
+def test_the_addon_changelog_follows_the_changelog() -> None:
+    """Home Assistant shows it with an update ("No changelog found" without it)."""
+    expected = release.addon_changelog((REPO / release.CHANGELOG).read_text(encoding="utf-8"))
+    assert (REPO / release.ADDON_CHANGELOG).read_text(encoding="utf-8") == expected
 
 
 def test_check_needs_the_addon_version(tree: Path) -> None:
