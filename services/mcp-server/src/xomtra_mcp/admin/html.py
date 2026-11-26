@@ -91,15 +91,16 @@ h2 { font:500 12px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
 p { margin:0 0 12px; }
 .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; }
 .card { background:var(--surface); border:1px solid var(--line); border-radius:12px;
-  padding:14px 16px; }
+  padding:12px 14px; }
 .card .muted { font:500 11px/1.3 var(--mono); letter-spacing:.07em; text-transform:uppercase; }
-.card .v { font:500 24px/1.2 var(--mono); margin-top:8px; font-variant-numeric:tabular-nums;
-  letter-spacing:-.02em; overflow-wrap:anywhere; }
+.card .v { font:600 16px/1.35 var(--sans); margin-top:6px; font-variant-numeric:tabular-nums;
+  letter-spacing:-.01em; overflow-wrap:break-word; }
 .muted { color:var(--muted); }
 .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
 p.ok, p.bad, p.warn { color:var(--ink); background:var(--surface); border:1px solid var(--line);
   border-left:3px solid var(--c); border-radius:8px; padding:10px 14px; }
 p.ok { --c:var(--ok); } p.bad { --c:var(--bad); } p.warn { --c:var(--warn); }
+p .more { display:block; margin-top:8px; color:var(--muted); }
 .scroll + p, .scroll + h2 + p { margin-top:14px; }
 .scroll { overflow-x:auto; background:var(--surface); border:1px solid var(--line);
   border-radius:12px; }

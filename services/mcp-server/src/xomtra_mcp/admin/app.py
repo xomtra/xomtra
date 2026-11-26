@@ -52,7 +52,7 @@ from xomtra_mcp.admin.analysis import (
     run_confidence,
 )
 from xomtra_mcp.admin.config import PREFIX, AdminSettings
-from xomtra_mcp.admin.html import CSS, cards, e, page, table, token_flow
+from xomtra_mcp.admin.html import CSS, cards, e, fmt, page, table, token_flow
 from xomtra_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
 from xomtra_mcp.admin.session import Signer
 from xomtra_mcp.admin.view import View, prefix
@@ -122,10 +122,9 @@ BACKUP_NOTE = (
     "history, the findings and the weekly summaries, which take tens of GB. After a "
     "restore xomtra starts a new lake and loads the history again from Home "
     "Assistant, only as far back as Home Assistant still keeps it, and computes the "
-    "findings again.</p>"
-    "<p class=muted>For a robust setup with backups of the whole history, run xomtra "
-    "on its own virtual machine (Proxmox, VMware or Docker on Linux) and back up that "
-    "machine.</p>"
+    "findings again.<span class=more>For a robust setup with backups of the whole "
+    "history, run xomtra on its own virtual machine (Proxmox, VMware or Docker on "
+    "Linux) and back up that machine.</span></p>"
 )
 
 
@@ -499,8 +498,8 @@ class AdminApp:
         kinds = lake.get("kinds") or []
         body += "<h2>Catalog</h2>"
         if kinds:
-            body += f"<p class=muted>Profiled at {e(kinds[0]['profiled_at'])}</p>" + table(
-                ["kind", "entities", "stale"],
+            body += f"<p class=muted>Profiled at {fmt(kinds[0]['profiled_at'])}</p>" + table(
+                ["entity kind", "entities", "stale entities"],
                 [(k["kind"], k["entities"], k["stale"]) for k in kinds],
                 {1, 2},
             )
@@ -703,7 +702,7 @@ class AdminApp:
         label = f"{e(spec.label)}<br><code>{e(spec.env)}</code>"
         if spec.help:
             label += f"<br><span class=muted>{e(spec.help)}</span>"
-        who = f"{e(stored.changed_by)}, {e(stored.changed_at)}" if stored else ""
+        who = f"{e(stored.changed_by)}, {fmt(stored.changed_at)}" if stored else ""
         return [label, self._shown(spec, spec.default), spec.bounds(), value or None, who, form]
 
     async def analysis_page(

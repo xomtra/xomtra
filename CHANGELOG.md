@@ -11,6 +11,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Changed
+
+- Admin GUI overview: smaller card values that fit on one line, clearer catalog column
+  names (entity kind, entities, stale entities), the profiling time in the local
+  format, and the backup note in one box.
+
 ### Fixed
 
 - Admin GUI after an upgrade: the browser kept the previous version's stylesheet and
