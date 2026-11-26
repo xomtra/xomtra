@@ -11,6 +11,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from xomtra_mcp import __version__
 from xomtra_mcp.admin import i18n, view
 
 # Colours, type and components follow the xomtra.com web (graphite, indigo accent,
@@ -85,6 +86,10 @@ nav a[aria-current=page] { color:var(--ink); background:var(--raise); }
 header form, header .who { margin-left:auto; display:flex; gap:10px; align-items:center;
   font:400 12.5px/1 var(--mono); }
 main { padding:28px 20px 56px; max-width:1300px; margin:0 auto; }
+footer { max-width:1300px; margin:0 auto; padding:14px 20px 28px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+footer a { color:var(--muted); text-decoration:none; } footer a:hover { color:var(--ink); }
+footer code { font:500 12px var(--mono); }
 h1 { font:600 clamp(24px,3vw,30px)/1.1 var(--sans); letter-spacing:-.035em; margin:0 0 18px; }
 h2 { font:500 12px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
   color:var(--accent); margin:34px 0 12px; }
@@ -222,6 +227,26 @@ def e(value: Any) -> str:
     return escape(str(value))
 
 
+def _out(href: str, label: str) -> str:
+    """A link out of the GUI: a new tab (not inside the Home Assistant panel) and no
+    Referer, which would carry the Ingress path of the installation."""
+    return f'<a href="{href}" target="_blank" rel="noopener noreferrer">{label}</a>'
+
+
+_REPO = "https://github.com/xomtra/xomtra"
+FOOTER = (
+    "<footer>"
+    + _out(f"{_REPO}/releases/tag/v{__version__}", f"<code>xomtra {escape(__version__)}</code>")
+    + " · "
+    + _out("https://xomtra.com", "xomtra.com")
+    + " · "
+    + _out(f"{_REPO}/tree/main/docs", "Documentation")
+    + " · "
+    + _out(f"{_REPO}/issues/new", "Report a bug")
+    + "</footer>"
+)
+
+
 def page(title: str, body: str, user: str | None) -> str:
     v = view.current.get()
     nav = (item for item in NAV if v.dagster or item[0] != "/dagster/")
@@ -248,7 +273,7 @@ def page(title: str, body: str, user: str | None) -> str:
         f'<link rel=stylesheet href="{v.prefix}/static.css?v={ASSET_VERSION}"></head><body>'
         f'<header><a class=brand href="{v.prefix}/">{MARK}<b>xomtra</b><small>admin</small></a>'
         f"<nav>{links}</nav>{logout}</header>"
-        f"<main><h1>{shown}</h1>{body}</main></body></html>",
+        f"<main><h1>{shown}</h1>{body}</main>{FOOTER}</body></html>",
         v.lang,
     )
 

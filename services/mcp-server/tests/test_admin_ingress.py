@@ -2,6 +2,7 @@
 
 import io
 import json
+import re
 import zipfile
 from typing import Any
 
@@ -308,3 +309,19 @@ async def test_gui_follows_the_language_cookie_and_accept_language() -> None:
     assert "<h1>Übersicht</h1>" in de.text
     assert "<html lang=en>" in en.text
     assert "<h1>Overview</h1>" in en.text
+
+
+async def test_footer_links_leave_the_panel_without_a_referer() -> None:
+    from xomtra_mcp import __version__
+
+    app, _, _ = make_app()
+    async with client_for(app) as client:
+        resp = await client.get("/", headers={**HA, "cookie": "xomtra_lang=cs"})
+    footer = resp.text.split("<footer>", 1)[1].split("</footer>", 1)[0]
+    assert f"xomtra {__version__}" in footer
+    assert "https://xomtra.com" in footer
+    assert ">Dokumentace</a>" in footer
+    assert ">Nahlásit chybu</a>" in footer
+    links = re.findall(r"<a [^>]*>", footer)
+    assert len(links) == 4
+    assert all('target="_blank" rel="noopener noreferrer"' in a for a in links)

@@ -11,6 +11,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Admin GUI footer with the version (links to its release notes), xomtra.com, the
+  documentation and bug reports. The links open in a new tab and send no Referer.
+
 ### Changed
 
 - Admin GUI overview: smaller card values that fit on one line, clearer catalog column
