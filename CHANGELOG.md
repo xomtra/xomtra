@@ -36,6 +36,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   by default; behind Home Assistant Ingress it turns light when Home Assistant is in
   light mode. The add-on has an icon and a logo for the add-on store.
 
+## [0.5.1] - 2026-11-26
+
 ### Fixed
 
 - Home Assistant add-on: it did not start ("expected url" for `mcp_url`). The empty
@@ -294,7 +296,8 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/xomtra/xomtra/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/xomtra/xomtra/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/xomtra/xomtra/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/xomtra/xomtra/compare/v0.3.0...v0.4.0
