@@ -30,9 +30,12 @@ Layers in the lake (DuckLake, schema per layer):
 ## 1. Home Assistant user and network
 
 The ingest uses the same `XOMTRA_HA_URL` / `XOMTRA_HA_TOKEN` as the MCP server: a
-long-lived token of a dedicated **non-admin** user. Read access is all it needs
-(registries, history, statistics); the contract tests in CI verify this with a non-admin
-user on every pull request. The VM needs TCP 8123 to Home Assistant (firewall rule from
+long-lived token of a dedicated **non-admin** user. xomtra only reads (registries,
+history, statistics) and never calls services; the contract tests in CI verify that a
+non-admin user is enough on every pull request. Home Assistant has no read-only tokens,
+so a non-admin user can still control devices (it only cannot administer Home
+Assistant); the read-only guarantee is xomtra's code. A dedicated user lets you revoke
+xomtra's access at any time without touching your own account. The VM needs TCP 8123 to Home Assistant (firewall rule from
 the DMZ to the HA host only).
 
 ## 2. Configuration (`.env`)

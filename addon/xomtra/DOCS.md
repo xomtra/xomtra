@@ -13,6 +13,15 @@ available to Claude and other MCP clients.
 4. On **Connect clients**, download the Claude Desktop extension or copy the command for
    Claude Code. The MCP endpoint is port 8000 of your Home Assistant host.
 
+## What xomtra can do in Home Assistant
+
+xomtra only reads data: registries, states, history and statistics. It never calls
+services and changes nothing in Home Assistant. Your AI assistant talks only to xomtra
+and gets read-only tools over xomtra's own copy of the data, never access to
+controlling your home. Home Assistant itself has no read-only tokens (the add-on's
+token could do more), so this is guaranteed by xomtra's open source code, not by a
+Home Assistant permission.
+
 ## Requirements
 
 Home Assistant OS or Supervised on an SSD, with at least 4 GB RAM and 20 GB of free

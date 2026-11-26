@@ -34,6 +34,12 @@ starts as root, as in other add-ons.
 Home Assistant is reached through the Supervisor (`http://supervisor/core`) with the
 add-on's own token (`homeassistant_api: true`), so no long-lived access token is needed.
 
+Home Assistant has no read-only tokens: the add-on's token could call any service.
+xomtra's code uses it only to read registries, states, history and statistics and never
+calls services or changes anything. The MCP server gives the assistant read-only tools
+over xomtra's own copy of the data, never direct access to Home Assistant, so the
+guarantee is xomtra's open source code, not a Home Assistant permission.
+
 ## Admin GUI (Ingress)
 
 The admin GUI opens as **xomtra** in the Home Assistant sidebar, for Home Assistant
