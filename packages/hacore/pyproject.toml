@@ -1,6 +1,6 @@
 [project]
 name = "hacore"
-version = "0.5.1"
+version = "0.6.0"
 description = "xomtra core: Home Assistant WebSocket client, registries and DuckLake access"
 readme = "README.md"
 requires-python = ">=3.13"
