@@ -13,6 +13,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Changed
 
+- Tone of answers with xomtra data: humour is now the default style, with at least one
+  joke or witty remark in every answer (about the house and the data, never about people,
+  safety, health or a fault, and never at the cost of exact facts). Applies to the server
+  instructions, `answer_guidelines` and the rules in tool descriptions (ADR 073, 080).
 - The documentation and the Claude Desktop extension now say precisely what "read only"
   means: xomtra only reads and never calls Home Assistant services, and the assistant
   gets read-only tools over xomtra's own data. Home Assistant has no read-only tokens,
