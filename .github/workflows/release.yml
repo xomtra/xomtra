@@ -134,6 +134,7 @@ jobs:
             "$REGISTRY/xomtra-mcp@$mcp_digest" -m xomtra_mcp.desktop --version "$VERSION" \
             > "dist/xomtra-$VERSION.mcpb"
           unzip -l "dist/xomtra-$VERSION.mcpb" | grep -q server/index.js
+          unzip -l "dist/xomtra-$VERSION.mcpb" | grep -q icon.png
           {
             python3 scripts/release.py notes "$TAG"
             echo

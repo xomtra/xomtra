@@ -301,7 +301,7 @@ def test_mcpb_contents() -> None:
     data = desktop.build_mcpb("https://xomtra.lan/mcp", version="1.2.3")
     assert data == desktop.build_mcpb("https://xomtra.lan/mcp", version="1.2.3")
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        assert sorted(archive.namelist()) == ["manifest.json", "server/index.js"]
+        assert sorted(archive.namelist()) == ["icon.png", "manifest.json", "server/index.js"]
         manifest = json.loads(archive.read("manifest.json"))
     assert manifest["version"] == "1.2.3"
     assert manifest["user_config"]["url"]["default"] == "https://xomtra.lan/mcp"
