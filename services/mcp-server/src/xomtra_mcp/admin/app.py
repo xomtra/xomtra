@@ -1114,6 +1114,9 @@ class AdminApp:
                 f"server, also download <a href='{e(ca)}'>xomtra-ca.crt</a> and select it "
                 "as <em>Certificate of the server</em>.</li></ol>"
                 if tls
+                else "<li>Paste the token. The address uses plain http://, so "
+                "<em>Allow unencrypted http://</em> is checked; keep it.</li></ol>"
+                if origin.scheme == "http"
                 else "<li>Paste the token.</li></ol>"
             )
             + "<h2>Claude Code</h2>"

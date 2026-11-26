@@ -23,6 +23,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Postgres (add-on and compose) logs errors without the failed statement. DuckLake
   retries a commit when another writer took its snapshot id, and the statement filled
   the add-on log with Home Assistant data.
+- Claude Desktop extension downloaded from the admin GUI: for a plain `http://` address
+  (the add-on in the LAN) *Allow unencrypted http://* is checked by default; before, the
+  extension refused the add-on's endpoint until the user found the checkbox.
 
 ## [0.5.0] - 2026-11-25
 
