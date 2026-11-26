@@ -264,3 +264,26 @@ async def test_empty_lake(tmp_path: Path) -> None:
             await call(srv, "search_catalog")
     finally:
         empty.close()
+
+
+async def test_rules_travel_with_data_tools(data: DataAccess) -> None:
+    """ADR 080: the key rules are in every data tool description and in findings results."""
+    srv = server(data, ADMIN)
+    async with Client(srv) as client:
+        tools = {t.name: t.description or "" for t in await client.list_tools()}
+    for name in (
+        "search_catalog",
+        "describe_entity",
+        "list_views",
+        "get_timeseries",
+        "get_findings",
+        "get_weekly_summary",
+        "query_sql",
+    ):
+        assert "findings are hypotheses, not causes" in tools[name], name
+        assert "presence, sleep, health" in tools[name], name
+    assert "\n\nHow to answer (xomtra)" in tools["get_findings"]
+    findings = await call(srv, "get_findings")
+    summary = await call(srv, "get_weekly_summary")
+    for result in (findings, summary):
+        assert "hypotheses, not as causes" in result["answer_guidelines"]

@@ -10,6 +10,7 @@ audited (ADR 038-040). Data tools are registered when a lake connection is confi
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from datetime import date
 from typing import Annotated, Any, Literal
@@ -34,18 +35,7 @@ from xomtra_mcp.tokens import PersonalTokenVerifier, PostgresTokenStore, TokenSt
 
 logger = logging.getLogger(__name__)
 
-INSTRUCTIONS = """\
-xomtra exposes the history and catalog of a Home Assistant installation.
-
-Start with `search_catalog` to find entities (by words, area, domain or kind), then
-`describe_entity` for details and data quality, and `get_timeseries` for values over
-time. `get_findings` lists what the daily analysis found (correlations between
-entities, anomalies, lasting level changes); `get_weekly_summary` what changed in a
-week. `list_views` shows the SQL views you may query with `query_sql` (DuckDB SQL, one
-SELECT, view names without schema). All times are UTC unless stated otherwise. What you
-can see depends on your role; entities outside it are not returned.
-
-How to answer with this data (ADR 073):
+GUIDELINES = """\
 - Findings are statistical. Present correlations, anomalies and change points as
   hypotheses, not as causes, with their strength, confidence and time window, and say
   when the confidence is low.
@@ -60,6 +50,44 @@ How to answer with this data (ADR 073):
 - xomtra only reads data. Do not suggest changes to locks, alarms, cameras or heating
   safety settings on the strength of a finding alone; point the user to check first.
 """
+
+INSTRUCTIONS = f"""\
+xomtra exposes the history and catalog of a Home Assistant installation.
+
+Start with `search_catalog` to find entities (by words, area, domain or kind), then
+`describe_entity` for details and data quality, and `get_timeseries` for values over
+time. `get_findings` lists what the daily analysis found (correlations between
+entities, anomalies, lasting level changes); `get_weekly_summary` what changed in a
+week. `list_views` shows the SQL views you may query with `query_sql` (DuckDB SQL, one
+SELECT, view names without schema). All times are UTC unless stated otherwise. What you
+can see depends on your role; entities outside it are not returned.
+
+How to answer with this data (ADR 073):
+{GUIDELINES}"""
+
+# Not every client passes the server instructions to the model (e.g. a proxy between
+# the MCP server and the model drops them), so the key rules also travel in each data
+# tool's description and, in full, in the results that are easiest to over-read (ADR 080).
+TOOL_RULES = (
+    "How to answer (xomtra): findings are hypotheses, not causes; name the entities and "
+    "the period and never invent values; show times (UTC here) in local time; no "
+    "conclusions about a person's presence, sleep, health or habits unless asked; be "
+    "friendly, light humour welcome but never about safety, health or a fault; xomtra "
+    "only reads, so never advise changing locks, alarms, cameras or heating safety on a "
+    "finding alone."
+)
+
+
+def with_rules(fn: Any) -> Any:
+    """Append the short answering rules to a tool's description (its docstring)."""
+    fn.__doc__ = f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{TOOL_RULES}"
+    return fn
+
+
+def with_guidelines(result: dict[str, Any]) -> dict[str, Any]:
+    """Attach the full answering guidelines to a result the model will interpret."""
+    return {**result, "answer_guidelines": GUIDELINES}
+
 
 READ_ONLY = {"readOnlyHint": True, "openWorldHint": False}
 
@@ -156,14 +184,18 @@ def create_server(
 
     @mcp.tool(annotations=READ_ONLY)
     def server_info() -> dict[str, Any]:
-        """Return xomtra server version and which back-ends are configured."""
-        return {
-            "name": "xomtra",
-            "version": __version__,
-            "auth_mode": settings.auth_mode,
-            "access_mode": settings.access_mode,
-            "home_assistant_configured": settings.ha_configured,
-        }
+        """Return xomtra server version and which back-ends are configured. Call it once
+        before answering about the house: it carries the guidelines for answering with
+        xomtra data (answer_guidelines)."""
+        return with_guidelines(
+            {
+                "name": "xomtra",
+                "version": __version__,
+                "auth_mode": settings.auth_mode,
+                "access_mode": settings.access_mode,
+                "home_assistant_configured": settings.ha_configured,
+            }
+        )
 
     ha_url, ha_token = settings.ha_url, settings.ha_token
     if ha_url and ha_token:
@@ -197,6 +229,7 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
         return await asyncio.to_thread(fn, current_access(), *args, **kwargs)
 
     @mcp.tool(annotations=READ_ONLY)
+    @with_rules
     async def search_catalog(  # noqa: PLR0917 - MCP tool arguments
         query: Annotated[
             str, Field(description="Words that must all appear (name, id, area, device...)")
@@ -224,6 +257,7 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
         return result
 
     @mcp.tool(annotations=READ_ONLY)
+    @with_rules
     async def describe_entity(
         entity_id: Annotated[str, Field(description="e.g. sensor.living_room_temperature")],
     ) -> dict[str, Any]:
@@ -233,12 +267,14 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
         return result
 
     @mcp.tool(annotations=READ_ONLY)
+    @with_rules
     async def list_views() -> dict[str, Any]:
         """SQL views available to you for query_sql, with their columns."""
         views: list[dict[str, Any]] = await run(data.list_views)
         return {"views": views, "row_count": len(views)}
 
     @mcp.tool(annotations=READ_ONLY)
+    @with_rules
     async def get_timeseries(
         entity_id: str,
         start: Annotated[
@@ -262,6 +298,7 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
         return result
 
     @mcp.tool(annotations=READ_ONLY)
+    @with_rules
     async def get_findings(  # noqa: PLR0917 - MCP tool arguments
         finding_type: Annotated[
             Literal["correlation", "anomaly", "change_point"] | None,
@@ -313,9 +350,10 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
             new_since=since,
             limit=limit,
         )
-        return result
+        return with_guidelines(result)
 
     @mcp.tool(annotations=READ_ONLY)
+    @with_rules
     async def get_weekly_summary(
         week: Annotated[
             str | None,
@@ -331,9 +369,10 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
         except ValueError as err:
             raise ValueError(f"Invalid week {week!r}: use YYYY-MM-DD") from err
         result: dict[str, Any] = await run(data.get_weekly_summary, week=day, top=top)
-        return result
+        return with_guidelines(result)
 
     @mcp.tool(annotations=READ_ONLY)
+    @with_rules
     async def query_sql(
         sql: Annotated[
             str,

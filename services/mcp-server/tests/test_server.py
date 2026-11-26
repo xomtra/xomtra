@@ -100,3 +100,14 @@ async def test_instructions_carry_the_default_guardrails() -> None:
     assert "presence, sleep, health" in text
     assert "locks, alarms" in text
     assert "friendly and warm" in text
+
+
+async def test_guidelines_reach_the_model_without_instructions() -> None:
+    """ADR 080: proxies may drop the instructions; server_info carries the guidelines."""
+    from fastmcp import Client
+
+    async with Client(create_server(dev_settings())) as client:
+        info = (await client.call_tool("server_info", {})).data
+        tools = {t.name: t for t in await client.list_tools()}
+    assert "hypotheses, not as causes" in info["answer_guidelines"]
+    assert "guidelines" in (tools["server_info"].description or "")
