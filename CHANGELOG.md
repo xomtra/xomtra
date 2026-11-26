@@ -13,6 +13,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Added
 
+- Admin GUI, Tokens and Connect clients: a note on which AI assistants can connect to
+  the local access mode (assistants on a computer in the LAN, not cloud connectors
+  such as claude.ai or ChatGPT).
 - Admin GUI footer with the version (links to its release notes), xomtra.com, the
   documentation and bug reports. The links open in a new tab and send no Referer.
 

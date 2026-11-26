@@ -128,6 +128,22 @@ BACKUP_NOTE = (
 )
 
 
+# Shown on the token pages: the local access mode only serves clients in the LAN.
+CLIENTS_NOTE = (
+    "<p class=warn><strong>Which AI assistants can connect</strong>"
+    "<span class=more>"
+    "This server runs in your local network and accepts personal tokens. "
+    "Assistants that run on a computer in this network can use it: Claude Desktop"
+    " (the extension below), Claude Code and other MCP clients that send a bearer"
+    " token, such as VS Code or Cursor."
+    "</span><span class=more>"
+    "Assistants that connect from the cloud cannot reach it: claude.ai on the web"
+    " and on phones, or ChatGPT connectors. They need a public https:// address "
+    "with sign-in, which the installation on its own virtual machine provides."
+    "</span></p>"
+)
+
+
 # Opening tag of a POST form in the GUI's HTML (the CSRF field goes right after it).
 _POST_FORM = re.compile(rb"<form\b[^>]*\bmethod=[\"']?post\b[^>]*>", re.IGNORECASE)
 
@@ -1136,6 +1152,7 @@ class AdminApp:
         body = (
             "<p class=muted>Each person or device gets its own token. A token is shown once; "
             "only its hash is stored. Revoked tokens stop working within 30 seconds.</p>"
+            + CLIENTS_NOTE
             + token_flow(prefix(), MCPB_FILENAME)
             + form
             + table(
@@ -1292,7 +1309,7 @@ class AdminApp:
             return refused
         body = (
             f"<p>Issue a personal token on <a href='{prefix()}/tokens'>Tokens</a> first, one "
-            "per person and device.</p>" + self._connect_help()
+            "per person and device.</p>" + CLIENTS_NOTE + self._connect_help()
         )
         return HTMLResponse(page("Connect clients", body, user.get("username")))
 
