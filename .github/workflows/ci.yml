@@ -390,7 +390,7 @@ jobs:
         run: |
           services=$(docker compose config --services | sort | tr '\n' ' ')
           echo "$services"
-          [ "$services" = "admin caddy ducklake-init mcp postgres postgres-init worker " ]
+          [ "$services" = "admin caddy ducklake-init mcp postgres postgres-init secrets-init worker " ]
           docker compose up -d --wait --wait-timeout 180 mcp
           docker compose up --no-start worker
           docker network connect xomtra-lite_egress ha
