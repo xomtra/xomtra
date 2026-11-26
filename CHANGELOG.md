@@ -13,6 +13,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Added
 
+- Admin GUI and add-on options in Czech, German, Polish and Dutch: the GUI follows Home
+  Assistant's language (outside Home Assistant the browser's), English stays the
+  default. Entity names, values and code stay as they are.
 - Analysis settings: "Reset all to defaults" sets every changed setting back to its
   default in one step (confirmed with a tick box, recorded in the history and audit).
 - Admin GUI: explanations of the columns and cards on hover or focus, in the language of

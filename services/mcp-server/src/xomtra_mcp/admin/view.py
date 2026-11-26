@@ -20,6 +20,7 @@ class View:
     dagster: bool = True  # Dagster UI under <prefix>/dagster/ (full edition only)
     sign_out: bool = True  # no own session behind Ingress, HA signs the user in
     endpoint: str | None = None  # MCP endpoint guessed from the request (Ingress)
+    lang: str = "en"  # GUI language (cs, de, en, nl, pl), see i18n.py
 
 
 current: ContextVar[View] = ContextVar("xomtra_admin_view", default=View())  # noqa: B039

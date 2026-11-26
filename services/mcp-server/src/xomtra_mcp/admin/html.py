@@ -10,7 +10,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from xomtra_mcp.admin import view
+from xomtra_mcp.admin import i18n, view
 
 # Colours, type and components follow the xomtra.com web (graphite, indigo accent,
 # amber signal, Geist / Geist Mono). Dark by default like the web; the light variant
@@ -227,16 +227,18 @@ def page(title: str, body: str, user: str | None) -> str:
         if user
         else ""
     )
-    return (
-        "<!doctype html><html lang=en><head><meta charset=utf-8>"
+    shown = escape(i18n.translate(title, v.lang))
+    return i18n.translate(
+        f"<!doctype html><html lang={v.lang}><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width, initial-scale=1">'
-        f"<title>{escape(title)} · xomtra admin</title>"
+        f"<title>{shown} · xomtra admin</title>"
         f'<link rel=icon href="{v.prefix}/favicon.svg" type="image/svg+xml">'
         f'<script src="{v.prefix}/ui.js"></script>'
         f'<link rel=stylesheet href="{v.prefix}/static.css"></head><body>'
         f'<header><a class=brand href="{v.prefix}/">{MARK}<b>xomtra</b><small>admin</small></a>'
         f"<nav>{links}</nav>{logout}</header>"
-        f"<main><h1>{escape(title)}</h1>{body}</main></body></html>"
+        f"<main><h1>{shown}</h1>{body}</main></body></html>",
+        v.lang,
     )
 
 
