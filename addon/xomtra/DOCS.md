@@ -18,6 +18,10 @@ available to Claude and other MCP clients.
 Home Assistant OS or Supervised on an SSD, with at least 4 GB RAM and 20 GB of free
 space. Home Assistant Green (32 GB eMMC) and SD cards are not supported.
 
+The **Overview** shows the free space of the disk. Below 10 % free xomtra runs its
+retention early; below 3 % it pauses collecting until there is space again and then
+catches up from Home Assistant's history.
+
 ## More
 
 Documentation: https://github.com/xomtra/xomtra/blob/main/docs/setup/home-assistant-addon.md

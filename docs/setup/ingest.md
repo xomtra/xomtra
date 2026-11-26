@@ -82,7 +82,10 @@ The worker records its runs in the Postgres database `ops` (`worker.job_run`, ke
 days). Jobs run one at a time; a schedule missed while the worker was down runs once
 after the start. Below 10 % free space on the lake's disk
 (`XOMTRA_WORKER_MIN_FREE_RATIO`) it logs a warning and runs the retention early, at
-most once a day.
+most once a day. Below 3 % (`XOMTRA_WORKER_STOP_FREE_RATIO`, `0` turns it off) the
+stream and the writing jobs pause, only the retention runs; once there is space again
+the stream catches up from Home Assistant's history (up to
+`XOMTRA_STREAM_MAX_CATCHUP_DAYS`). The admin GUI shows the free space on the overview.
 
 ## 3. Deploy
 

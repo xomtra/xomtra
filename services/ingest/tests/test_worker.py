@@ -131,6 +131,28 @@ def test_enough_disk_does_nothing() -> None:
     assert calls == []
 
 
+def test_full_disk_pauses_writing_jobs_but_not_the_retention() -> None:
+    calls: list[str] = []
+    sched = _scheduler(calls, disk_path="/data/lake", stop_free_ratio=0.03, free=lambda _p: 0.01)
+    assert sched.disk_full()
+    assert not sched.run_job("ingest_hourly", "schedule")
+    assert sched.run_job("retention_daily", "schedule")
+    assert calls == ["retention_daily"]
+    assert [r.job for r in sched.store.recent()] == ["retention_daily"]
+    roomy = _scheduler(calls, disk_path="/data/lake", stop_free_ratio=0.03, free=lambda _p: 0.2)
+    assert not roomy.disk_full()
+
+
+def test_disk_gate() -> None:
+    s = IngestSettings(worker_stop_free_ratio=0.05)
+    gate = worker.disk_gate("/data/lake", s, free=lambda _p: 0.04)
+    assert gate is not None
+    assert gate() is False
+    assert worker.disk_gate("/data/lake", s, free=lambda _p: 0.5)() is True  # type: ignore[misc]
+    assert worker.disk_gate(None, s) is None  # object storage
+    assert worker.disk_gate("/data/lake", IngestSettings(worker_stop_free_ratio=0)) is None
+
+
 def test_retry_ha() -> None:
     attempts: list[int] = []
     sleeps: list[float] = []
@@ -172,3 +194,4 @@ def test_worker_settings_defaults() -> None:
     s = IngestSettings()
     assert s.worker_pg_db == "ops"
     assert s.worker_min_free_ratio == 0.10
+    assert s.worker_stop_free_ratio == 0.03

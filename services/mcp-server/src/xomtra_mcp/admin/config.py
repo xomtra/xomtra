@@ -55,6 +55,12 @@ class AdminSettings(BaseSettings):
     audit_admin_user: str = "xomtra_audit_admin"
     audit_admin_password: SecretStr | None = None
 
+    # Free space of the lake's local disk on the overview (ADR 072); the worker pauses
+    # writing below worker_stop_free_ratio. Unset with object storage.
+    lake_data_path: str | None = None
+    worker_min_free_ratio: float = Field(default=0.10, ge=0, lt=1)
+    worker_stop_free_ratio: float = Field(default=0.03, ge=0, lt=1)
+
     # Shown on the retention page (the ingest applies them, ADR 034).
     states_retention_days: int = 365
     statistics_5min_retention_days: int = 365

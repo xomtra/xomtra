@@ -19,6 +19,7 @@ import ipaddress
 import json
 import logging
 import re
+import shutil
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -415,9 +416,11 @@ class AdminApp:
             ha_card = ("Home Assistant", f"{ha['version']} · {ha['latency_ms']} ms", "ok")
         else:
             ha_card = ("Home Assistant", "unreachable", "bad")
+        disk = self._disk()
         body = cards(
             [
                 ha_card,
+                *([disk[0]] if disk else []),
                 ("Entities in HA", ha.get("entities"), ""),
                 ("Last state in lake", last_state, fresh_cls),
                 ("Last statistic", lake.get("last_statistic"), ""),
@@ -425,6 +428,8 @@ class AdminApp:
         )
         if ha.get("error"):
             body += f"<p class=bad>{e(ha['error'])}</p>"
+        if disk and disk[1]:
+            body += disk[1]
         kinds = lake.get("kinds") or []
         body += "<h2>Catalog</h2>"
         if kinds:
@@ -442,6 +447,33 @@ class AdminApp:
             else "<p class=muted>None.</p>"
         )
         return HTMLResponse(page("Overview", body, user.get("username")))
+
+    def _disk(self) -> tuple[tuple[str, Any, str], str] | None:
+        """Card and note on the free space of the lake's disk (ADR 072)."""
+        path = self.settings.lake_data_path
+        if not path:
+            return None
+        try:
+            usage = shutil.disk_usage(path)
+        except OSError:
+            return ("Free disk", "unknown", "warn"), ""
+        ratio = usage.free / usage.total if usage.total else 1.0
+        value = f"{usage.free / 2**30:,.1f} GiB · {ratio:.0%}"
+        stop, low = self.settings.worker_stop_free_ratio, self.settings.worker_min_free_ratio
+        if ratio < stop:
+            note = (
+                f"<p class=bad>Less than {stop:.0%} free on the disk: collecting is paused "
+                "and only the retention runs. Free some space or shorten the retention; "
+                "xomtra then resumes and catches up from Home Assistant's history.</p>"
+            )
+            return ("Free disk", value, "bad"), note
+        if ratio < low:
+            note = (
+                f"<p class=warn>Less than {low:.0%} free on the disk: the retention runs "
+                f"early. Below {stop:.0%} collecting pauses.</p>"
+            )
+            return ("Free disk", value, "warn"), note
+        return ("Free disk", value, "ok"), ""
 
     async def catalog(self, request: Request, user: dict[str, Any]) -> Response:
         data = self.data

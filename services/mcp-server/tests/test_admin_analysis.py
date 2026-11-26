@@ -203,3 +203,31 @@ async def test_findings_page_lists_current_findings(data: DataAccess) -> None:
         assert "3 analysed entities without an area" in page
         flagged = (await client.get("/admin/findings?type=correlation&flagged=1")).text
         assert "same_device" in flagged
+
+
+async def test_overview_shows_free_disk(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    import shutil
+    from collections import namedtuple
+
+    usage = namedtuple("usage", "total used free")
+    store, audit = MemorySettingsStore(), MemoryAuditSink()
+    app = AdminApp(
+        AdminSettings(auth_mode="none", base_url=BASE, lake_data_path=str(tmp_path)),
+        data=None,
+        audit=audit,
+        analysis=store,
+    ).build()
+    async with client_for(app) as client:
+        monkeypatch.setattr(
+            shutil, "disk_usage", lambda _p: usage(100 * 2**30, 98 * 2**30, 2 * 2**30)
+        )
+        full = await client.get("/admin/")
+        monkeypatch.setattr(
+            shutil, "disk_usage", lambda _p: usage(100 * 2**30, 50 * 2**30, 50 * 2**30)
+        )
+        roomy = await client.get("/admin/")
+    assert "Free disk" in full.text
+    assert "collecting is paused" in full.text
+    assert "2.0 GiB · 2%" in full.text
+    assert "collecting is paused" not in roomy.text
+    assert "50.0 GiB · 50%" in roomy.text

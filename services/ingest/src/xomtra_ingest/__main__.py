@@ -47,6 +47,7 @@ def _make_stream(settings: IngestSettings) -> StateStream:
             max_catchup=timedelta(days=settings.stream_max_catchup_days),
             heartbeat_file=settings.heartbeat_file,
             labels=settings.labels,
+            can_write=worker.disk_gate(lake_settings.local_data_path, settings),
         ),
     )
 

@@ -19,6 +19,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   Home Assistant (English, Czech, German, Polish, Dutch); numbers with digit grouping,
   shares as percentages, dates and times in Home Assistant's number, date and time
   format and time zone (outside Home Assistant the browser's).
+- Free disk space of the lake on the admin overview. Below
+  `XOMTRA_WORKER_STOP_FREE_RATIO` (default 3 %) the worker pauses the stream and the
+  writing jobs until there is space again, then catches up from Home Assistant's
+  history; the retention still runs (ADR 072).
 - Tokens page: a picture of how a token connects an LLM agent with xomtra and that
   xomtra only reads Home Assistant, with the page's actions on it.
 

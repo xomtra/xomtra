@@ -58,6 +58,14 @@ class StreamSettings:
     # How often the no-ingest labels are re-read from the registries.
     exclusions_refresh: float = 300.0
     labels: ExclusionLabels = DEFAULT_LABELS
+    # False while the lake's disk is too full: the stream writes nothing, disconnects
+    # and waits; after that it catches up from Home Assistant's history.
+    can_write: Callable[[], bool] | None = None
+    paused_poll: float = 60.0
+
+
+class DiskLowError(RuntimeError):
+    """The lake's disk is too full to write."""
 
 
 class StateStream:
@@ -91,9 +99,15 @@ class StateStream:
         """Run until ``stop()``; reconnects with exponential backoff and jitter."""
         delay = self._settings.reconnect_min
         while not self._stop.is_set():
+            if not self._may_write():
+                await self._wait_for_space()
+                continue
             started = time.monotonic()
             try:
                 await self.run_once()
+            except DiskLowError:
+                logger.warning("Stream paused: the lake's disk is too full")
+                continue
             except HAAuthError:
                 # A wrong token does not heal by retrying quickly.
                 logger.exception("Home Assistant rejected the token")
@@ -109,8 +123,22 @@ class StateStream:
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._stop.wait(), timeout=sleep)
             delay = min(delay * 2, self._settings.reconnect_max)
-        await self._flush()
+        with contextlib.suppress(DiskLowError):
+            await self._flush()
         self._close_lake()
+
+    def _may_write(self) -> bool:
+        check = self._settings.can_write
+        return check is None or check()
+
+    async def _wait_for_space(self) -> None:
+        """Wait while the disk is too full (logged once per pause)."""
+        logger.warning("Stream paused until the lake's disk has space again")
+        while not self._stop.is_set() and not self._may_write():
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._stop.wait(), timeout=self._settings.paused_poll)
+        if not self._stop.is_set():
+            logger.info("Disk space is back; the stream resumes and catches up")
 
     async def run_once(self) -> None:
         """One connection lifetime: subscribe, catch up, flush until disconnect/stop."""
@@ -211,6 +239,10 @@ class StateStream:
     async def _flush(self) -> None:
         if not self._buffer:
             return
+        if not self._may_write():
+            # Dropped: the catch-up after the pause reads them from Home Assistant.
+            self._buffer.clear()
+            raise DiskLowError("the lake's disk is too full")
         rows, self._buffer = self._buffer, []
         async with self._lake_lock:
             try:
