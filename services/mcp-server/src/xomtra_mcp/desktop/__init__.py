@@ -27,6 +27,10 @@ def manifest(endpoint: str | None = None, version: str = __version__) -> dict[st
     data["version"] = version
     if endpoint:
         data["user_config"]["url"]["default"] = endpoint
+        # A server known to answer on plain http (the add-on in the LAN) would otherwise
+        # be refused until the user found the checkbox; https stays the default.
+        if endpoint.startswith("http://"):
+            data["user_config"]["allow_http"]["default"] = True
     return data
 
 

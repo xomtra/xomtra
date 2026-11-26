@@ -37,7 +37,8 @@ options:
   states_retention_days: 90
   statistics_5min_retention_days: 90
   statistics_hour_retention_days: 1825
-  mcp_url: ""
+# Optional options (schema "?") stay out of the defaults: the Supervisor validates an
+# empty string against the type and refuses to start (url? does not accept "").
 schema:
   log_level: list(debug|info|warning|error)
   states_retention_days: int(1,3650)

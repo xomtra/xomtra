@@ -172,3 +172,32 @@ def test_the_repository_has_one_addon() -> None:
         )
     ]
     assert found == [release.ADDON_CONFIG]
+
+
+def _addon_section(name: str) -> dict[str, str]:
+    """Top-level mapping ``name`` of the add-on config (flat ``key: value`` lines)."""
+    lines = (REPO / release.ADDON_CONFIG).read_text().splitlines()
+    start = lines.index(f"{name}:") + 1
+    section: dict[str, str] = {}
+    for line in lines[start:]:
+        if not line.startswith("  "):
+            if line.startswith("#"):
+                continue
+            break
+        key, _, value = line.strip().partition(":")
+        section[key] = value.strip()
+    return section
+
+
+def test_addon_defaults_fit_the_schema() -> None:
+    """The Supervisor checks the options against the schema before it starts the add-on;
+    an optional option (``?``) with an empty default fails that check (``url?`` refuses
+    ``""``), so optional options stay out of the defaults."""
+    options, schema = _addon_section("options"), _addon_section("schema")
+    assert set(options) <= set(schema)
+    for key, kind in schema.items():
+        if kind.endswith("?"):
+            assert key not in options, f"optional option {key} must not have a default"
+        else:
+            assert key in options, f"option {key} needs a default"
+    assert all(value not in {'""', "''"} for value in options.values())

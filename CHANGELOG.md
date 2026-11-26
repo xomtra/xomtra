@@ -33,6 +33,26 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   by default; behind Home Assistant Ingress it turns light when Home Assistant is in
   light mode. The add-on has an icon and a logo for the add-on store.
 
+### Fixed
+
+- Home Assistant add-on: it did not start ("expected url" for `mcp_url`). The empty
+  default of the optional option failed the Supervisor's check of `url?`; optional
+  options now have no default, and a test keeps the defaults in line with the schema.
+- `migrate-from-hammond.sh` stopped at its first step: `docker compose -p hammond down`
+  read the new `compose.yaml` with the old `.env` and failed on the missing `XOMTRA_*`
+  variables. It now stops and removes the old containers and networks by their compose
+  labels.
+- Postgres (add-on and compose) logs errors without the failed statement. DuckLake
+  retries a commit when another writer took its snapshot id, and the statement filled
+  the add-on log with Home Assistant data.
+- Claude Desktop extension downloaded from the admin GUI: for a plain `http://` address
+  (the add-on in the LAN) *Allow unencrypted http://* is checked by default; before, the
+  extension refused the add-on's endpoint until the user found the checkbox.
+- Admin GUI behind Home Assistant Ingress: every form (issuing a token, settings) was
+  refused with 403 when Home Assistant is opened through another address than its own
+  host, e.g. behind a reverse proxy. The cross-site check now trusts the browser's
+  `Sec-Fetch-Site` header and compares the Origin only where that header is missing.
+
 ## [0.5.0] - 2026-11-25
 
 ### Added
