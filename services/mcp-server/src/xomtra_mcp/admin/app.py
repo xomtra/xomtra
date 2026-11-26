@@ -624,6 +624,15 @@ class AdminApp:
             "The thresholds set the rate of false findings, not their number (ADR 060, "
             "062): a larger home rightly finds more.</p>"
         )
+        if any(k in BY_KEY for k in current):
+            body += (
+                f"<form class=filters method=post action='{prefix()}/analysis'>"
+                "<input type=hidden name=action value=reset_all>"
+                "<label><input type=checkbox name=confirm value=1 required> "
+                "set every changed setting back to its default</label>"
+                "<input name=reason size=18 maxlength=200 placeholder='reason (optional)'>"
+                "<button class=danger>Reset all to defaults</button></form>"
+            )
         for group in dict.fromkeys(s.group for s in SPECS):
             rows = [self._setting_row(s, current.get(s.key)) for s in SPECS if s.group == group]
             body += f"<h2>{e(group)}</h2>" + table(
@@ -655,6 +664,8 @@ class AdminApp:
         spec = BY_KEY.get(form.get("key", ""))
         action = form.get("action", "save")
         reason = form.get("reason", "")[:200] or None
+        if action == "reset_all" and self.analysis is not None:
+            return await self._reset_all(request, user, form.get("confirm") == "1", reason)
         if spec is None or action not in ("save", "reset", "preview") or self.analysis is None:
             return await self.analysis_page(
                 request, user, note="<p class=bad>Unknown setting.</p>", status_code=400
@@ -699,6 +710,34 @@ class AdminApp:
                 request,
                 user,
                 note="<p class=bad>Not saved: the settings store or audit is unavailable.</p>",
+                status_code=503,
+            )
+        return RedirectResponse(f"{prefix()}/analysis", status_code=303)
+
+    async def _reset_all(
+        self, request: Request, user: dict[str, Any], confirmed: bool, reason: str | None
+    ) -> Response:
+        """Every stored analysis setting back to its default (one history row each)."""
+        assert self.analysis is not None  # noqa: S101 - checked by the caller
+        if not confirmed:
+            return await self.analysis_page(
+                request, user, note="<p class=bad>Tick the box to confirm.</p>", status_code=400
+            )
+        try:
+            stored = await asyncio.to_thread(self.analysis.current)
+            keys = sorted(k for k, c in stored.items() if k in BY_KEY and c.value is not None)
+            for key in keys:
+                await asyncio.to_thread(
+                    self.analysis.set, key, None, by=user.get("username"), reason=reason
+                )
+            await self._audit(
+                "analysis_setting_reset_all", user, arguments={"keys": keys, "reason": reason}
+            )
+        except (SettingsStoreError, AuditError):
+            return await self.analysis_page(
+                request,
+                user,
+                note="<p class=bad>Not reset: the settings store or audit is unavailable.</p>",
                 status_code=503,
             )
         return RedirectResponse(f"{prefix()}/analysis", status_code=303)

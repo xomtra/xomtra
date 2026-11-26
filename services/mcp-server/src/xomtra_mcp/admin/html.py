@@ -116,6 +116,7 @@ input[type=checkbox] { accent-color:var(--accent); padding:0; }
 button { cursor:pointer; font-weight:500; background:var(--ink); color:var(--bg);
   border-color:var(--ink); }
 button:hover { opacity:.88; }
+button.danger { background:var(--bad); border-color:var(--bad); color:var(--bg); }
 button[value=reset], button[value=preview] { background:var(--surface);
   color:var(--ink); border-color:var(--line); }
 form.filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }

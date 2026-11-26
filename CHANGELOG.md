@@ -11,6 +11,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Analysis settings: "Reset all to defaults" sets every changed setting back to its
+  default in one step (confirmed with a tick box, recorded in the history and audit).
+
 ### Changed
 
 - The admin GUI has the look of xomtra.com: the xomtra mark and wordmark, Geist and

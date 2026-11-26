@@ -89,6 +89,39 @@ async def test_analysis_settings_save_validate_reset() -> None:
     ]
 
 
+async def test_reset_all_settings_to_defaults() -> None:
+    store, audit = MemorySettingsStore(), MemoryAuditSink()
+    store.set("correlation_max_q", 0.2, by="someone", reason=None)
+    store.set("anomalies_enabled", False, by="someone", reason=None)
+    origin = {"origin": BASE}
+    async with client_for(dev_app(None, store, audit)) as client:
+        page = await client.get("/admin/analysis")
+        assert "Reset all to defaults" in page.text
+        unconfirmed = await client.post(
+            "/admin/analysis", data={"action": "reset_all"}, headers=origin
+        )
+        assert unconfirmed.status_code == 400
+        assert len(store.current()) == 2
+        done = await client.post(
+            "/admin/analysis",
+            data={"action": "reset_all", "confirm": "1", "reason": "messed up"},
+            headers=origin,
+        )
+        assert done.status_code == 303
+        assert store.current() == {}
+        page = await client.get("/admin/analysis")
+        assert "Reset all to defaults" not in page.text  # nothing left to reset
+        cross = await client.post(
+            "/admin/analysis",
+            data={"action": "reset_all", "confirm": "1"},
+            headers={"origin": "https://evil.example"},
+        )
+        assert cross.status_code == 403
+    assert [c.reason for c in store.history()[:2]] == ["messed up", "messed up"]
+    (record,) = [r for r in audit.records if r.tool == "admin:analysis_setting_reset_all"]
+    assert record.arguments["keys"] == ["anomalies_enabled", "correlation_max_q"]
+
+
 async def test_analysis_preview_without_findings_saves_nothing() -> None:
     store = MemorySettingsStore()
     async with client_for(dev_app(None, store, MemoryAuditSink())) as client:
