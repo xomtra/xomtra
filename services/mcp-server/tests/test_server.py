@@ -99,7 +99,9 @@ async def test_instructions_carry_the_default_guardrails() -> None:
     assert "local time" in text
     assert "presence, sleep, health" in text
     assert "locks, alarms" in text
-    assert "friendly and warm" in text
+    assert "Humour is the default style" in text
+    assert "at least one joke" in text
+    assert "No jokes about safety, health, a fault" in text
 
 
 async def test_guidelines_reach_the_model_without_instructions() -> None:

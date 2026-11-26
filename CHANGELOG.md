@@ -26,6 +26,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Changed
 
+- Tone of answers with xomtra data: humour is now the default style, with at least one
+  joke or witty remark in every answer (about the house and the data, never about people,
+  safety, health or a fault, and never at the cost of exact facts). Applies to the server
+  instructions, `answer_guidelines` and the rules in tool descriptions (ADR 073, 080).
 - Compose defaults: `XOMTRA_ACCESS_MODE=local`, `XOMTRA_AUTH_MODE=ha`, `ADMIN_CIDR` all
   private ranges; no variable is required any more. Public access still needs its
   values in `.env`.
