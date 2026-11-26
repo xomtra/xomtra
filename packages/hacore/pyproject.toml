@@ -9,6 +9,8 @@ dependencies = [
   "websockets>=15.0",
   "duckdb>=1.4",
   "numpy>=2.2",
+  # Home Assistant token stored by the admin GUI (ADR 077).
+  "cryptography>=46",
 ]
 
 [build-system]

@@ -174,6 +174,8 @@ def create_server(
         )
     )
 
+    resolver = settings.ha_resolver()
+
     @mcp.custom_route("/healthz", methods=["GET"], include_in_schema=False)
     async def healthz(_: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
@@ -202,18 +204,20 @@ def create_server(
                 "version": __version__,
                 "auth_mode": settings.auth_mode,
                 "access_mode": settings.access_mode,
-                "home_assistant_configured": settings.ha_configured,
+                "home_assistant_configured": resolver.get() is not None,
             }
         )
 
-    ha_url, ha_token = settings.ha_url, settings.ha_token
-    if ha_url and ha_token:
+    if resolver.from_env or resolver.storable:
 
         @mcp.tool(annotations=READ_ONLY)
         async def ha_overview() -> dict[str, Any]:
             """Summarise the Home Assistant installation: counts of floors, areas, devices
             and entities per domain (from the registries, no state history)."""
-            async with HAClient(ha_url, ha_token.get_secret_value()) as ha:
+            ha_conn = await asyncio.to_thread(resolver.get)
+            if ha_conn is None:
+                return {"error": "Home Assistant is not connected yet (admin GUI)."}
+            async with HAClient(ha_conn.url, ha_conn.token) as ha:
                 snapshot = await fetch_registries(ha)
                 version = ha.ha_version
             return {

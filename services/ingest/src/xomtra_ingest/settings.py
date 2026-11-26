@@ -12,14 +12,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from hacore.edition import PROFILES, Edition
 from hacore.exclusions import NO_ANALYSIS, NO_INGEST, ExclusionLabels
+from hacore.ha_connection import Resolver
 from hacore.maintenance import Retention
+
+
+class HANotConnectedError(ValueError):
+    """Neither the environment nor the admin GUI has a Home Assistant connection yet."""
 
 
 class IngestSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="XOMTRA_", extra="ignore")
 
+    # Home Assistant: from the environment, else as entered in the admin GUI (ADR 077),
+    # stored in the database ``analysis_settings_db`` and encrypted with settings_key.
     ha_url: str = ""
     ha_token: SecretStr = SecretStr("")
+    settings_key: SecretStr = SecretStr("")
 
     # Resource profile (ADR 050); only changes the defaults of the values below.
     edition: Edition = Edition.FULL
@@ -165,11 +173,27 @@ class IngestSettings(BaseSettings):
             },
         )
 
+    def ha_resolver(self) -> Resolver:
+        stored = bool(
+            self.analysis_settings_db
+            and self.ops_pg_password.get_secret_value()
+            and self.settings_key.get_secret_value()
+        )
+        return Resolver(
+            self.ha_url,
+            self.ha_token.get_secret_value(),
+            self.ops_pg_uri(self.analysis_settings_db) if stored else None,
+            self.settings_key.get_secret_value() if stored else None,
+        )
+
     def require_ha(self) -> tuple[str, str]:
-        token = self.ha_token.get_secret_value()
-        if not self.ha_url or not token:
-            raise ValueError("XOMTRA_HA_URL and XOMTRA_HA_TOKEN must be set")
-        return self.ha_url, token
+        found = self.ha_resolver().get()
+        if found is None:
+            raise HANotConnectedError(
+                "Home Assistant is not connected yet: enter its URL and token in the "
+                "admin GUI (or set XOMTRA_HA_URL and XOMTRA_HA_TOKEN)"
+            )
+        return found.url, found.token
 
     def ops_pg_uri(self, database: str) -> str:
         user = quote(self.ops_pg_user, safe="")

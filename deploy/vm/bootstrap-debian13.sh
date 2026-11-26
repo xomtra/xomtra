@@ -91,5 +91,5 @@ install -d -m 0750 -o root -g root "$XOMTRA_DIR"
 
 echo
 echo "Done. Next steps (docs/setup/homelab-vm.md):"
-echo "  1. Copy deploy/compose/* to ${XOMTRA_DIR}, create ${XOMTRA_DIR}/.env (chmod 600)."
-echo "  2. docker compose -f ${XOMTRA_DIR}/compose.yaml up -d"
+echo "  1. Copy deploy/compose/* to ${XOMTRA_DIR} (a .env, chmod 600, only for public access)."
+echo "  2. docker compose -f ${XOMTRA_DIR}/compose.yaml up -d, then the setup link from: docker compose logs admin"

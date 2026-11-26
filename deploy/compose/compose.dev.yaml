@@ -6,11 +6,15 @@ services:
       context: ../..
       dockerfile: services/mcp-server/Dockerfile
     image: xomtra-mcp:dev
+  secrets-init:
+    image: xomtra-mcp:dev
   mcp:
     image: xomtra-mcp:dev
     # Direct access for local tests, loopback only.
     ports:
       - "127.0.0.1:8000:8000"
+  admin:
+    image: xomtra-mcp:dev
   caddy:
     build:
       context: ../caddy

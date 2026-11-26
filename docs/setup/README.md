@@ -1,6 +1,7 @@
 # Setup guides
 
-Quick start (phase 1c.1): [local access](local-access.md) – LAN only, generated secrets,
+Quick start: [Docker Compose](docker.md) – `docker compose up -d`, then connect Home
+Assistant in the browser (ADR 077); [local access](local-access.md) – LAN only,
 personal tokens for Claude Desktop, Claude Code and other MCP clients, sign-in to the
 admin GUI with a [Home Assistant account](ha-login.md).
 

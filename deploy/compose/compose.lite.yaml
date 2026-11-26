@@ -5,7 +5,7 @@
 #   docker compose -f compose.yaml -f compose.lite.yaml up -d
 #
 # Services of the full edition are put into the profile "full" and do not start.
-# init-env.sh still generates the S3 keys of the full edition; they are not used here.
+# secrets-init still generates the S3 keys of the full edition; they are not used here.
 
 x-lite-env: &lite-env
   XOMTRA_EDITION: lite
@@ -57,10 +57,10 @@ services:
       XOMTRA_LAKE_PG_HOST: postgres
       XOMTRA_LAKE_PG_DB: ${DUCKLAKE_PG_DB:-ducklake}
       XOMTRA_LAKE_PG_USER: ${DUCKLAKE_PG_USER:-ducklake}
-      XOMTRA_LAKE_PG_PASSWORD: ${DUCKLAKE_PG_PASSWORD:?set DUCKLAKE_PG_PASSWORD in .env}
       XOMTRA_OPS_PG_HOST: postgres
       XOMTRA_OPS_PG_USER: ${OPS_PG_USER:-xomtra_ops}
-      XOMTRA_OPS_PG_PASSWORD: ${OPS_PG_PASSWORD:?set OPS_PG_PASSWORD in .env}
+      # Passwords and keys from the secrets volume (ADR 077).
+      XOMTRA_SECRETS_FILE: /secrets/ingest.env
       XOMTRA_SQLMESH_PG_DB: ${SQLMESH_PG_DB:-sqlmesh}
       XOMTRA_WORKER_PG_DB: ${WORKER_PG_DB:-ops}
       XOMTRA_ANALYSIS_SETTINGS_DB: ${AUDIT_PG_DB:-audit}
@@ -84,6 +84,7 @@ services:
     volumes:
       - lake-data:/lake
       - ingest-data:/data
+      - secrets:/secrets:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]

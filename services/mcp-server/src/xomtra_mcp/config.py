@@ -13,6 +13,7 @@ from typing import Annotated, Literal, Self
 from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from hacore.ha_connection import Resolver
 from xomtra_mcp.ha_auth import DEFAULT_ROLE_MAP, RoleMap
 
 # Redirect URIs used by Claude (claude.ai / Claude Desktop) for remote MCP connectors.
@@ -54,9 +55,12 @@ class Settings(BaseSettings):
     jwt_signing_key: SecretStr | None = None
     allowed_client_redirect_uris: Annotated[list[str], NoDecode] = CLAUDE_REDIRECT_URIS
 
-    # Optional Home Assistant connection (read-only use in the PoC).
+    # Optional Home Assistant connection (read-only use in the PoC). Without it in the
+    # environment, the one entered in the admin GUI (ADR 077), decrypted with
+    # settings_key.
     ha_url: str | None = None
     ha_token: SecretStr | None = None
+    settings_key: SecretStr | None = None
     # HA URL as the user's browser reaches it (sign-in page); default XOMTRA_HA_URL.
     ha_auth_url: str | None = None
     # Optional allow-list of HA users (id or name); empty = every HA user with a role.
@@ -94,8 +98,9 @@ class Settings(BaseSettings):
             ):
                 if key in data:
                     data[key] = _split_csv(data[key])
-            if data.get("policy_file") == "":
-                data["policy_file"] = None
+            for key in ("policy_file", "base_url", "ha_url", "ha_token", "settings_key"):
+                if data.get(key) == "":
+                    data[key] = None
         return data
 
     @model_validator(mode="after")
@@ -151,6 +156,15 @@ class Settings(BaseSettings):
     @property
     def ha_configured(self) -> bool:
         return bool(self.ha_url and self.ha_token)
+
+    def ha_resolver(self) -> Resolver:
+        key = self.settings_key.get_secret_value() if self.settings_key else None
+        return Resolver(
+            self.ha_url,
+            self.ha_token.get_secret_value() if self.ha_token else None,
+            self.audit_dsn if key else None,
+            key,
+        )
 
     @property
     def audit_dsn(self) -> str | None:

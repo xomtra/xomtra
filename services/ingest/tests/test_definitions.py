@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from dagster import SensorResult, SkipReason, build_sensor_context
@@ -58,7 +59,7 @@ def test_settings_defaults_and_uri(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.statistics_5min_retention_days == 365
     assert s.statistics_hour_retention_days == 1825
     assert s.ops_pg_uri("dagster").endswith(":p%40ss%2Fword@postgres:5432/dagster")
-    with pytest.raises(ValueError, match="XOMTRA_HA_URL"):
+    with pytest.raises(ValueError, match="not connected"):
         IngestSettings(ha_url="").require_ha()
 
 
@@ -148,3 +149,30 @@ def test_lite_edition_retention_defaults(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.delenv("XOMTRA_EDITION")
     monkeypatch.delenv("XOMTRA_STATES_RETENTION_DAYS")
     assert IngestSettings().states_retention_days == 365
+
+
+def test_stream_waits_for_the_ha_connection(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from hacore.ha_connection import HAConnection
+    from xomtra_ingest.__main__ import wait_for_ha
+
+    answers = [None, None, HAConnection("http://ha:8123", "t", "stored")]
+
+    class Fake:
+        invalidated = 0
+
+        def get(self) -> HAConnection | None:
+            return answers.pop(0)
+
+        def invalidate(self) -> None:
+            Fake.invalidated += 1
+
+    monkeypatch.setattr(IngestSettings, "ha_resolver", lambda self: Fake())
+    heartbeat = tmp_path / "hb"
+    slept: list[float] = []
+    url, token = wait_for_ha(IngestSettings(heartbeat_file=heartbeat), poll=5, sleep=slept.append)
+    assert (url, token) == ("http://ha:8123", "t")
+    assert slept == [5, 5]
+    assert Fake.invalidated == 2
+    assert heartbeat.exists()  # healthy while waiting
