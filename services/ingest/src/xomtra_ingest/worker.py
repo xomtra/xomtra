@@ -497,9 +497,22 @@ class Scheduler:
                     await in_thread(self.run_job, job, "schedule")
 
 
-async def run_worker(settings: IngestSettings, store: RunStore, stream: Any) -> None:
-    """Stream and scheduler until SIGTERM/SIGINT (``stream.stop()``, ``scheduler.stop()``)."""
+async def run_worker(
+    settings: IngestSettings,
+    store: RunStore,
+    stream: Any,
+    *,
+    prepare: Callable[[], None] = tasks.prepare_lake,
+) -> None:
+    """Stream and scheduler until SIGTERM/SIGINT (``stream.stop()``, ``scheduler.stop()``).
+
+    The lake's schemas and tables are created first, alone: on a new lake the stream and
+    a missed job would otherwise both create ``bronze`` and one of them fail on the
+    DuckLake transaction conflict.
+    """
     import signal  # noqa: PLC0415
+
+    await asyncio.to_thread(prepare)
 
     from hacore import lake  # noqa: PLC0415
 

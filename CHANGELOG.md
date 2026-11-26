@@ -49,6 +49,14 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   failed on Parquet files the catalog still named. It now detects the missing lake,
   starts a new one and loads the history from Home Assistant again; tokens, audit and
   analysis settings stay.
+- Worker on a new lake (first start, or after a restore without it): the live stream
+  and the missed jobs both created the `bronze` schema, one failed on the DuckLake
+  transaction conflict and the stream reconnected. The worker now creates the lake's
+  schemas and tables once before the stream and the jobs start.
+- Postgres no longer logs DuckLake's commit retries ("duplicate key value violates
+  unique constraint ducklake_snapshot_pkey") as errors: the stream and the jobs write
+  at the same time and DuckLake retries such a commit by design. Errors of the catalog
+  database are left to the services, which log them.
 
 ## [0.5.1] - 2026-11-26
 

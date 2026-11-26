@@ -190,6 +190,29 @@ def test_run_loop_runs_missed_jobs_then_stops() -> None:
     assert calls == [s.job for s in worker.SCHEDULES]
 
 
+def test_worker_prepares_the_lake_before_the_stream_and_the_jobs() -> None:
+    # On a new lake the stream and a missed job both created the bronze schema and one
+    # failed on the DuckLake transaction conflict: the schemas come first, alone.
+    started: list[str] = []
+
+    class Stream:
+        async def run(self) -> None:
+            started.append("stream")
+
+        def stop(self) -> None:
+            pass
+
+    def prepare() -> None:
+        started.append("prepare")
+        raise RuntimeError("catalog down")
+
+    with pytest.raises(RuntimeError, match="catalog down"):
+        asyncio.run(
+            worker.run_worker(IngestSettings(), worker.MemoryRunStore(), Stream(), prepare=prepare)
+        )
+    assert started == ["prepare"]
+
+
 def test_worker_settings_defaults() -> None:
     s = IngestSettings()
     assert s.worker_pg_db == "ops"

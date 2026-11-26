@@ -101,6 +101,9 @@ test "$(psql_q ducklake "SELECT count(*) FROM ducklake_table WHERE table_name = 
   { echo "The catalog still names the smoke table" >&2; exit 1; }
 test "$(psql_q postgres "SELECT oid FROM pg_database WHERE datname = 'audit'")" = "$audit_oid" ||
   { echo "The audit database was recreated" >&2; exit 1; }
+# DuckLake's commit retries are not logged as Postgres errors (also on the new catalog).
+test "$(psql_q ducklake 'SHOW log_min_messages')" = fatal ||
+  { echo "log_min_messages of the catalog is not fatal" >&2; exit 1; }
 echo "Restore without the lake starts a new lake and keeps the audit database"
 
 # Memory at rest (target <= 2 GiB, plan 1c.2 PR 9): every service has started and

@@ -31,6 +31,13 @@ SQL
 }
 
 ensure "$DUCKLAKE_USER" "$DUCKLAKE_PASSWORD" "$DUCKLAKE_DB"
+# DuckLake retries a commit when another writer took its snapshot id (the stream and the
+# jobs write at the same time), and Postgres would log every retry as an ERROR
+# ("duplicate key ... ducklake_snapshot_pkey"). Errors of the catalog reach the services
+# as exceptions and are logged there, so the server log keeps only FATAL for it.
+psql -v ON_ERROR_STOP=1 -U postgres -d postgres -v db="$DUCKLAKE_DB" <<'SQL'
+SELECT format('ALTER DATABASE %I SET log_min_messages = %L', :'db', 'fatal') \gexec
+SQL
 # OPS_DB: runs and cursors of the built-in worker (lite edition, ADR 050).
 ensure "$OPS_USER" "$OPS_PASSWORD" "$DAGSTER_DB" "$SQLMESH_DB" "${OPS_DB:-ops}"
 
