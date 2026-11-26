@@ -138,3 +138,15 @@ def test_fetch_extracts_members_by_range(monkeypatch: pytest.MonkeyPatch, tmp_pa
         fetch.extract(
             "https://example.invalid/x.zip", ideal.HOURLY, tmp_path, expected_sha256="0" * 64
         )
+
+
+def test_planted_stages_narrow_to_recall() -> None:
+    rng = np.random.default_rng(3)
+    houses = [fake_house(f"h{i:02d}", rng) for i in range(8)]
+    s = ch.summarise(ch.run(houses, runs=2, days=90, per_house=4, seed=1), 4)
+    assert s["planted_stages"]
+    for k, st in s["planted_stages"].items():
+        # Each step keeps at most what the previous one kept; the last is the recall.
+        assert st["detected"] >= st["candidate"] >= st["raw_p"] >= st["found"]
+        assert st["found"] == s["recall_by_magnitude"][k]
+    assert s["candidates_median"] is not None

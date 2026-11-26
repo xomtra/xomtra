@@ -94,6 +94,16 @@ class RunMetrics:
     # (one of the strongest episodes of its series in the recent week), and the p-value
     # and peak |z| of the strongest overlapping candidate.
     planted_candidate: dict[str, int] = field(default_factory=dict)
+    # Recall broken down by step, per magnitude: |z| >= min_effect_z in the planted
+    # hours (detected), an episode among the strongest of its series (candidate),
+    # p <= max_q before the multiple-testing correction (raw_p), q <= max_q after
+    # Benjamini-Hochberg (found, the final finding).
+    planted_detected: dict[str, int] = field(default_factory=dict)
+    planted_raw_p: dict[str, int] = field(default_factory=dict)
+    candidates: int = 0
+    reference_size: int = 0
+    # Largest p-value that still passes BH in this run (None: nothing passes).
+    bh_cutoff_p: float | None = None
     planted_p: dict[str, list[float]] = field(default_factory=dict)
     planted_peak_z: dict[str, list[float]] = field(default_factory=dict)
     reference_quantiles: dict[str, float] = field(default_factory=dict)
@@ -218,10 +228,60 @@ def _robust_scale(grid: corr.Grid, params: an.AnomalyParams) -> tuple[FloatArray
     return np.asarray(scale, dtype=np.float64), np.asarray(robust < HEAVY_TAIL_RATIO * spread)
 
 
+def _recent_z(grid: corr.Grid, params: an.AnomalyParams) -> FloatArray:
+    """|z| of every hour as the method measures it (expectation from the baseline,
+    scale with its floor)."""
+    t = len(grid.hours)
+    first_recent = t - params.recent_days * 24
+    idx = np.arange(t)
+    baseline = (idx < first_recent) & (idx >= first_recent - params.baseline_days * 24)
+    how = (grid.local_dow - 1) * 24 + grid.local_hour
+    exp = an.expectation(grid.values, how, grid.local_hour, baseline, grid.series)
+    floor = an.scale_floor(grid.values, baseline, exp)
+    return np.asarray(np.abs(np.nan_to_num(an._z(grid.values, exp, floor))), dtype=np.float64)
+
+
 def _anomalies(grid: corr.Grid, params: an.AnomalyParams) -> tuple[list[dict[str, Any]], int]:
     cps, _ = an.detect_change_points_v2(grid, params)
     found, _ = an.detect_anomalies_v2(grid, params, an._shift_hours(grid, cps))
     return found, len(cps)
+
+
+def _score_planted(
+    m: RunMetrics,
+    grid: corr.Grid,
+    planted: list[tuple[str, float, int, int, str]],
+    cands: list[dict[str, Any]],
+    params: an.AnomalyParams,
+) -> None:
+    """Follow every planted episode (in ``grid``, the series with them) through the
+    steps of the method, per magnitude and shape."""
+    z = _recent_z(grid, params)
+    hours = [corr._to_dt(h) for h in grid.hours]
+    for entity, mag, a, b, shape in planted:
+        key = f"{mag:g}"
+        m.planted[key] = m.planted.get(key, 0) + 1
+        m.planted_shape[shape] = m.planted_shape.get(shape, 0) + 1
+        lo, hi = hours[a], hours[b - 1]
+        j = next(i for i, sr in enumerate(grid.series) if sr.entity_id == entity)
+        if np.nanmax(np.abs(z[a:b, j]), initial=0.0) >= params.min_effect_z:
+            m.planted_detected[key] = m.planted_detected.get(key, 0) + 1
+        overlap = [
+            f
+            for f in cands
+            if f["entity_id"] == entity and f["period_start"] <= hi and f["period_end"] > lo
+        ]
+        if not overlap:
+            continue
+        best = min(overlap, key=lambda f: f["p_value"])
+        m.planted_candidate[key] = m.planted_candidate.get(key, 0) + 1
+        m.planted_p.setdefault(key, []).append(float(best["p_value"]))
+        m.planted_peak_z.setdefault(key, []).append(abs(float(best["score"])))
+        if best["p_value"] <= params.max_q:
+            m.planted_raw_p[key] = m.planted_raw_p.get(key, 0) + 1
+        if best["q_value"] <= params.max_q:
+            m.planted_found[key] = m.planted_found.get(key, 0) + 1
+            m.planted_found_shape[shape] = m.planted_found_shape.get(shape, 0) + 1
 
 
 def score_anomalies(
@@ -258,27 +318,11 @@ def score_anomalies(
     cps, _ = an.detect_change_points_v2(injected, params)
     cands, stats = an.detect_anomalies_v2(injected, everything, an._shift_hours(injected, cps))
     m.reference_quantiles = stats.get("reference_quantiles", {})
+    m.candidates = int(stats.get("candidates", 0))
+    m.reference_size = int(stats.get("reference_size", 0))
     after = [f for f in cands if f["q_value"] <= params.max_q]
-    hours = [corr._to_dt(h) for h in grid.hours]
-    for entity, mag, a, b, shape in planted:
-        key = f"{mag:g}"
-        m.planted[key] = m.planted.get(key, 0) + 1
-        m.planted_shape[shape] = m.planted_shape.get(shape, 0) + 1
-        lo, hi = hours[a], hours[b - 1]
-        overlap = [
-            f
-            for f in cands
-            if f["entity_id"] == entity and f["period_start"] <= hi and f["period_end"] > lo
-        ]
-        if not overlap:
-            continue
-        best = min(overlap, key=lambda f: f["p_value"])
-        m.planted_candidate[key] = m.planted_candidate.get(key, 0) + 1
-        m.planted_p.setdefault(key, []).append(float(best["p_value"]))
-        m.planted_peak_z.setdefault(key, []).append(abs(float(best["score"])))
-        if best["q_value"] <= params.max_q:
-            m.planted_found[key] = m.planted_found.get(key, 0) + 1
-            m.planted_found_shape[shape] = m.planted_found_shape.get(shape, 0) + 1
+    m.bh_cutoff_p = max((float(f["p_value"]) for f in after), default=None)
+    _score_planted(m, injected, planted, cands, params)
     planted_entities = {p[0] for p in planted}
     m.new_after_planting = sum(
         1
@@ -326,6 +370,22 @@ def _ratio(a: int, b: int) -> float | None:
     return round(a / b, 4) if b else None
 
 
+def _sum_counts(metrics: list[RunMetrics], attr: str) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for m in metrics:
+        for k, v in getattr(m, attr).items():
+            out[k] = out.get(k, 0) + v
+    return out
+
+
+def _join_lists(metrics: list[RunMetrics], attr: str) -> dict[str, list[float]]:
+    out: dict[str, list[float]] = {}
+    for m in metrics:
+        for k, v in getattr(m, attr).items():
+            out.setdefault(k, []).extend(v)
+    return out
+
+
 def summarise(metrics: list[RunMetrics], per_house: int) -> dict[str, Any]:
     tot = {
         k: sum(getattr(m, k) for m in metrics)
@@ -345,31 +405,16 @@ def summarise(metrics: list[RunMetrics], per_house: int) -> dict[str, Any]:
             "new_after_planting",
         )
     }
-    planted: dict[str, int] = {}
-    found: dict[str, int] = {}
-    for m in metrics:
-        for k, v in m.planted.items():
-            planted[k] = planted.get(k, 0) + v
-        for k, v in m.planted_found.items():
-            found[k] = found.get(k, 0) + v
-    candidate: dict[str, int] = {}
-    p_values: dict[str, list[float]] = {}
-    peak_z: dict[str, list[float]] = {}
-    for m in metrics:
-        for k, v in m.planted_candidate.items():
-            candidate[k] = candidate.get(k, 0) + v
-        for k, ps in m.planted_p.items():
-            p_values.setdefault(k, []).extend(ps)
-        for k, zs in m.planted_peak_z.items():
-            peak_z.setdefault(k, []).extend(zs)
+    planted = _sum_counts(metrics, "planted")
+    found = _sum_counts(metrics, "planted_found")
+    detected = _sum_counts(metrics, "planted_detected")
+    raw_p = _sum_counts(metrics, "planted_raw_p")
+    candidate = _sum_counts(metrics, "planted_candidate")
+    p_values = _join_lists(metrics, "planted_p")
+    peak_z = _join_lists(metrics, "planted_peak_z")
     quantiles = [m.reference_quantiles for m in metrics if m.reference_quantiles]
-    shape: dict[str, int] = {}
-    shape_found: dict[str, int] = {}
-    for m in metrics:
-        for k, v in m.planted_shape.items():
-            shape[k] = shape.get(k, 0) + v
-        for k, v in m.planted_found_shape.items():
-            shape_found[k] = shape_found.get(k, 0) + v
+    shape = _sum_counts(metrics, "planted_shape")
+    shape_found = _sum_counts(metrics, "planted_found_shape")
     out: dict[str, Any] = {
         "runs": len(metrics),
         "channels_per_house": per_house,
@@ -391,6 +436,20 @@ def summarise(metrics: list[RunMetrics], per_house: int) -> dict[str, Any]:
         "planted_candidate_share": {
             k: _ratio(candidate.get(k, 0), v) for k, v in sorted(planted.items())
         },
+        # Recall by step (ADR 079 point 5): share of the planted episodes still in
+        # after each step; the last one equals recall_by_magnitude.
+        "planted_stages": {
+            k: {
+                "detected": _ratio(detected.get(k, 0), v),
+                "candidate": _ratio(candidate.get(k, 0), v),
+                "raw_p": _ratio(raw_p.get(k, 0), v),
+                "found": _ratio(found.get(k, 0), v),
+            }
+            for k, v in sorted(planted.items())
+        },
+        "candidates_median": _pct([float(m.candidates) for m in metrics if m.planted], 50),
+        "reference_size_median": _pct([float(m.reference_size) for m in metrics if m.planted], 50),
+        "bh_cutoff_p_median": _pct([m.bh_cutoff_p or 0.0 for m in metrics if m.planted], 50, 5),
         "planted_p_median": {k: _pct(v, 50, 4) for k, v in sorted(p_values.items())},
         "planted_peak_z_median": {k: _pct(v, 50) for k, v in sorted(peak_z.items())},
         "reference_quantiles_median": {
