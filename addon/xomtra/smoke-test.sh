@@ -96,8 +96,9 @@ test "$before" = "$(docker exec "$NAME" md5sum /data/secrets.env)"
 # The lost lake was started anew; the audit database (tokens, settings) is the same one.
 docker logs "$NAME" 2>&1 | grep -q 'The lake is missing' ||
   { echo "No restore message in the log" >&2; exit 1; }
-files=$(psql_q ducklake 'SELECT count(*) FROM ducklake_data_file')
-test "$files" = 0 || { echo "The catalog still names $files data file(s)" >&2; exit 1; }
+# (The health check writes its own file again on start: look for the smoke table only.)
+test "$(psql_q ducklake "SELECT count(*) FROM ducklake_table WHERE table_name = 'smoke_restore'")" = 0 ||
+  { echo "The catalog still names the smoke table" >&2; exit 1; }
 test "$(psql_q postgres "SELECT oid FROM pg_database WHERE datname = 'audit'")" = "$audit_oid" ||
   { echo "The audit database was recreated" >&2; exit 1; }
 echo "Restore without the lake starts a new lake and keeps the audit database"
