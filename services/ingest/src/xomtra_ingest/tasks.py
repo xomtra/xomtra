@@ -45,6 +45,12 @@ def open_lake() -> Iterator[duckdb.DuckDBPyConnection]:
         con.close()
 
 
+def prepare_lake() -> None:
+    """Create the schemas and tables of :func:`open_lake` once, before anything writes."""
+    with open_lake():
+        pass
+
+
 def _with_ha[T](
     fn: Callable[[HAClient, duckdb.DuckDBPyConnection], Awaitable[T]],
     settings: IngestSettings | None = None,
