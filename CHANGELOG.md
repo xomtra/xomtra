@@ -11,6 +11,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Changed
+
+- Admin GUI is always dark like xomtra.com, also when Home Assistant is in light mode.
+
 ## [0.6.0] - 2026-11-26
 
 ### Added

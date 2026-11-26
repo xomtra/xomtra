@@ -13,8 +13,8 @@ from typing import Any
 from xomtra_mcp.admin import i18n, view
 
 # Colours, type and components follow the xomtra.com web (graphite, indigo accent,
-# amber signal, Geist / Geist Mono). Dark by default like the web; the light variant
-# only when Home Assistant is in light mode (ui.js sets data-theme).
+# amber signal, Geist / Geist Mono). Always dark like the web, also in a light Home
+# Assistant (MD 2026-11-26).
 DARK = {
     "bg": "#0b0c0f",
     "surface": "#121419",
@@ -27,19 +27,6 @@ DARK = {
     "ok": "#5fd4a0",
     "warn": "#ffb547",
     "bad": "#ff7a6b",
-}
-LIGHT = {
-    "bg": "#f5f6f8",
-    "surface": "#ffffff",
-    "raise": "#eceef3",
-    "line": "#dfe2e8",
-    "ink": "#0b0c0f",
-    "muted": "#5b6273",
-    "accent": "#4c58d6",
-    "signal": "#a4600a",
-    "ok": "#12805a",
-    "warn": "#a15c07",
-    "bad": "#c0362c",
 }
 
 
@@ -56,8 +43,6 @@ CSS = (
 :root { --sans:"Geist","Segoe UI",system-ui,sans-serif;
   --mono:"Geist Mono",ui-monospace,Menlo,monospace; """
     + _tokens(DARK, "dark")
-    + "}\n:root[data-theme=light] { "
-    + _tokens(LIGHT, "light")
     + "}\n"
     + """
 * { box-sizing:border-box; }

@@ -1,6 +1,6 @@
 // xomtra admin GUI: follows Home Assistant when shown in its Ingress iframe (same
-// origin): light/dark mode, language, number, date and time format, time zone.
-// Outside Home Assistant it stays dark and uses the browser's language.
+// origin): language, number, date and time format, time zone. Always dark like
+// xomtra.com; outside Home Assistant it uses the browser's language.
 (function () {
   "use strict";
   var LANGS = ["en", "cs", "de", "pl", "nl"];
@@ -32,8 +32,6 @@
       /* no cookies or storage: stay in the server's language */
     }
   }
-  var dark = hass && hass.themes && hass.themes.darkMode;
-  if (dark === false) document.documentElement.dataset.theme = "light";
 
   var loc = (hass && hass.locale) || {};
   var lang = loc.language || (hass && hass.language) || navigator.language || "en";
