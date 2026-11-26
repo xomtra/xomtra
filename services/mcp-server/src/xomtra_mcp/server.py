@@ -29,7 +29,7 @@ from xomtra_mcp.audit import AuditSink, LogAuditSink, PostgresAuditSink
 from xomtra_mcp.config import Settings
 from xomtra_mcp.data import DataAccess, parse_time
 from xomtra_mcp.guard import PolicyMiddleware
-from xomtra_mcp.guidelines import DEFAULT_GUIDELINES, Guidelines, ThemeSource
+from xomtra_mcp.guidelines import CORE_GUIDELINES, DEFAULT_GUIDELINES, Guidelines, ThemeSource
 from xomtra_mcp.ha_auth import HomeAssistantProvider
 from xomtra_mcp.identity import Identity, current_identity
 from xomtra_mcp.policy import Policy, current_access
@@ -53,9 +53,10 @@ can see depends on your role; entities outside it are not returned.
 def build_instructions(guidelines: Guidelines) -> str:
     """Server instructions; the central theme changes during the run, so only the
     default guidelines go here, and results carry the current text (ADR 080)."""
+    text = f"{OVERVIEW}\nCore rules (always apply):\n{CORE_GUIDELINES}"
     if not guidelines.defaults:
-        return OVERVIEW
-    return f"{OVERVIEW}\nHow to answer with this data (ADR 073):\n{DEFAULT_GUIDELINES}"
+        return text
+    return f"{text}\nHow to answer with this data (ADR 073):\n{DEFAULT_GUIDELINES}"
 
 
 def rules_decorator(guidelines: Guidelines) -> Callable[[Any], Any]:
@@ -63,8 +64,7 @@ def rules_decorator(guidelines: Guidelines) -> Callable[[Any], Any]:
     rules = guidelines.tool_rules
 
     def apply(fn: Any) -> Any:
-        if rules:
-            fn.__doc__ = f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{rules}"
+        fn.__doc__ = f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{rules}"
         return fn
 
     return apply
@@ -74,8 +74,7 @@ def guidelines_attacher(guidelines: Guidelines) -> Callable[[dict[str, Any]], di
     """Attaches the current answering guidelines to a result the model interprets."""
 
     def attach(result: dict[str, Any]) -> dict[str, Any]:
-        text = guidelines.text()
-        return {**result, "answer_guidelines": text} if text else result
+        return {**result, "answer_guidelines": guidelines.text()}
 
     return attach
 

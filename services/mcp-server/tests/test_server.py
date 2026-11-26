@@ -104,6 +104,7 @@ async def test_instructions_carry_the_default_guardrails() -> None:
     assert "language and country of the installation" in text
     assert "Never guess or play on the user's wealth, social status" in text
     assert "Joke about the user only with tact" in text
+    assert "racist, sexist, homophobic or political jokes" in text
     assert "No jokes and no vulgarity about accidents, faults" in text
 
 
@@ -125,9 +126,12 @@ async def test_default_guidelines_can_be_turned_off() -> None:
     settings = dev_settings().model_copy(update={"default_guidelines": False})
     srv = create_server(settings)
     assert "crude" not in (srv.instructions or "")
+    assert "racist, sexist, homophobic or political" in (srv.instructions or "")
     async with Client(srv) as client:
         info = (await client.call_tool("server_info", {})).data
-    assert "answer_guidelines" not in info
+    # The core rules stay, the default style goes.
+    assert "racist, sexist, homophobic or political" in info["answer_guidelines"]
+    assert "crude" not in info["answer_guidelines"]
 
 
 async def test_central_theme_takes_precedence_and_expires() -> None:
@@ -140,8 +144,9 @@ async def test_central_theme_takes_precedence_and_expires() -> None:
     theme = Theme("Christmas: add a festive touch.", received_at=now)
     guidelines = Guidelines(defaults=True, theme=lambda: theme)
     text = guidelines.text(now) or ""
+    assert text.index("political jokes") < text.index("Christmas")
     assert text.index("Christmas") < text.index("occupant of the property")
-    assert "takes precedence" in text
+    assert "never over the core" in " ".join(text.split())
     assert "2026-12-02 12:00 UTC" in text
     assert "Christmas" not in (guidelines.text(now + timedelta(hours=24)) or "")
     # A longer validity from the centre does not extend the 24 hours.
@@ -149,6 +154,7 @@ async def test_central_theme_takes_precedence_and_expires() -> None:
     assert not long.active(now + timedelta(hours=25))
     # The theme applies even with the default guidelines off.
     off = Guidelines(defaults=False, theme=lambda: theme)
-    assert off.tool_rules is None
-    assert (off.text(now) or "").startswith("Current theme from xomtra.com")
-    assert off.text(now + timedelta(days=2)) is None
+    assert "political jokes" in off.tool_rules
+    assert "Christmas" in off.text(now)
+    assert "occupant" not in off.text(now)
+    assert "Christmas" not in off.text(now + timedelta(days=2))

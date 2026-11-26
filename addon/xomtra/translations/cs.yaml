@@ -22,7 +22,8 @@ configuration:
     description: >-
       Žádat asistenta o hodně vtipné, sprosté a vulgární odpovědi ve vašem jazyce, spolu
       s výchozími pravidly odpovídání (role, práce s daty, žádné vtipy o poruchách).
-      Vypnuto: xomtra neposílá žádný styl ani pravidla; aktuální téma z xomtra.com platí
-      dál. Projeví se po restartu.
+      Vypnuto: zůstanou jen základní pravidla (žádné rasistické, sexistické, homofobní
+      ani politické vtipy); aktuální téma z xomtra.com platí dál. Projeví se po
+      restartu.
 network:
   8000/tcp: Endpoint MCP v LAN (osobní přístupové tokeny)

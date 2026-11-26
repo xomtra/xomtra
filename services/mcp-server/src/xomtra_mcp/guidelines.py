@@ -5,6 +5,8 @@ instructions to the model: the instructions, a short version in every data tool
 description and the full text as ``answer_guidelines`` in selected results.
 
 Order of precedence (ADR 080):
+0. The core rules below. They always apply: even with the default guidelines off and
+   above any central theme.
 1. A central theme fetched from xomtra.com (ADR 075), when one is active. It is valid
    for at most 24 hours from when it was received and then forgotten. It applies even
    when the default guidelines are turned off.
@@ -42,8 +44,7 @@ DEFAULT_GUIDELINES = """\
   never screws up." "The boiler and the washing machine peak together every Sunday:
   either a correlation, or the bastards are planning something."
 - Joke about the user only with tact: friendly teasing, never humiliating, and never
-  about their body, health, money, family or private life. No slurs against any group
-  of people.
+  about their body, health, money, family or private life.
 - No jokes and no vulgarity about accidents, faults, failures or risky states (leaks,
   fire or smoke, gas or CO, frost, power or heating outages, alarms, open locks,
   anything about health): there be factual, calm and clear. Humour never replaces or
@@ -51,6 +52,16 @@ DEFAULT_GUIDELINES = """\
 - xomtra only reads data. Do not suggest changes to locks, alarms, cameras or heating
   safety settings on the strength of a finding alone; point the user to check first.
 """
+
+CORE_GUIDELINES = """\
+- Never make racist, sexist, homophobic or political jokes, and never use slurs against
+  any group of people. This holds for every style and theme.
+"""
+
+CORE_RULES = (
+    "xomtra core rule: no racist, sexist, homophobic or political jokes and no slurs "
+    "against any group of people, in every style and theme."
+)
 
 TOOL_RULES = (
     "How to answer (xomtra): the user is the occupant of the property; findings are "
@@ -60,7 +71,8 @@ TOOL_RULES = (
     "user's language and local culture (never by wealth or status), tease the user only "
     "with tact, and no jokes about accidents, faults or risky states; facts stay exact; "
     "xomtra only reads, so never advise changing locks, alarms, cameras or heating "
-    "safety on a finding alone. Full text: answer_guidelines of server_info."
+    "safety on a finding alone. " + CORE_RULES + " Full text: answer_guidelines of "
+    "server_info."
 )
 
 # A central theme is forgotten 24 hours after it was received, whatever it says.
@@ -95,23 +107,23 @@ class Guidelines:
         self._theme = theme
 
     @property
-    def tool_rules(self) -> str | None:
-        return TOOL_RULES if self.defaults else None
+    def tool_rules(self) -> str:
+        return TOOL_RULES if self.defaults else CORE_RULES
 
     def theme(self, now: datetime | None = None) -> Theme | None:
         theme = self._theme() if self._theme else None
         return theme if theme and theme.active(now) else None
 
-    def text(self, now: datetime | None = None) -> str | None:
-        parts: list[str] = []
+    def text(self, now: datetime | None = None) -> str:
+        parts = [f"Core rules (always apply, above any theme):\n{CORE_GUIDELINES}"]
         theme = self.theme(now)
         if theme:
             until = theme.expires_at().astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
             parts.append(
                 f"Current theme from xomtra.com (valid until {until}). It takes precedence "
-                "over everything below where they differ; follow it.\n"
-                f"{theme.text.strip()}\n"
+                "over the default guidelines below where they differ, never over the core "
+                f"rules; follow it.\n{theme.text.strip()}\n"
             )
         if self.defaults:
-            parts.append(DEFAULT_GUIDELINES)
-        return "\n".join(parts) if parts else None
+            parts.append(f"Default guidelines:\n{DEFAULT_GUIDELINES}")
+        return "\n".join(parts)

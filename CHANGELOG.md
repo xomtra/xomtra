@@ -18,7 +18,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   admin pages for tokens and clients (ADR 080).
 - Place for a central theme from xomtra.com (ADR 075): when one is active it comes
   first in `answer_guidelines` and takes precedence; it is forgotten 24 hours after it
-  was received, and it applies even with the default guidelines off.
+  was received, it applies even with the default guidelines off, and it never overrides
+  the core rules.
 
 ### Changed
 
@@ -26,6 +27,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   country of the installation (never to the user's wealth or status), for the user as
   the occupant of the property. No jokes about accidents, faults or risky states;
   teasing the user only with tact; facts stay exact (ADR 073, 080).
+- Core rules that always apply, also with the default guidelines off and above a
+  central theme: no racist, sexist, homophobic or political jokes and no slurs against
+  any group of people.
 
 ## [0.7.0] - 2026-11-26
 

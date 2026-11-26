@@ -22,7 +22,8 @@ configuration:
     description: >-
       Prosić asystenta o bardzo zabawne, sprośne i wulgarne odpowiedzi w Twoim języku,
       wraz z domyślnymi zasadami odpowiadania (rola, praca z danymi, bez żartów o
-      awariach). Wyłączone: xomtra nie wysyła stylu ani zasad; bieżący motyw z
+      awariach). Wyłączone: zostają tylko podstawowe zasady (żadnych rasistowskich,
+      seksistowskich, homofobicznych ani politycznych żartów); bieżący motyw z
       xomtra.com nadal obowiązuje. Działa po ponownym uruchomieniu.
 network:
   8000/tcp: Endpoint MCP w sieci LAN (osobiste tokeny dostępu)

@@ -21,8 +21,8 @@ configuration:
     name: Default answer style
     description: >-
       Ask the assistant for very funny, crude and vulgar answers in your language, with
-      the default rules for answering (role, data, no jokes about faults). Off: xomtra
-      sends no style or rules; a current theme from xomtra.com still applies. Takes
-      effect after a restart.
+      the default rules for answering (role, data, no jokes about faults). Off: only the
+      core rules stay (no racist, sexist, homophobic or political jokes); a current
+      theme from xomtra.com still applies. Takes effect after a restart.
 network:
   8000/tcp: MCP endpoint in the LAN (personal access tokens)

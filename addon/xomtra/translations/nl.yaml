@@ -22,7 +22,8 @@ configuration:
     description: >-
       Vraag de assistent om heel grappige, grove en vulgaire antwoorden in je taal, met
       de standaardregels voor antwoorden (rol, omgang met data, geen grappen over
-      storingen). Uit: xomtra stuurt geen stijl of regels; een actueel thema van
-      xomtra.com blijft gelden. Werkt na een herstart.
+      storingen). Uit: alleen de basisregels blijven (geen racistische, seksistische,
+      homofobe of politieke grappen); een actueel thema van xomtra.com blijft gelden.
+      Werkt na een herstart.
 network:
   8000/tcp: MCP-endpoint in het LAN (persoonlijke toegangstokens)

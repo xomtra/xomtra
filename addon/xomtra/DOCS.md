@@ -28,7 +28,8 @@ By default xomtra asks your assistant for very funny, crude and vulgar answers, 
 to your language and country, with a few firm rules: no jokes about accidents, faults
 or risky states, tactful teasing of you only, and exact facts. If this form of the
 answers does not suit you, turn off the option **Default answer style** on the
-add-on's **Configuration** tab and restart the add-on.
+add-on's **Configuration** tab and restart the add-on. The core rules always stay: no
+racist, sexist, homophobic or political jokes, in any style.
 
 ## Requirements
 
