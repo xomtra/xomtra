@@ -26,6 +26,7 @@ import contextlib
 import logging
 import os
 import secrets
+import shlex
 import socket
 import string
 import sys
@@ -137,14 +138,19 @@ def generate(length: int = 40) -> str:
 
 
 def parse(text: str) -> dict[str, str]:
-    """``KEY=value`` lines (no quoting: every value here is [A-Za-z0-9] or a URL)."""
+    """``KEY=value`` lines as :func:`render` writes them (values in POSIX shell quoting).
+
+    Generated values are [A-Za-z0-9], but a value taken over from an older .env may hold
+    any character, and the shell based services source these files.
+    """
     out: dict[str, str] = {}
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        out[key.strip()] = value.strip()
+        value = value.strip()
+        out[key.strip()] = "".join(shlex.split(value)) if value else ""
     return out
 
 
@@ -152,7 +158,7 @@ def render(values: Mapping[str, str]) -> str:
     for key, value in values.items():
         if "\n" in value or "\n" in key:
             raise ValueError(f"{key}: line break in value")
-    return "".join(f"{k}={v}\n" for k, v in values.items())
+    return "".join(f"{k}={shlex.quote(v)}\n" for k, v in values.items())
 
 
 def resolve_master(

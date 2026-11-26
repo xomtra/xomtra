@@ -94,3 +94,20 @@ def test_load_env(tmp_path: Path) -> None:
 def test_render_refuses_line_breaks() -> None:
     with pytest.raises(ValueError, match="line break"):
         ss.render({"A": "x\ny"})
+
+
+def test_values_with_shell_characters_survive(tmp_path: Path) -> None:
+    import subprocess
+
+    odd = 'ci-ops-\'quote $HOME `x` \\ "q" ;&'
+    ss.init(tmp_path, env={"OPS_PG_PASSWORD": odd})
+    assert ss.parse((tmp_path / "master.env").read_text())["OPS_PG_PASSWORD"] == odd
+    file = tmp_path / "ingest.env"
+    file.chmod(0o600)
+    out = subprocess.run(  # noqa: S603 - fixed test command
+        ["sh", "-c", f'set -a; . "{file}"; printf %s "$XOMTRA_OPS_PG_PASSWORD"'],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert out == odd
