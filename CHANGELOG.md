@@ -26,6 +26,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Home Assistant add-on: the overview and the documentation say that Home Assistant
   backups do not include the lake (history and findings) and recommend xomtra on its
   own virtual machine for backups of the whole history.
+- Default guidance for the LLM in the MCP server's instructions (ADR 073): findings as
+  hypotheses with their strength and window, statements based on fetched data, local
+  time, no conclusions about a person unless asked, a friendly tone with the odd joke,
+  and no advice on locks or alarms from a finding alone. Advisory for the model; the
+  server's access rules are unchanged.
 - Tokens page: a picture of how a token connects an LLM agent with xomtra and that
   xomtra only reads Home Assistant, with the page's actions on it.
 

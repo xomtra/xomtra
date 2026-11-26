@@ -89,3 +89,14 @@ def test_identity_from_flat_claims() -> None:
     ident = identity_from_claims({"sub": "s1", "upn": "u@example.org"}, [])
     assert ident.subject == "s1"
     assert ident.roles == ()
+
+
+async def test_instructions_carry_the_default_guardrails() -> None:
+    """ADR 073: the client puts the server instructions in the model's context."""
+    text = create_server(dev_settings()).instructions or ""
+    assert "hypotheses, not as causes" in text
+    assert "Do not invent values" in text
+    assert "local time" in text
+    assert "presence, sleep, health" in text
+    assert "locks, alarms" in text
+    assert "friendly and warm" in text
