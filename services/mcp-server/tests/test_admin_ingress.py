@@ -198,3 +198,13 @@ async def test_ingress_page_has_the_xomtra_look() -> None:
     assert icon.status_code == 200
     assert icon.headers["content-type"] == "image/svg+xml"
     assert missing.status_code == 404
+
+
+async def test_tokens_page_explains_the_flow_with_actions() -> None:
+    app, _, _ = make_app()
+    async with client_for(app) as client:
+        resp = await client.get("/tokens", headers=HA)
+    assert "<figure class='flow'>" in resp.text
+    assert f"href='{INGRESS}/connect/xomtra.mcpb' download" in resp.text
+    assert "href='#issue'" in resp.text
+    assert "<form id=issue " in resp.text

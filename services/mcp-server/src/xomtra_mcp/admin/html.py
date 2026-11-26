@@ -130,6 +130,28 @@ details { border-top:1px solid var(--line); border-bottom:1px solid var(--line);
 summary { cursor:pointer; font-weight:500; }
 ol, ul { padding-left:22px; }
 li { margin-bottom:4px; }
+figure.flow { margin:0 0 18px; background:var(--surface); border:1px solid var(--line);
+  border-radius:12px; padding:16px; }
+figure.flow svg { display:block; width:100%; height:auto; }
+figure.flow .tall { display:none; max-width:360px; margin:0 auto; }
+figure.flow figcaption { color:var(--muted); font-size:13.5px; margin-top:10px; }
+.flow .box { fill:var(--bg); stroke:var(--line); stroke-width:1.5; }
+.flow .box.us { stroke:var(--accent); }
+.flow .t { fill:var(--ink); font:600 17px var(--sans); letter-spacing:-.02em; }
+.flow .s { fill:var(--muted); font:400 12.5px var(--sans); }
+.flow .m { fill:var(--signal); font:500 11.5px var(--mono); }
+.flow .a { fill:var(--muted); font:500 11.5px var(--mono); letter-spacing:.02em; }
+.flow .ln { stroke:var(--muted); stroke-width:1.5; fill:none; }
+.flow .ln.req { stroke:var(--accent); }
+.flow .ln.ro { stroke-dasharray:5 4; }
+.flow .hd { fill:var(--muted); } .flow .hd.req { fill:var(--accent); }
+.flow .hot rect { fill:var(--ink); }
+.flow .hot text { fill:var(--bg); font:500 13px var(--sans); }
+.flow .hot:hover rect { fill:var(--accent); }
+.flow .hot:focus-visible { outline:2px solid var(--accent); }
+form:target { outline:2px solid var(--accent); outline-offset:6px; border-radius:8px; }
+@media (max-width:700px) { figure.flow .wide { display:none; }
+  figure.flow .tall { display:block; } }
 @media (max-width:700px) { header { position:static; padding-inline:16px; }
   main { padding-inline:16px; }
   header form, header .who { margin-left:0; } }
@@ -232,4 +254,121 @@ def cards(items: Iterable[tuple[str, Any, str]]) -> str:
             for label, value, cls in items
         )
         + "</div>"
+    )
+
+
+def _defs(p: str) -> str:
+    """Arrow heads; ids per picture, a marker in a hidden SVG does not render."""
+    return (
+        "<defs>"
+        + "".join(
+            f"<marker id='{p}{n}' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' "
+            f"markerHeight='7' orient='auto-start-reverse'><path class='{cls}' "
+            "d='M0 0L10 5L0 10z'/></marker>"
+            for n, cls in (("a", "hd"), ("b", "hd req"))
+        )
+        + "</defs>"
+    )
+
+
+def _box(
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    *,
+    title: str,
+    lines: Sequence[str],
+    us: bool = False,
+    mono: str = "",
+) -> str:
+    out = (
+        f"<rect class='box{' us' if us else ''}' x='{x}' y='{y}' width='{w}' height='{h}' rx='12'/>"
+    )
+    out += f"<text class='t' x='{x + 18}' y='{y + 32}'>{escape(title)}</text>"
+    for i, line in enumerate(lines):
+        out += f"<text class='s' x='{x + 18}' y='{y + 56 + i * 18}'>{escape(line)}</text>"
+    if mono:
+        out += f"<text class='m' x='{x + 18}' y='{y + h - 16}'>{escape(mono)}</text>"
+    return out
+
+
+def _hotspot(x: int, y: int, w: int, href: str, label: str, *, download: bool = False) -> str:
+    """A clickable pill on the picture (an SVG link, no script)."""
+    return (
+        f"<a class='hot' href='{escape(href)}'{' download' if download else ''}>"
+        f"<rect x='{x}' y='{y}' width='{w}' height='30' rx='15'/>"
+        f"<text x='{x + w // 2}' y='{y + 20}' text-anchor='middle'>{escape(label)}</text></a>"
+    )
+
+
+AGENT = ("LLM agent", ("Claude Desktop, Claude Code", "or another MCP client"), "")
+XOMTRA = (
+    "xomtra add-on",
+    ("MCP server, checks the token", "own copy of the history,", "analyses"),
+    "",
+)
+HA = ("Home Assistant", ("entities, states", "and statistics"), "read only")
+
+
+def token_flow(prefix: str, mcpb: str) -> str:
+    """How a token connects an LLM agent, xomtra and Home Assistant (Tokens page).
+
+    The boxes carry the page's actions: download the Claude Desktop extension on the
+    agent, issue a token on xomtra (jumps to the form, ``#issue``).
+    """
+    get = _hotspot(
+        22, 144, 210, f"{prefix}/connect/{mcpb}", "↓ Claude Desktop extension", download=True
+    )
+    issue = _hotspot(363, 144, 170, "#issue", "+ Issue a token")
+    get_t = _hotspot(
+        38, 86, 210, f"{prefix}/connect/{mcpb}", "↓ Claude Desktop extension", download=True
+    )
+    issue_t = _hotspot(38, 316, 170, "#issue", "+ Issue a token")
+    wide = (
+        "<svg class='wide' viewBox='0 0 960 236' role='img' aria-labelledby='flow-t'>"
+        "<title id='flow-t'>LLM agent sends requests with the token to xomtra; xomtra answers "
+        "from its own copy of the Home Assistant history, which it reads from Home Assistant."
+        "</title>"
+        + _defs("w")
+        + _box(4, 40, 270, 150, title=AGENT[0], lines=AGENT[1], mono=AGENT[2])
+        + _box(345, 40, 270, 150, title=XOMTRA[0], lines=XOMTRA[1], us=True, mono=XOMTRA[2])
+        + _box(686, 40, 270, 150, title=HA[0], lines=HA[1], mono=HA[2])
+        + get
+        + issue
+        + "<path class='ln req' marker-end='url(#wb)' d='M278 88H339'/>"
+        "<text class='a' x='280' y='24'>1 request</text>"
+        "<text class='a' x='280' y='38'>+ Bearer token</text>"
+        "<path class='ln' marker-end='url(#wa)' d='M341 142H282'/>"
+        "<text class='a' x='280' y='212'>2 answer: data,</text>"
+        "<text class='a' x='280' y='226'>findings</text>"
+        "<path class='ln ro' marker-end='url(#wa)' d='M682 115H621'/>"
+        "<text class='a' x='621' y='24'>3 reads</text>"
+        "<text class='a' x='621' y='38'>continuously</text></svg>"
+    )
+    tall = (
+        "<svg class='tall' viewBox='0 0 330 560' role='img' aria-labelledby='flow-t2'>"
+        "<title id='flow-t2'>LLM agent, xomtra and Home Assistant</title>"
+        + _defs("t")
+        + _box(20, 0, 290, 130, title=AGENT[0], lines=AGENT[1], mono=AGENT[2])
+        + _box(20, 210, 290, 150, title=XOMTRA[0], lines=XOMTRA[1], us=True, mono=XOMTRA[2])
+        + _box(20, 440, 290, 120, title=HA[0], lines=HA[1], mono=HA[2])
+        + get_t
+        + issue_t
+        + "<path class='ln req' marker-end='url(#tb)' d='M110 134V204'/>"
+        "<text class='a' x='120' y='165'>1 request</text>"
+        "<text class='a' x='120' y='180'>+ token</text>"
+        "<path class='ln' marker-end='url(#ta)' d='M230 206V138'/>"
+        "<text class='a' x='238' y='165'>2 answer</text>"
+        "<path class='ln ro' marker-end='url(#ta)' d='M165 436V366'/>"
+        "<text class='a' x='175' y='405'>3 reads</text></svg>"
+    )
+    return (
+        f"<figure class='flow'>{wide}{tall}<figcaption>Issue a token and paste it into the "
+        "agent; for Claude Desktop download the extension, it asks for the token. The agent "
+        "sends every request with it to xomtra (1); xomtra checks it and answers with data "
+        "and findings within the token's role (2). xomtra reads Home Assistant on its own "
+        "and only reads (3): the agent never talks to Home Assistant and cannot switch "
+        "anything. The model sees only the answers it asked for.</figcaption>"
+        "</figure>"
     )

@@ -46,7 +46,7 @@ from xomtra_mcp.admin.analysis import (
     run_confidence,
 )
 from xomtra_mcp.admin.config import PREFIX, AdminSettings
-from xomtra_mcp.admin.html import CSS, cards, e, page, table
+from xomtra_mcp.admin.html import CSS, cards, e, page, table, token_flow
 from xomtra_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
 from xomtra_mcp.admin.session import Signer
 from xomtra_mcp.admin.view import View, prefix
@@ -1003,7 +1003,7 @@ class AdminApp:
             for d in TOKEN_DAYS
         )
         form = (
-            f"<form class=filters method=post action='{prefix()}/tokens/issue'>"
+            f"<form id=issue class=filters method=post action='{prefix()}/tokens/issue'>"
             f"<input name=owner required maxlength=100 value='{e(user.get('username') or '')}'"
             " placeholder='for whom'>"
             "<input name=description required maxlength=200 placeholder='device or app, "
@@ -1035,6 +1035,7 @@ class AdminApp:
         body = (
             "<p class=muted>Each person or device gets its own token. A token is shown once; "
             "only its hash is stored. Revoked tokens stop working within 30 seconds.</p>"
+            + token_flow(prefix(), MCPB_FILENAME)
             + form
             + table(
                 ["id", "for", "description", "role", "created", "expires", "last used", ""],
