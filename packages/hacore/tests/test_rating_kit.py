@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -40,9 +41,10 @@ def row(kind: str = "correlation", **kw: str) -> dict[str, str]:
     return base | kw
 
 
+@pytest.mark.parametrize("lang", rk.LANGS)
 @pytest.mark.parametrize("kind", ["correlation", "anomaly", "change_point"])
-def test_description_is_blinded(kind: str) -> None:
-    text = rk.describe(row(kind))
+def test_description_is_blinded(kind: str, lang: str) -> None:
+    text = rk.describe(row(kind), rk.load_rubric(lang))
     rubric = rk.load_rubric()
     # What the AI raters get besides the rubric (which names the categories).
     reqs = json.dumps([r["params"]["messages"] for r in rk.requests([row(kind)], rubric, "m")])
@@ -134,3 +136,58 @@ def test_parse_results() -> None:
     ratings, failed = rk.parse_results(json.dumps(x) for x in (ok, bad, off))
     assert ratings == [rk.Rating("s1", "ai:owner", 3, False, "fault")]
     assert failed == ["s2-owner", "s3-adviser"]
+
+
+def test_translations_match_the_source() -> None:
+    en = rk.load_rubric()
+    for lang in ("cs", "de"):
+        local = rk.load_rubric(lang)
+        assert local.version == en.version
+        # Same scale, the same answers, the same placeholders, the same context facts.
+        assert [v["value"] for v in local.data["usefulness"]["levels"]] == [1, 2, 3, 4]
+        assert [v["value"] for v in local.data["category"]["values"]] == list(rk.CATEGORIES)
+        assert set(local.data["flags"]) == set(en.data["flags"])
+        assert set(local.data["describe"]) == set(en.data["describe"])
+        for key, template in en.data["describe"].items():
+            fields = set(re.findall(r"{(\w+)}", template))
+            assert set(re.findall(r"{(\w+)}", local.data["describe"][key])) == fields, key
+        # The AI raters stay English.
+        assert local.system_prompt("owner") != ""
+        assert local.data["role"] == en.data["role"]
+
+
+def test_forms_in_czech_and_german_keep_the_rater_order() -> None:
+    rows = [row(sample_id=f"s{i}") for i in range(9)]
+    cs = rk.forms(rows, ["r1"], rk.load_rubric("cs"))["r1"]
+    de = rk.forms(rows, ["r1"], rk.load_rubric("de"))["r1"]
+    assert [r["sample_id"] for r in cs] == [r["sample_id"] for r in de]
+    assert "klesá o 2 h později" in cs[0]["finding"]
+    assert "sinkt" in de[0]["finding"]
+    assert "ve stejné místnosti" in cs[0]["finding"]
+
+
+def test_numbers_use_the_decimal_comma() -> None:
+    text = rk.describe(row("anomaly", observed="12.5"), rk.load_rubric("cs"))
+    assert "průměr 12,5" in text
+
+
+@pytest.mark.parametrize(
+    ("lang", "answer", "expected"),
+    [
+        ("cs", ("3", "ano", "úspora"), (3, True, "savings")),
+        ("de", ("2", "nein", "Defekt"), (2, False, "fault")),
+        ("en", ("4", "no", "automation"), (4, False, "automation")),
+        ("cs", ("1", "ne", "behaviour"), (1, False, "behaviour")),
+    ],
+)
+def test_normalise_answers(
+    lang: str, answer: tuple[str, str, str], expected: tuple[int, bool, str]
+) -> None:
+    assert rk.load_rubric(lang).normalise(*answer) == expected
+
+
+def test_normalise_rejects_answers_outside_the_rubric() -> None:
+    with pytest.raises(ValueError, match="trivial"):
+        rk.load_rubric("de").normalise("2", "ano", "keine")
+    with pytest.raises(ValueError, match="usefulness"):
+        rk.load_rubric("cs").normalise("5", "ano", "žádný")
