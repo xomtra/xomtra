@@ -72,11 +72,16 @@ psql_q() { # DB SQL
 # A restart keeps the generated secrets (the catalog stays readable). The restart also
 # plays a restore from a Home Assistant backup, which leaves the lake out
 # (backup_exclude): one Parquet file in the catalog, an empty /data/lake.
-docker exec "$NAME" sh -c '. xomtra-env && s6-setuidgid xomtra python3 -c "
+echo "Writing a smoke table to the lake"
+docker exec "$NAME" sh -c '. xomtra-env && cd /data/home && HOME=/data/home s6-setuidgid xomtra python3 -c "
 from hacore.lake import LakeSettings, connect
 connect(LakeSettings.from_env()).execute(\"CREATE TABLE lake.smoke_restore AS SELECT 1 AS x\")"'
-test "$(psql_q ducklake 'SELECT count(*) > 0 FROM ducklake_data_file')" = t
+files=$(psql_q ducklake 'SELECT count(*) FROM ducklake_data_file')
+echo "Lake before the restore: $files data file(s) in the catalog; /data/lake:"
+docker exec "$NAME" find /data/lake -type f
+test "$files" -gt 0 || { echo "The smoke table wrote no Parquet file" >&2; exit 1; }
 audit_oid=$(psql_q postgres "SELECT oid FROM pg_database WHERE datname = 'audit'")
+test -n "$audit_oid"
 before=$(docker exec "$NAME" md5sum /data/secrets.env)
 docker stop "$NAME" >/dev/null
 docker run --rm -v "$DATA:/data" --entrypoint find "$IMAGE" /data/lake -mindepth 1 -delete
@@ -89,9 +94,12 @@ until curl -fsS http://127.0.0.1:18000/healthz >/dev/null 2>&1; do
 done
 test "$before" = "$(docker exec "$NAME" md5sum /data/secrets.env)"
 # The lost lake was started anew; the audit database (tokens, settings) is the same one.
-docker logs "$NAME" 2>&1 | grep -q 'The lake is missing'
-test "$(psql_q ducklake 'SELECT count(*) FROM ducklake_data_file')" = 0
-test "$(psql_q postgres "SELECT oid FROM pg_database WHERE datname = 'audit'")" = "$audit_oid"
+docker logs "$NAME" 2>&1 | grep -q 'The lake is missing' ||
+  { echo "No restore message in the log" >&2; exit 1; }
+files=$(psql_q ducklake 'SELECT count(*) FROM ducklake_data_file')
+test "$files" = 0 || { echo "The catalog still names $files data file(s)" >&2; exit 1; }
+test "$(psql_q postgres "SELECT oid FROM pg_database WHERE datname = 'audit'")" = "$audit_oid" ||
+  { echo "The audit database was recreated" >&2; exit 1; }
 echo "Restore without the lake starts a new lake and keeps the audit database"
 
 # Memory at rest (target <= 2 GiB, plan 1c.2 PR 9): every service has started and
