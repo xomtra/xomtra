@@ -43,6 +43,13 @@ only allowed when it listens on a loopback address (local development).
 
 ## Releases and installation
 
+**Home Assistant add-on:** add this repository to your Home Assistant with one click:
+
+[![Open your Home Assistant instance and show the add add-on repository dialog with this repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fxomtra%2Fxomtra)
+
+Or add `https://github.com/xomtra/xomtra` under Settings → Add-ons → Add-on store → ⋮ →
+Repositories.
+
 Releases follow Semantic Versioning; each one lists its images pinned by digest and the
 changes in [CHANGELOG.md](CHANGELOG.md). Install and upgrade from a release tag as
 described in [docs/releasing.md](docs/releasing.md), then follow the

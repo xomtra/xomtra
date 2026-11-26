@@ -19,8 +19,10 @@ import ipaddress
 import json
 import logging
 import re
+import shutil
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
@@ -45,7 +47,7 @@ from xomtra_mcp.admin.analysis import (
     run_confidence,
 )
 from xomtra_mcp.admin.config import PREFIX, AdminSettings
-from xomtra_mcp.admin.html import CSS, cards, e, page, table
+from xomtra_mcp.admin.html import CSS, cards, e, page, table, token_flow
 from xomtra_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
 from xomtra_mcp.admin.session import Signer
 from xomtra_mcp.admin.view import View, prefix
@@ -67,6 +69,15 @@ HEADERS = {
     "'self' https://login.microsoftonline.com",
     "Cache-Control": "no-store",
     "X-Frame-Options": "DENY",
+}
+# Fonts, icon and theme script of the GUI (xomtra.com look); a fixed allowlist.
+STATIC = Path(__file__).parent / "static"
+STATIC_TYPES = {
+    "Geist-Variable.woff2": "font/woff2",
+    "GeistMono-Variable.woff2": "font/woff2",
+    "favicon.svg": "image/svg+xml",
+    "tips.json": "application/json",
+    "ui.js": "text/javascript",
 }
 TOKEN_ROLES = ("xomtra.Reader", "xomtra.Admin")
 TOKEN_DAYS = (30, 90, 365, 0)
@@ -96,6 +107,21 @@ def _url_host(hostname: str) -> str:
 
 
 type Handler = Callable[[Request, dict[str, Any]], Awaitable[Response]]
+
+
+# The add-on keeps the lake out of Home Assistant backups (config.yaml backup_exclude).
+BACKUP_NOTE = (
+    "<h2 id=backups>Backups</h2>"
+    "<p class=warn>Home Assistant backups do not include xomtra's analytics. They keep "
+    "the tokens, the settings and the dismissed findings, but not the lake: the "
+    "history, the findings and the weekly summaries, which take tens of GB. After a "
+    "restore xomtra starts a new lake and loads the history again from Home "
+    "Assistant, only as far back as Home Assistant still keeps it, and computes the "
+    "findings again.</p>"
+    "<p class=muted>For a robust setup with backups of the whole history, run xomtra "
+    "on its own virtual machine (Proxmox, VMware or Docker on Linux) and back up that "
+    "machine.</p>"
+)
 
 
 class AdminApp:
@@ -411,16 +437,20 @@ class AdminApp:
             ha_card = ("Home Assistant", f"{ha['version']} · {ha['latency_ms']} ms", "ok")
         else:
             ha_card = ("Home Assistant", "unreachable", "bad")
+        disk = self._disk()
         body = cards(
             [
                 ha_card,
+                *([disk[0]] if disk else []),
                 ("Entities in HA", ha.get("entities"), ""),
-                ("Last state in lake (UTC)", last_state, fresh_cls),
-                ("Last statistic (UTC)", lake.get("last_statistic"), ""),
+                ("Last state in lake", last_state, fresh_cls),
+                ("Last statistic", lake.get("last_statistic"), ""),
             ]
         )
         if ha.get("error"):
             body += f"<p class=bad>{e(ha['error'])}</p>"
+        if disk and disk[1]:
+            body += disk[1]
         kinds = lake.get("kinds") or []
         body += "<h2>Catalog</h2>"
         if kinds:
@@ -437,7 +467,36 @@ class AdminApp:
             if drift
             else "<p class=muted>None.</p>"
         )
+        if self.ingress:
+            body += BACKUP_NOTE
         return HTMLResponse(page("Overview", body, user.get("username")))
+
+    def _disk(self) -> tuple[tuple[str, Any, str], str] | None:
+        """Card and note on the free space of the lake's disk (ADR 072)."""
+        path = self.settings.lake_data_path
+        if not path:
+            return None
+        try:
+            usage = shutil.disk_usage(path)
+        except OSError:
+            return ("Free disk", "unknown", "warn"), ""
+        ratio = usage.free / usage.total if usage.total else 1.0
+        value = f"{usage.free / 2**30:,.1f} GiB · {ratio:.0%}"
+        stop, low = self.settings.worker_stop_free_ratio, self.settings.worker_min_free_ratio
+        if ratio < stop:
+            note = (
+                f"<p class=bad>Less than {stop:.0%} free on the disk: collecting is paused "
+                "and only the retention runs. Free some space or shorten the retention; "
+                "xomtra then resumes and catches up from Home Assistant's history.</p>"
+            )
+            return ("Free disk", value, "bad"), note
+        if ratio < low:
+            note = (
+                f"<p class=warn>Less than {low:.0%} free on the disk: the retention runs "
+                f"early. Below {stop:.0%} collecting pauses.</p>"
+            )
+            return ("Free disk", value, "warn"), note
+        return ("Free disk", value, "ok"), ""
 
     async def catalog(self, request: Request, user: dict[str, Any]) -> Response:
         data = self.data
@@ -500,7 +559,7 @@ class AdminApp:
             "<code>.env</code> and restart the ingest containers.</p>"
         )
         body += table(
-            ["data", "variable", "days", "deleted before (UTC)"],
+            ["data", "variable", "days", "deleted before"],
             [(n, v, d, (now - timedelta(days=d)).date().isoformat()) for n, v, d in periods],
             {2},
         )
@@ -620,7 +679,17 @@ class AdminApp:
             "wins over the default. The next analysis run (daily) uses it; no restart. "
             "The thresholds set the rate of false findings, not their number (ADR 060, "
             "062): a larger home rightly finds more.</p>"
+            "<p class=muted><small>Don't change it, if it works.</small></p>"
         )
+        if any(k in BY_KEY for k in current):
+            body += (
+                f"<form class=filters method=post action='{prefix()}/analysis'>"
+                "<input type=hidden name=action value=reset_all>"
+                "<label><input type=checkbox name=confirm value=1 required> "
+                "set every changed setting back to its default</label>"
+                "<input name=reason size=18 maxlength=200 placeholder='reason (optional)'>"
+                "<button class=danger>Reset all to defaults</button></form>"
+            )
         for group in dict.fromkeys(s.group for s in SPECS):
             rows = [self._setting_row(s, current.get(s.key)) for s in SPECS if s.group == group]
             body += f"<h2>{e(group)}</h2>" + table(
@@ -652,6 +721,8 @@ class AdminApp:
         spec = BY_KEY.get(form.get("key", ""))
         action = form.get("action", "save")
         reason = form.get("reason", "")[:200] or None
+        if action == "reset_all" and self.analysis is not None:
+            return await self._reset_all(request, user, form.get("confirm") == "1", reason)
         if spec is None or action not in ("save", "reset", "preview") or self.analysis is None:
             return await self.analysis_page(
                 request, user, note="<p class=bad>Unknown setting.</p>", status_code=400
@@ -696,6 +767,34 @@ class AdminApp:
                 request,
                 user,
                 note="<p class=bad>Not saved: the settings store or audit is unavailable.</p>",
+                status_code=503,
+            )
+        return RedirectResponse(f"{prefix()}/analysis", status_code=303)
+
+    async def _reset_all(
+        self, request: Request, user: dict[str, Any], confirmed: bool, reason: str | None
+    ) -> Response:
+        """Every stored analysis setting back to its default (one history row each)."""
+        assert self.analysis is not None  # noqa: S101 - checked by the caller
+        if not confirmed:
+            return await self.analysis_page(
+                request, user, note="<p class=bad>Tick the box to confirm.</p>", status_code=400
+            )
+        try:
+            stored = await asyncio.to_thread(self.analysis.current)
+            keys = sorted(k for k, c in stored.items() if k in BY_KEY and c.value is not None)
+            for key in keys:
+                await asyncio.to_thread(
+                    self.analysis.set, key, None, by=user.get("username"), reason=reason
+                )
+            await self._audit(
+                "analysis_setting_reset_all", user, arguments={"keys": keys, "reason": reason}
+            )
+        except (SettingsStoreError, AuditError):
+            return await self.analysis_page(
+                request,
+                user,
+                note="<p class=bad>Not reset: the settings store or audit is unavailable.</p>",
                 status_code=503,
             )
         return RedirectResponse(f"{prefix()}/analysis", status_code=303)
@@ -829,11 +928,11 @@ class AdminApp:
                     r["reasons"],
                     r["series"],
                     r["entities"],
-                    None if r["group_coverage"] is None else f"{r['group_coverage']:.0%}",
+                    r["group_coverage"],
                 ]
                 for r in runs
             ],
-            {0, 4, 5},
+            {0, 4, 5, 6},
         )
         ungrouped = sorted({e for r in runs for e in (r.get("ungrouped") or [])})
         if any(r["confidence"] == "low" for r in runs):
@@ -961,7 +1060,7 @@ class AdminApp:
             for d in TOKEN_DAYS
         )
         form = (
-            f"<form class=filters method=post action='{prefix()}/tokens/issue'>"
+            f"<form id=issue class=filters method=post action='{prefix()}/tokens/issue'>"
             f"<input name=owner required maxlength=100 value='{e(user.get('username') or '')}'"
             " placeholder='for whom'>"
             "<input name=description required maxlength=200 placeholder='device or app, "
@@ -993,6 +1092,7 @@ class AdminApp:
         body = (
             "<p class=muted>Each person or device gets its own token. A token is shown once; "
             "only its hash is stored. Revoked tokens stop working within 30 seconds.</p>"
+            + token_flow(prefix(), MCPB_FILENAME)
             + form
             + table(
                 ["id", "for", "description", "role", "created", "expires", "last used", ""],
@@ -1165,6 +1265,16 @@ class AdminApp:
         async def css(_: Request) -> Response:
             return Response(CSS, media_type="text/css", headers={"Cache-Control": "max-age=3600"})
 
+        async def asset(request: Request) -> Response:
+            name = request.path_params.get("name") or request.url.path.rsplit("/", 1)[-1]
+            if name not in STATIC_TYPES:
+                return Response("Not found", status_code=404)
+            return Response(
+                (STATIC / name).read_bytes(),
+                media_type=STATIC_TYPES[name],
+                headers={"Cache-Control": "max-age=86400"},
+            )
+
         async def healthz(_: Request) -> Response:
             return JSONResponse({"status": "ok"})
 
@@ -1211,6 +1321,10 @@ class AdminApp:
             Route(f"{PREFIX}/connect", p("connect", self.connect_page)),
             Route(f"{PREFIX}/connect/{MCPB_FILENAME}", p("download_mcpb", self.mcpb)),
             Route(f"{PREFIX}/static.css", css),
+            Route(f"{PREFIX}/fonts/{{name}}", asset),
+            Route(f"{PREFIX}/favicon.svg", asset),
+            Route(f"{PREFIX}/ui.js", asset),
+            Route(f"{PREFIX}/tips.json", asset),
             Route(f"{PREFIX}/login", self.login),
             Route(f"{PREFIX}/auth/callback", self.callback),
             Route(f"{PREFIX}/auth/check", self.check),

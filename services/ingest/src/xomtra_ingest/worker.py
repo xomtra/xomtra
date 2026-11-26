@@ -18,7 +18,8 @@ commits; the stream keeps running in the event loop. Runs and the restate cursor
 kept in the provisioning database (``worker.job_run``, ``worker.cursor``) of the ops
 role. A schedule missed while the worker was down runs once after the start. When the
 lake's disk has less than ``min_free_ratio`` free, the worker logs a warning and brings
-the retention forward (at most once a day).
+the retention forward (at most once a day); below ``stop_free_ratio`` the stream and the
+writing jobs pause until there is space again.
 """
 
 from __future__ import annotations
@@ -319,6 +320,17 @@ def free_ratio(path: str) -> float:
     return usage.free / usage.total if usage.total else 1.0
 
 
+def disk_gate(
+    path: str | None, settings: IngestSettings, free: Callable[[str], float] = free_ratio
+) -> Callable[[], bool] | None:
+    """``can_write`` of the stream: False below ``worker_stop_free_ratio`` free on the
+    lake's local disk; None (no gate) with object storage or a ratio of 0."""
+    stop = settings.worker_stop_free_ratio
+    if not path or stop <= 0:
+        return None
+    return lambda: free(path) >= stop
+
+
 # ---- scheduler ----------------------------------------------------------------------
 
 
@@ -334,6 +346,7 @@ class Scheduler:
         schedules: Iterable[Schedule] = SCHEDULES,
         disk_path: str | None = None,
         min_free_ratio: float = 0.10,
+        stop_free_ratio: float = 0.0,
         restate: Callable[[datetime, datetime], None] = tasks.restate,
         pending_gaps: Callable[[int | None], list[tuple[datetime, datetime, int]]] = (
             tasks.pending_gaps
@@ -347,6 +360,7 @@ class Scheduler:
         self.tz = ZoneInfo(settings.timezone)
         self.disk_path = disk_path
         self.min_free_ratio = min_free_ratio
+        self.stop_free_ratio = stop_free_ratio
         self._restate = restate
         self._pending_gaps = pending_gaps
         self._free = free
@@ -358,8 +372,22 @@ class Scheduler:
 
     # -- single runs (synchronous, called in the worker thread) --
 
+    def disk_full(self) -> bool:
+        """Less than ``stop_free_ratio`` free: writing jobs pause (ADR 072)."""
+        if not self.disk_path or self.stop_free_ratio <= 0:
+            return False
+        return self._free(self.disk_path) < self.stop_free_ratio
+
     def run_job(self, job: str, trigger: str = "manual") -> bool:
         fn = self.jobs[job]
+        if job != "retention_daily" and self.disk_full():
+            logger.warning(
+                "Job %s skipped: less than %.0f %% free on the lake's disk (%s)",
+                job,
+                self.stop_free_ratio * 100,
+                self.disk_path,
+            )
+            return False
         run_id = self.store.start(job, trigger)
         started = time.monotonic()
         logger.info("Job %s started (%s)", job, trigger)
@@ -476,7 +504,13 @@ async def run_worker(settings: IngestSettings, store: RunStore, stream: Any) -> 
     from hacore import lake  # noqa: PLC0415
 
     lake_settings = lake.LakeSettings.from_env()
-    scheduler = Scheduler(settings, store, disk_path=lake_settings.local_data_path)
+    scheduler = Scheduler(
+        settings,
+        store,
+        disk_path=lake_settings.local_data_path,
+        min_free_ratio=settings.worker_min_free_ratio,
+        stop_free_ratio=settings.worker_stop_free_ratio,
+    )
     loop = asyncio.get_running_loop()
 
     def stop() -> None:

@@ -160,3 +160,35 @@ async def test_labelled_entities_are_not_stored(
     await asyncio.wait_for(task, 5)
     assert asked == {"sensor.a"}
     assert all(e == "sensor.a" for e, _, _ in stored(lake))
+
+
+async def test_full_disk_pauses_the_stream(
+    fake_ha: tuple[FakeHA, str], lake: duckdb.DuckDBPyConnection
+) -> None:
+    fake, url = fake_ha
+    space = {"ok": False}
+    settings = StreamSettings(
+        flush_interval=0.1,
+        ping_interval=0.5,
+        reconnect_min=0.05,
+        reconnect_max=0.1,
+        can_write=lambda: space["ok"],
+        paused_poll=0.05,
+    )
+    stream = StateStream(url, VALID_TOKEN, lake.cursor, settings)
+    task = asyncio.create_task(stream.run())
+    await asyncio.sleep(0.3)
+    assert not fake.subscriptions  # paused before connecting
+
+    space["ok"] = True
+    await wait_for(lambda: bool(fake.subscriptions))
+    await fake.fire("state_changed", {"new_state": state_obj("sensor.c", "1", datetime.now(UTC))})
+    await wait_for(lambda: len(stored(lake)) == 1)
+
+    space["ok"] = False
+    await fake.fire("state_changed", {"new_state": state_obj("sensor.c", "2", datetime.now(UTC))})
+    await wait_for(lambda: not fake.subscriptions)  # disconnected, nothing written
+    assert len(stored(lake)) == 1
+
+    stream.stop()
+    await asyncio.wait_for(task, 5)

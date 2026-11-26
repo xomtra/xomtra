@@ -59,6 +59,8 @@ async def test_ingress_page_uses_the_ingress_path() -> None:
     assert "frame-ancestors 'self'" in csp
     assert resp.headers["x-frame-options"] == "SAMEORIGIN"
     assert root.status_code == 200
+    assert "Home Assistant backups do not include" in root.text  # the lake is excluded
+    assert "its own virtual machine" in root.text
     record = next(r for r in audit.records if r.tool == "admin:tokens")
     assert (record.subject, record.username, record.idp) == ("8f0c2a", "jana", "ha-ingress")
 
@@ -193,3 +195,61 @@ def test_peer_address_comparison() -> None:
     assert not _same_address("::ffff:172.30.32.9", "172.30.32.2")
     assert not _same_address("172.30.32.2", "not-an-address")
     assert _same_address("testclient", "testclient")
+
+
+async def test_ingress_page_has_the_xomtra_look() -> None:
+    app, _, _ = make_app()
+    async with client_for(app) as client:
+        resp = await client.get("/tokens", headers=HA)
+        css = await client.get("/static.css", headers=HA)
+        font = await client.get("/fonts/Geist-Variable.woff2", headers=HA)
+        theme = await client.get("/ui.js", headers=HA)
+        tips = await client.get("/tips.json", headers=HA)
+        icon = await client.get("/favicon.svg", headers=HA)
+        missing = await client.get("/fonts/..%2Fapp.py", headers=HA)
+    assert f'<script src="{INGRESS}/ui.js"></script>' in resp.text
+    assert f'href="{INGRESS}/favicon.svg"' in resp.text
+    assert '<a href="' + INGRESS + '/tokens" aria-current=page>Tokens</a>' in resp.text
+    assert "<b>xomtra</b><small>admin</small>" in resp.text
+    # Fonts resolve relative to the stylesheet, so they work under the Ingress path too.
+    assert 'url("fonts/Geist-Variable.woff2")' in css.text
+    assert "prefers-color-scheme" not in css.text  # dark unless Home Assistant is light
+    assert ":root[data-theme=light]" in css.text
+    assert font.status_code == 200
+    assert font.headers["content-type"] == "font/woff2"
+    assert font.content[:4] == b"wOF2"
+    assert theme.status_code == 200
+    assert "darkMode" in theme.text
+    assert icon.status_code == 200
+    assert icon.headers["content-type"] == "image/svg+xml"
+    assert missing.status_code == 404
+    assert set(tips.json()) == {"en", "cs", "de", "pl", "nl"}
+
+
+async def test_tokens_page_explains_the_flow_with_actions() -> None:
+    app, _, _ = make_app()
+    async with client_for(app) as client:
+        resp = await client.get("/tokens", headers=HA)
+    assert "<figure class='flow'>" in resp.text
+    assert f"href='{INGRESS}/connect/xomtra.mcpb' download" in resp.text
+    assert "href='#issue'" in resp.text
+    assert "<form id=issue " in resp.text
+
+
+def test_values_are_formatted_for_the_locale() -> None:
+    from datetime import UTC, datetime
+
+    from xomtra_mcp.admin.html import TIPS, fmt, table
+
+    assert fmt(31204118) == '<data class="n" value="31204118">31,204,118</data>'
+    assert fmt(0.9812, pct=True) == '<data class="p" value="0.9812">98.1%</data>'
+    assert fmt(datetime(2026, 11, 26, 7, 20, tzinfo=UTC)) == (
+        '<time datetime="2026-11-26T07:20:00Z">2026-11-26 07:20 UTC</time>'
+    )
+    assert 'datetime="2026-11-26T07:20:00Z"' in fmt("2026-11-26 07:20:00")  # naive = UTC
+    assert fmt(True) == "True"
+    html = table(["missing_share", "nothing"], [[0.5, "x"]], {0})
+    assert '<data class="p" value="0.5">50.0%</data>' in html
+    assert 'data-tip="missing_share"' in html
+    assert "data-tip" not in html.split("nothing")[0].rsplit("<th", 1)[-1]
+    assert all(set(TIPS[lang]) == set(TIPS["en"]) for lang in TIPS)

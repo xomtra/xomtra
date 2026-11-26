@@ -11,6 +11,38 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Analysis settings: "Reset all to defaults" sets every changed setting back to its
+  default in one step (confirmed with a tick box, recorded in the history and audit).
+- Admin GUI: explanations of the columns and cards on hover or focus, in the language of
+  Home Assistant (English, Czech, German, Polish, Dutch); numbers with digit grouping,
+  shares as percentages, dates and times in Home Assistant's number, date and time
+  format and time zone (outside Home Assistant the browser's).
+- Free disk space of the lake on the admin overview. Below
+  `XOMTRA_WORKER_STOP_FREE_RATIO` (default 3 %) the worker pauses the stream and the
+  writing jobs until there is space again, then catches up from Home Assistant's
+  history; the retention still runs (ADR 072).
+- Home Assistant add-on: the overview and the documentation say that Home Assistant
+  backups do not include the lake (history and findings) and recommend xomtra on its
+  own virtual machine for backups of the whole history.
+- Default guidance for the LLM in the MCP server's instructions (ADR 073): findings as
+  hypotheses with their strength and window, statements based on fetched data, local
+  time, no conclusions about a person unless asked, a friendly tone with the odd joke or irony,
+  and no advice on locks or alarms from a finding alone. Advisory for the model; the
+  server's access rules are unchanged.
+- Tokens page: a picture of how a token connects an LLM agent with xomtra and that
+  xomtra only reads Home Assistant, with the page's actions on it.
+
+### Changed
+
+- The admin GUI has the look of xomtra.com: the xomtra mark and wordmark, Geist and
+  Geist Mono (bundled, no external requests), graphite and indigo colours. It is dark
+  by default; behind Home Assistant Ingress it turns light when Home Assistant is in
+  light mode. The add-on has an icon and a logo for the add-on store.
+- The add-on's website link in Home Assistant points to https://xomtra.com instead of
+  the GitHub repository.
+
 ### Fixed
 
 - Home Assistant add-on: after a restore from a backup (which leaves the lake out) it

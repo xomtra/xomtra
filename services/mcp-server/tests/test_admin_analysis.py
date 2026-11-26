@@ -89,6 +89,40 @@ async def test_analysis_settings_save_validate_reset() -> None:
     ]
 
 
+async def test_reset_all_settings_to_defaults() -> None:
+    store, audit = MemorySettingsStore(), MemoryAuditSink()
+    store.set("correlation_max_q", 0.2, by="someone", reason=None)
+    store.set("anomalies_enabled", False, by="someone", reason=None)
+    origin = {"origin": BASE}
+    async with client_for(dev_app(None, store, audit)) as client:
+        page = await client.get("/admin/analysis")
+        assert "Reset all to defaults" in page.text
+        assert "Don't change it, if it works." in page.text
+        unconfirmed = await client.post(
+            "/admin/analysis", data={"action": "reset_all"}, headers=origin
+        )
+        assert unconfirmed.status_code == 400
+        assert len(store.current()) == 2
+        done = await client.post(
+            "/admin/analysis",
+            data={"action": "reset_all", "confirm": "1", "reason": "messed up"},
+            headers=origin,
+        )
+        assert done.status_code == 303
+        assert store.current() == {}
+        page = await client.get("/admin/analysis")
+        assert "Reset all to defaults" not in page.text  # nothing left to reset
+        cross = await client.post(
+            "/admin/analysis",
+            data={"action": "reset_all", "confirm": "1"},
+            headers={"origin": "https://evil.example"},
+        )
+        assert cross.status_code == 403
+    assert [c.reason for c in store.history()[:2]] == ["messed up", "messed up"]
+    (record,) = [r for r in audit.records if r.tool == "admin:analysis_setting_reset_all"]
+    assert record.arguments["keys"] == ["anomalies_enabled", "correlation_max_q"]
+
+
 async def test_analysis_preview_without_findings_saves_nothing() -> None:
     store = MemorySettingsStore()
     async with client_for(dev_app(None, store, MemoryAuditSink())) as client:
@@ -170,3 +204,32 @@ async def test_findings_page_lists_current_findings(data: DataAccess) -> None:
         assert "3 analysed entities without an area" in page
         flagged = (await client.get("/admin/findings?type=correlation&flagged=1")).text
         assert "same_device" in flagged
+
+
+async def test_overview_shows_free_disk(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    import shutil
+    from collections import namedtuple
+
+    usage = namedtuple("usage", "total used free")
+    store, audit = MemorySettingsStore(), MemoryAuditSink()
+    app = AdminApp(
+        AdminSettings(auth_mode="none", base_url=BASE, lake_data_path=str(tmp_path)),
+        data=None,
+        audit=audit,
+        analysis=store,
+    ).build()
+    async with client_for(app) as client:
+        monkeypatch.setattr(
+            shutil, "disk_usage", lambda _p: usage(100 * 2**30, 98 * 2**30, 2 * 2**30)
+        )
+        full = await client.get("/admin/")
+        monkeypatch.setattr(
+            shutil, "disk_usage", lambda _p: usage(100 * 2**30, 50 * 2**30, 50 * 2**30)
+        )
+        roomy = await client.get("/admin/")
+    assert "Free disk" in full.text
+    assert "Backups" not in full.text  # the note is for the add-on only
+    assert "collecting is paused" in full.text
+    assert "2.0 GiB · 2%" in full.text
+    assert "collecting is paused" not in roomy.text
+    assert "50.0 GiB · 50%" in roomy.text

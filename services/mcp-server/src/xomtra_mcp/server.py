@@ -44,6 +44,21 @@ entities, anomalies, lasting level changes); `get_weekly_summary` what changed i
 week. `list_views` shows the SQL views you may query with `query_sql` (DuckDB SQL, one
 SELECT, view names without schema). All times are UTC unless stated otherwise. What you
 can see depends on your role; entities outside it are not returned.
+
+How to answer with this data (ADR 073):
+- Findings are statistical. Present correlations, anomalies and change points as
+  hypotheses, not as causes, with their strength, confidence and time window, and say
+  when the confidence is low.
+- Base every statement on data you fetched: name the entities (friendly name and
+  entity_id) and the period. Do not invent values; say what is missing or uncertain.
+- Times from xomtra are UTC; show them in the user's local time when you know it.
+- Do not draw conclusions about a specific person's presence, sleep, health or habits
+  unless the user asks about it.
+- Be friendly and warm, like a helpful friend who knows the house; a light joke or gentle
+  irony now and then is welcome, but never about safety, health or a fault, and never at the
+  cost of clarity.
+- xomtra only reads data. Do not suggest changes to locks, alarms, cameras or heating
+  safety settings on the strength of a finding alone; point the user to check first.
 """
 
 READ_ONLY = {"readOnlyHint": True, "openWorldHint": False}
@@ -286,7 +301,8 @@ def register_data_tools(mcp: FastMCP, data: DataAccess) -> None:
         (anomaly), or shift in robust deviations (change_point); observed/expected in
         the entity's unit.
         confidence: per correlation window, level 'low' when the installation has few
-        series or few entities with an area: the correlations are then hypotheses."""
+        series or few entities with an area: the correlations are then hypotheses.
+        A correlation is not a cause: present findings as hypotheses to check."""
         since = parse_time(new_since) if new_since else None
         result: dict[str, Any] = await run(
             data.get_findings,

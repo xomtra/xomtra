@@ -18,6 +18,21 @@ available to Claude and other MCP clients.
 Home Assistant OS or Supervised on an SSD, with at least 4 GB RAM and 20 GB of free
 space. Home Assistant Green (32 GB eMMC) and SD cards are not supported.
 
+The **Overview** shows the free space of the disk. Below 10 % free xomtra runs its
+retention early; below 3 % it pauses collecting until there is space again and then
+catches up from Home Assistant's history.
+
+## Backups
+
+Home Assistant backups do not include xomtra's analytics. They keep the tokens, the
+settings and the dismissed findings, but not the lake (the history, the findings and the
+weekly summaries, tens of GB). After a restore xomtra starts a new lake and loads the
+history again from Home Assistant, only as far back as Home Assistant still keeps it,
+and computes the findings again.
+
+For a robust setup with backups of the whole history, run xomtra on its own virtual
+machine (Proxmox, VMware or Docker on Linux) and back up that machine.
+
 ## More
 
 Documentation: https://github.com/xomtra/xomtra/blob/main/docs/setup/home-assistant-addon.md

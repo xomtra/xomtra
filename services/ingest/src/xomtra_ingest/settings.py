@@ -100,6 +100,10 @@ class IngestSettings(BaseSettings):
     # The worker warns and brings the retention forward below this free share of the
     # lake's disk (local data path only).
     worker_min_free_ratio: float = Field(default=0.10, ge=0, lt=1)
+    # Below this free share the stream and the writing jobs pause until there is space
+    # again (only the retention runs); the stream then catches up from Home Assistant's
+    # history (at most stream_max_catchup_days).
+    worker_stop_free_ratio: float = Field(default=0.03, ge=0, lt=1)
 
     # Schedules of the Dagster jobs (cron, in ``timezone``).
     timezone: str = "UTC"
