@@ -679,6 +679,7 @@ class AdminApp:
             "wins over the default. The next analysis run (daily) uses it; no restart. "
             "The thresholds set the rate of false findings, not their number (ADR 060, "
             "062): a larger home rightly finds more.</p>"
+            "<p class=muted><small>Don't change it, if it works.</small></p>"
         )
         if any(k in BY_KEY for k in current):
             body += (

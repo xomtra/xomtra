@@ -97,6 +97,7 @@ async def test_reset_all_settings_to_defaults() -> None:
     async with client_for(dev_app(None, store, audit)) as client:
         page = await client.get("/admin/analysis")
         assert "Reset all to defaults" in page.text
+        assert "Don't change it, if it works." in page.text
         unconfirmed = await client.post(
             "/admin/analysis", data={"action": "reset_all"}, headers=origin
         )
