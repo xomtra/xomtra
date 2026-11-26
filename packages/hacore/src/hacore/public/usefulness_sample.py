@@ -48,6 +48,7 @@ from hacore.synthetic.evaluate import analyse_grid
 SEED = 20261125
 SPLITS = (("calibration", 0.6), ("validation", 0.2), ("test", 0.2))
 MAX_WINDOWS = 4
+PILOT = 20
 TOTAL = 1000
 MIN_PER_CELL = 20
 HUMAN_PER_SET = 100
@@ -308,6 +309,19 @@ def stratified_sample(
     return sorted(picked, key=lambda r: r["sample_id"])
 
 
+def pilot_sample(
+    frame: list[dict[str, Any]], sample: list[dict[str, Any]], n: int, seed: int = SEED
+) -> list[dict[str, Any]]:
+    """``n`` findings for the pilot of the rubric (prereg section 3): calibration
+    findings outside the sample, stratified as the sample. Validation and test stay
+    untouched (their reserve serves a repeated gate)."""
+    drawn = {r["sample_id"] for r in sample}
+    rest = [r for r in frame if r["split"] == "calibration" and r["sample_id"] not in drawn]
+    rng = np.random.default_rng([seed, 1])
+    picked = _draw(rest, n, 1, rng)
+    return sorted(({**r, "human": True} for r in picked), key=lambda r: r["sample_id"])
+
+
 @dataclass(frozen=True, slots=True)
 class Summary:
     houses: dict[str, int]
@@ -351,6 +365,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--days", type=int, default=90)
     parser.add_argument("--total", type=int, default=TOTAL)
     parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument("--pilot-out", type=Path, help="CSV of the pilot findings")
+    parser.add_argument("--pilot", type=int, default=PILOT)
     args = parser.parse_args(argv)
     houses = load(args.dataset, args.data)
     split = split_houses([h.house for h in houses], args.seed)
@@ -366,6 +382,11 @@ def main(argv: list[str] | None = None) -> int:
         writer = csv.DictWriter(f, fieldnames=COLUMNS)
         writer.writeheader()
         writer.writerows(sample)
+    if args.pilot_out:
+        with args.pilot_out.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=COLUMNS)
+            writer.writeheader()
+            writer.writerows(pilot_sample(frame, sample, args.pilot, args.seed))
     summary = summarise(split, frame, sample, classes)
     out = {
         "manifest": {

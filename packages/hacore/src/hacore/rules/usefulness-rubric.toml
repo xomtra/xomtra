@@ -1,0 +1,65 @@
+# Rubric and AI rater prompts for the usefulness rating (preregistration
+# docs/evaluation/usefulness-prereg.md, sections 3 and 6; ADR 062 point 9, ADR 069).
+#
+# One source for the human form and the AI raters: the same wording of the scale, the
+# trivial question and the categories. Change the version with every change of the
+# wording; the pilot (20 findings outside the sample) may change the wording, never the
+# scale. After the first rating of the sample the file is frozen; a change is a new
+# version and a new gate (prereg section 4).
+
+version = "1.0.0"
+
+intro = """
+You rate one finding of a smart-home analysis. The analysis looked at about 90 days of
+hourly data from the sensors and meters of one home and reports relations between two
+series (correlations), unusual episodes (anomalies) and lasting changes of level (change
+points). Judge the finding from the point of view of the people who live in the home and
+look after it. You see what the finding says, not how strong the statistics behind it
+are; take it as true and judge whether it is worth their attention."""
+
+answer = """
+Answer with one JSON object and nothing else:
+{"usefulness": 1-4, "trivial": true or false, "category": "fault" | "savings" |
+"automation" | "behaviour" | "none", "reason": "one sentence"}"""
+
+[usefulness]
+question = "How useful is this finding to the household?"
+levels = [
+  { value = 1, label = "Nothing to learn", text = "Obvious, impossible to understand, or only about how the data were collected. The household learns nothing." },
+  { value = 2, label = "Interesting, no action", text = "Not obvious and true to life, but there is nothing to check or do about it." },
+  { value = 3, label = "Worth checking", text = "It may point to a fault, a waste, an opportunity or a habit worth a look; someone would check it." },
+  { value = 4, label = "Act on it", text = "A concrete action follows (repair, a setting, an automation, a change of habit) with a likely benefit." },
+]
+
+[trivial]
+question = "Is the finding trivial?"
+text = """Yes when it follows from how the home or the measurement is built, whatever its
+use: one device measured twice or by two of its own sensors, a value and a helper
+computed from it, two sensors of the same quantity in one room, known physics (solar
+output and sunshine, a heat pump and the outdoor temperature, a battery and the grid),
+or series that drop out together because they come from one integration. Otherwise
+no."""
+
+[category]
+question = "Which kind of action does the finding most call for?"
+values = [
+  { value = "fault", text = "Something may be broken, wrongly set or measuring wrong." },
+  { value = "savings", text = "Energy or money could be saved." },
+  { value = "automation", text = "Something could be automated or an automation adjusted." },
+  { value = "behaviour", text = "A habit, comfort or routine of the household could change." },
+  { value = "none", text = "No action." },
+]
+
+# Roles of the AI raters (prereg section 3): each role answers the same rubric, with the
+# question of its role in mind. The AI consensus is the median of the roles.
+[[role]]
+name = "technician"
+text = "You are a home technician. Ask yourself: does this point to a fault, a wrong setting or a data error?"
+
+[[role]]
+name = "owner"
+text = "You are the owner of this home. Ask yourself: would I do something about this?"
+
+[[role]]
+name = "adviser"
+text = "You are an energy adviser. Ask yourself: could this home save energy or money because of it?"

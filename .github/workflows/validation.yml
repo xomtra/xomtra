@@ -121,7 +121,13 @@ jobs:
           hash=$(python3 -c 'import json; print(json.load(open("fetch.json"))["member_list_sha256"])')
           uv run python -m hacore.public.usefulness_sample --dataset ideal \
             --data "$RUNNER_TEMP/ideal" --dataset-hash "$hash" \
-            --out usefulness-sample/sample.csv | tee usefulness-sample/summary.json
+            --out usefulness-sample/sample.csv --pilot-out usefulness-sample/pilot.csv \
+            | tee usefulness-sample/summary.json
+          # Blinded forms of the panel (raters r1-r3): the pilot first, then the gate sample.
+          uv run python -m hacore.public.rating_kit forms --sample usefulness-sample/pilot.csv \
+            --raters r1,r2,r3 --out usefulness-sample/forms-pilot
+          uv run python -m hacore.public.rating_kit forms --sample usefulness-sample/sample.csv \
+            --raters r1,r2,r3 --out usefulness-sample/forms-gate
           python3 - > usefulness-sample/SOURCE.txt <<'PY'
           import json
           d = json.load(open("packages/hacore/src/hacore/public/datasets.json"))["ideal"]
