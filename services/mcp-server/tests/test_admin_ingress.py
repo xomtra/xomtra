@@ -319,7 +319,7 @@ async def test_footer_links_leave_the_panel_without_a_referer() -> None:
         resp = await client.get("/", headers={**HA, "cookie": "xomtra_lang=cs"})
     footer = resp.text.split("<footer>", 1)[1].split("</footer>", 1)[0]
     assert f"xomtra {__version__}" in footer
-    assert "https://xomtra.com" in footer
+    assert 'href="https://xomtra.com"' in footer
     assert ">Dokumentace</a>" in footer
     assert ">Nahlásit chybu</a>" in footer
     links = re.findall(r"<a [^>]*>", footer)
