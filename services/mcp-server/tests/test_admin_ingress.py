@@ -238,7 +238,7 @@ async def test_ingress_page_has_the_xomtra_look() -> None:
         icon = await client.get("/favicon.svg", headers=HA)
         missing = await client.get("/fonts/..%2Fapp.py", headers=HA)
     assert f'<script src="{INGRESS}/ui.js?v={ASSET_VERSION}"></script>' in resp.text
-    assert f'href="{INGRESS}/favicon.svg"' in resp.text
+    assert f'href="{INGRESS}/favicon.svg?v={ASSET_VERSION}"' in resp.text
     assert '<a href="' + INGRESS + '/tokens" aria-current=page>Tokens</a>' in resp.text
     assert "<b>xomtra</b><small>admin</small>" in resp.text
     # Fonts resolve relative to the stylesheet, so they work under the Ingress path too.

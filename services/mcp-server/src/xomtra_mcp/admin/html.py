@@ -177,7 +177,11 @@ TIPS: dict[str, dict[str, str]] = json.loads(
 # Version of the stylesheet and script in their URLs: browsers keep them cached (Cache-
 # Control max-age), and after an upgrade the new pages would otherwise get the old CSS.
 ASSET_VERSION = hashlib.sha256(
-    CSS.encode() + (Path(__file__).parent / "static" / "ui.js").read_bytes()
+    CSS.encode()
+    + b"".join(
+        (Path(__file__).parent / "static" / name).read_bytes()
+        for name in ("ui.js", "tips.json", "favicon.svg")
+    )
 ).hexdigest()[:12]
 # Columns holding a share in [0, 1], shown as a percentage.
 PERCENT = frozenset({"numeric_share", "missing_share", "with area"})
@@ -238,7 +242,7 @@ def page(title: str, body: str, user: str | None) -> str:
         f"<!doctype html><html lang={v.lang}><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width, initial-scale=1">'
         f"<title>{shown} · xomtra admin</title>"
-        f'<link rel=icon href="{v.prefix}/favicon.svg" type="image/svg+xml">'
+        f'<link rel=icon href="{v.prefix}/favicon.svg?v={ASSET_VERSION}" type="image/svg+xml">'
         f'<script src="{v.prefix}/ui.js?v={ASSET_VERSION}"></script>'
         f'<link rel=stylesheet href="{v.prefix}/static.css?v={ASSET_VERSION}"></head><body>'
         f'<header><a class=brand href="{v.prefix}/">{MARK}<b>xomtra</b><small>admin</small></a>'

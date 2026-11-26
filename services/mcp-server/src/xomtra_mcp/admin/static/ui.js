@@ -160,9 +160,11 @@
     document.querySelectorAll("time[datetime]").forEach(when);
     var code = String(lang).toLowerCase().split("-")[0];
     if (LANGS.indexOf(code) < 0) code = "en";
-    var src = document.currentScript || document.querySelector("script[src$='/ui.js']");
-    var base = src ? src.src.replace(/ui\.js(\?.*)?$/, "") : "";
-    fetch(base + "tips.json", { credentials: "same-origin" })
+    // tips.json sits next to ui.js and carries its version (?v=), so an upgrade does
+    // not keep the cached tips of the previous one.
+    var src = document.querySelector("script[src*='/ui.js']");
+    var url = src ? src.src.replace(/ui\.js(\?|$)/, "tips.json$1") : "tips.json";
+    fetch(url, { credentials: "same-origin" })
       .then(function (r) {
         return r.ok ? r.json() : {};
       })
