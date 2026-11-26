@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Iterable, Sequence
@@ -10,6 +11,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from xomtra_mcp import __version__
 from xomtra_mcp.admin import i18n, view
 
 # Colours, type and components follow the xomtra.com web (graphite, indigo accent,
@@ -84,21 +86,26 @@ nav a[aria-current=page] { color:var(--ink); background:var(--raise); }
 header form, header .who { margin-left:auto; display:flex; gap:10px; align-items:center;
   font:400 12.5px/1 var(--mono); }
 main { padding:28px 20px 56px; max-width:1300px; margin:0 auto; }
+footer { max-width:1300px; margin:0 auto; padding:14px 20px 28px; border-top:1px solid var(--line);
+  color:var(--muted); font-size:13px; }
+footer a { color:var(--muted); text-decoration:none; } footer a:hover { color:var(--ink); }
+footer code { font:500 12px var(--mono); }
 h1 { font:600 clamp(24px,3vw,30px)/1.1 var(--sans); letter-spacing:-.035em; margin:0 0 18px; }
 h2 { font:500 12px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
   color:var(--accent); margin:34px 0 12px; }
 p { margin:0 0 12px; }
 .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; }
 .card { background:var(--surface); border:1px solid var(--line); border-radius:12px;
-  padding:14px 16px; }
+  padding:12px 14px; }
 .card .muted { font:500 11px/1.3 var(--mono); letter-spacing:.07em; text-transform:uppercase; }
-.card .v { font:500 24px/1.2 var(--mono); margin-top:8px; font-variant-numeric:tabular-nums;
-  letter-spacing:-.02em; overflow-wrap:anywhere; }
+.card .v { font:600 16px/1.35 var(--sans); margin-top:6px; font-variant-numeric:tabular-nums;
+  letter-spacing:-.01em; overflow-wrap:break-word; }
 .muted { color:var(--muted); }
 .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
 p.ok, p.bad, p.warn { color:var(--ink); background:var(--surface); border:1px solid var(--line);
   border-left:3px solid var(--c); border-radius:8px; padding:10px 14px; }
 p.ok { --c:var(--ok); } p.bad { --c:var(--bad); } p.warn { --c:var(--warn); }
+p .more { display:block; margin-top:8px; color:var(--muted); }
 .scroll + p, .scroll + h2 + p { margin-top:14px; }
 .scroll { overflow-x:auto; background:var(--surface); border:1px solid var(--line);
   border-radius:12px; }
@@ -173,6 +180,15 @@ form:target { outline:2px solid var(--accent); outline-offset:6px; border-radius
 TIPS: dict[str, dict[str, str]] = json.loads(
     (Path(__file__).parent / "static" / "tips.json").read_text(encoding="utf-8")
 )
+# Version of the stylesheet and script in their URLs: browsers keep them cached (Cache-
+# Control max-age), and after an upgrade the new pages would otherwise get the old CSS.
+ASSET_VERSION = hashlib.sha256(
+    CSS.encode()
+    + b"".join(
+        (Path(__file__).parent / "static" / name).read_bytes()
+        for name in ("ui.js", "tips.json", "favicon.svg")
+    )
+).hexdigest()[:12]
 # Columns holding a share in [0, 1], shown as a percentage.
 PERCENT = frozenset({"numeric_share", "missing_share", "with area"})
 _ISO = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
@@ -211,6 +227,26 @@ def e(value: Any) -> str:
     return escape(str(value))
 
 
+def _out(href: str, label: str) -> str:
+    """A link out of the GUI: a new tab (not inside the Home Assistant panel) and no
+    Referer, which would carry the Ingress path of the installation."""
+    return f'<a href="{href}" target="_blank" rel="noopener noreferrer">{label}</a>'
+
+
+_REPO = "https://github.com/xomtra/xomtra"
+FOOTER = (
+    "<footer>"
+    + _out(f"{_REPO}/releases/tag/v{__version__}", f"<code>xomtra {escape(__version__)}</code>")
+    + " · "
+    + _out("https://xomtra.com", "xomtra.com")
+    + " · "
+    + _out(f"{_REPO}/tree/main/docs", "Documentation")
+    + " · "
+    + _out(f"{_REPO}/issues/new", "Report a bug")
+    + "</footer>"
+)
+
+
 def page(title: str, body: str, user: str | None) -> str:
     v = view.current.get()
     nav = (item for item in NAV if v.dagster or item[0] != "/dagster/")
@@ -232,12 +268,12 @@ def page(title: str, body: str, user: str | None) -> str:
         f"<!doctype html><html lang={v.lang}><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width, initial-scale=1">'
         f"<title>{shown} · xomtra admin</title>"
-        f'<link rel=icon href="{v.prefix}/favicon.svg" type="image/svg+xml">'
-        f'<script src="{v.prefix}/ui.js"></script>'
-        f'<link rel=stylesheet href="{v.prefix}/static.css"></head><body>'
+        f'<link rel=icon href="{v.prefix}/favicon.svg?v={ASSET_VERSION}" type="image/svg+xml">'
+        f'<script src="{v.prefix}/ui.js?v={ASSET_VERSION}"></script>'
+        f'<link rel=stylesheet href="{v.prefix}/static.css?v={ASSET_VERSION}"></head><body>'
         f'<header><a class=brand href="{v.prefix}/">{MARK}<b>xomtra</b><small>admin</small></a>'
         f"<nav>{links}</nav>{logout}</header>"
-        f"<main><h1>{shown}</h1>{body}</main></body></html>",
+        f"<main><h1>{shown}</h1>{body}</main>{FOOTER}</body></html>",
         v.lang,
     )
 
@@ -328,6 +364,12 @@ def cards(items: Iterable[tuple[str, Any, str]]) -> str:
     )
 
 
+# Presentation attributes the stylesheet overrides; they keep the picture readable in
+# both themes when the stylesheet is missing or stale (an SVG shape is black by default).
+_FB = "#959cab"
+_FB_LINE = f"fill='none' stroke='{_FB}' stroke-width='1.5'"
+
+
 def _defs(p: str) -> str:
     """Arrow heads; ids per picture, a marker in a hidden SVG does not render."""
     return (
@@ -335,7 +377,7 @@ def _defs(p: str) -> str:
         + "".join(
             f"<marker id='{p}{n}' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' "
             f"markerHeight='7' orient='auto-start-reverse'><path class='{cls}' "
-            "d='M0 0L10 5L0 10z'/></marker>"
+            f"fill='{_FB}' d='M0 0L10 5L0 10z'/></marker>"
             for n, cls in (("a", "hd"), ("b", "hd req"))
         )
         + "</defs>"
@@ -354,22 +396,34 @@ def _box(
     mono: str = "",
 ) -> str:
     out = (
-        f"<rect class='box{' us' if us else ''}' x='{x}' y='{y}' width='{w}' height='{h}' rx='12'/>"
+        f"<rect class='box{' us' if us else ''}' {_FB_LINE} x='{x}' y='{y}' width='{w}' "
+        f"height='{h}' rx='12'/>"
     )
-    out += f"<text class='t' x='{x + 18}' y='{y + 32}'>{escape(title)}</text>"
+    out += f"<text class='t' fill='{_FB}' x='{x + 18}' y='{y + 32}'>{escape(title)}</text>"
     for i, line in enumerate(lines):
-        out += f"<text class='s' x='{x + 18}' y='{y + 56 + i * 18}'>{escape(line)}</text>"
+        y_line = y + 56 + i * 18
+        out += f"<text class='s' fill='{_FB}' x='{x + 18}' y='{y_line}'>{escape(line)}</text>"
     if mono:
-        out += f"<text class='m' x='{x + 18}' y='{y + h - 16}'>{escape(mono)}</text>"
+        out += f"<text class='m' fill='{_FB}' x='{x + 18}' y='{y + h - 16}'>{escape(mono)}</text>"
     return out
+
+
+def _line(cls: str, marker: str, d: str) -> str:
+    return f"<path class='{cls}' {_FB_LINE} marker-end='url(#{marker})' d='{d}'/>"
+
+
+def _label(x: int, y: int, text: str) -> str:
+    return f"<text class='a' fill='{_FB}' x='{x}' y='{y}'>{escape(text)}</text>"
 
 
 def _hotspot(x: int, y: int, w: int, href: str, label: str, *, download: bool = False) -> str:
     """A clickable pill on the picture (an SVG link, no script)."""
+    dl = f" download='{escape(href.rsplit('/', 1)[-1])}'" if download else ""
     return (
-        f"<a class='hot' href='{escape(href)}'{' download' if download else ''}>"
-        f"<rect x='{x}' y='{y}' width='{w}' height='30' rx='15'/>"
-        f"<text x='{x + w // 2}' y='{y + 20}' text-anchor='middle'>{escape(label)}</text></a>"
+        f"<a class='hot' href='{escape(href)}'{dl}>"
+        f"<rect fill='#7d8bff' x='{x}' y='{y}' width='{w}' height='30' rx='15'/>"
+        f"<text fill='#0b0c0f' x='{x + w // 2}' y='{y + 20}' text-anchor='middle'>"
+        f"{escape(label)}</text></a>"
     )
 
 
@@ -407,18 +461,22 @@ def token_flow(prefix: str, mcpb: str) -> str:
         + _box(686, 40, 270, 150, title=HA[0], lines=HA[1], mono=HA[2])
         + get
         + issue
-        + "<path class='ln req' marker-end='url(#wb)' d='M278 88H339'/>"
-        "<text class='a' x='280' y='24'>1 request</text>"
-        "<text class='a' x='280' y='38'>+ Bearer token</text>"
-        "<path class='ln' marker-end='url(#wa)' d='M341 142H282'/>"
-        "<text class='a' x='280' y='212'>2 answer: data,</text>"
-        "<text class='a' x='280' y='226'>findings</text>"
-        "<path class='ln ro' marker-end='url(#wa)' d='M682 115H621'/>"
-        "<text class='a' x='621' y='24'>3 reads</text>"
-        "<text class='a' x='621' y='38'>continuously</text></svg>"
+        + _line("ln req", "wb", "M278 88H339")
+        + _label(280, 24, "1 request")
+        + _label(280, 38, "+ Bearer token")
+        + _line("ln", "wa", "M341 142H282")
+        + _label(280, 212, "2 answer: data,")
+        + _label(280, 226, "findings")
+        + _line("ln ro", "wa", "M682 115H621")
+        + _label(621, 24, "3 reads")
+        + _label(621, 38, "continuously")
+        + "</svg>"
     )
+    # Hidden by attribute as well as by the stylesheet, so that only one picture shows
+    # without it.
     tall = (
-        "<svg class='tall' viewBox='0 0 330 560' role='img' aria-labelledby='flow-t2'>"
+        "<svg class='tall' display='none' viewBox='0 0 330 560' role='img' "
+        "aria-labelledby='flow-t2'>"
         "<title id='flow-t2'>LLM agent, xomtra and Home Assistant</title>"
         + _defs("t")
         + _box(20, 0, 290, 130, title=AGENT[0], lines=AGENT[1], mono=AGENT[2])
@@ -426,13 +484,14 @@ def token_flow(prefix: str, mcpb: str) -> str:
         + _box(20, 440, 290, 120, title=HA[0], lines=HA[1], mono=HA[2])
         + get_t
         + issue_t
-        + "<path class='ln req' marker-end='url(#tb)' d='M110 134V204'/>"
-        "<text class='a' x='120' y='165'>1 request</text>"
-        "<text class='a' x='120' y='180'>+ token</text>"
-        "<path class='ln' marker-end='url(#ta)' d='M230 206V138'/>"
-        "<text class='a' x='238' y='165'>2 answer</text>"
-        "<path class='ln ro' marker-end='url(#ta)' d='M165 436V366'/>"
-        "<text class='a' x='175' y='405'>3 reads</text></svg>"
+        + _line("ln req", "tb", "M110 134V204")
+        + _label(120, 165, "1 request")
+        + _label(120, 180, "+ token")
+        + _line("ln", "ta", "M230 206V138")
+        + _label(238, 165, "2 answer")
+        + _line("ln ro", "ta", "M165 436V366")
+        + _label(175, 405, "3 reads")
+        + "</svg>"
     )
     return (
         f"<figure class='flow'>{wide}{tall}<figcaption>Issue a token and paste it into the "

@@ -40,6 +40,7 @@ def build_mcpb(endpoint: str | None = None, version: str = __version__) -> bytes
         for name, content in (
             ("manifest.json", json.dumps(manifest(endpoint, version), indent=2) + "\n"),
             ("server/index.js", files(__name__).joinpath("server/index.js").read_text()),
+            ("icon.png", files(__name__).joinpath("icon.png").read_bytes()),
         ):
             info = zipfile.ZipInfo(name, date_time=_ZIP_TIME)
             info.compress_type = zipfile.ZIP_DEFLATED

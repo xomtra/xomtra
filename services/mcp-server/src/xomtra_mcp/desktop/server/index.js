@@ -22,6 +22,12 @@ const readline = require("node:readline");
 const PROTOCOL_HEADER = "mcp-protocol-version";
 const SESSION_HEADER = "mcp-session-id";
 const TIMEOUT_MS = 120000;
+// Claude Desktop gives up on a server after 60 s without a word; a connection that
+// does not open (on macOS: Claude not allowed in Local Network) must fail long before.
+const CONNECT_TIMEOUT_MS = Number(process.env.XOMTRA_CONNECT_TIMEOUT_MS) || 10000;
+const UNREACHABLE_HINT =
+  "Check the address and that this computer reaches the server. On macOS allow Claude " +
+  "in System Settings > Privacy & Security > Local Network, then restart Claude.";
 
 function log(message) {
   process.stderr.write(`[xomtra-bridge] ${message}\n`);
@@ -128,6 +134,15 @@ class Bridge {
         });
         res.on("error", reject);
       });
+      req.on("socket", (socket) => {
+        if (!socket.connecting) return; // a kept-alive connection
+        const timer = setTimeout(
+          () => req.destroy(new Error(`no connection within ${CONNECT_TIMEOUT_MS / 1000} s`)),
+          CONNECT_TIMEOUT_MS,
+        );
+        socket.once("connect", () => clearTimeout(timer));
+        socket.once("close", () => clearTimeout(timer));
+      });
       req.on("timeout", () => req.destroy(new Error("xomtra did not answer in time")));
       req.on("error", reject);
       if (body !== undefined) req.write(JSON.stringify(body));
@@ -167,7 +182,10 @@ class Bridge {
     try {
       res = await this.post(message);
     } catch (err) {
-      this.errorFor(message, `Cannot reach xomtra at ${this.url.origin}: ${err.message}`);
+      this.errorFor(
+        message,
+        `Cannot reach xomtra at ${this.url.origin}: ${err.message}. ${UNREACHABLE_HINT}`,
+      );
       return;
     }
     if (res.status === 404 && this.session && !retried && this.initialize) {
@@ -234,6 +252,6 @@ function main() {
   });
 }
 
-if (require.main === module) main();
-
-module.exports = { Bridge, config, sseEvents };
+// Always start: Claude Desktop runs the extension in its built-in Node (an Electron
+// utility process), where require.main is not this module.
+main();

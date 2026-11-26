@@ -9,9 +9,10 @@
     "name": "xomtra contributors",
     "url": "https://github.com/xomtra/xomtra"
   },
-  "homepage": "https://github.com/xomtra/xomtra",
+  "homepage": "https://xomtra.com",
   "documentation": "https://github.com/xomtra/xomtra/blob/main/docs/setup/local-access.md",
   "license": "Apache-2.0",
+  "icon": "icon.png",
   "keywords": ["home assistant", "smart home", "history", "energy"],
   "server": {
     "type": "node",

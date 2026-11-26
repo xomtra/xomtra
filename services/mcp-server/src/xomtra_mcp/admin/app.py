@@ -52,7 +52,7 @@ from xomtra_mcp.admin.analysis import (
     run_confidence,
 )
 from xomtra_mcp.admin.config import PREFIX, AdminSettings
-from xomtra_mcp.admin.html import CSS, cards, e, page, table, token_flow
+from xomtra_mcp.admin.html import CSS, cards, e, fmt, page, table, token_flow
 from xomtra_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
 from xomtra_mcp.admin.session import Signer
 from xomtra_mcp.admin.view import View, prefix
@@ -122,10 +122,25 @@ BACKUP_NOTE = (
     "history, the findings and the weekly summaries, which take tens of GB. After a "
     "restore xomtra starts a new lake and loads the history again from Home "
     "Assistant, only as far back as Home Assistant still keeps it, and computes the "
-    "findings again.</p>"
-    "<p class=muted>For a robust setup with backups of the whole history, run xomtra "
-    "on its own virtual machine (Proxmox, VMware or Docker on Linux) and back up that "
-    "machine.</p>"
+    "findings again.<span class=more>For a robust setup with backups of the whole "
+    "history, run xomtra on its own virtual machine (Proxmox, VMware or Docker on "
+    "Linux) and back up that machine.</span></p>"
+)
+
+
+# Shown on the token pages: the local access mode only serves clients in the LAN.
+CLIENTS_NOTE = (
+    "<p class=warn><strong>Which AI assistants can connect</strong>"
+    "<span class=more>"
+    "This server runs in your local network and accepts personal tokens. "
+    "Assistants that run on a computer in this network can use it: Claude Desktop"
+    " (the extension below), Claude Code and other MCP clients that send a bearer"
+    " token, such as VS Code or Cursor."
+    "</span><span class=more>"
+    "Assistants that connect from the cloud cannot reach it: claude.ai on the web"
+    " and on phones, or ChatGPT connectors. They need a public https:// address "
+    "with sign-in, which the installation on its own virtual machine provides."
+    "</span></p>"
 )
 
 
@@ -499,8 +514,8 @@ class AdminApp:
         kinds = lake.get("kinds") or []
         body += "<h2>Catalog</h2>"
         if kinds:
-            body += f"<p class=muted>Profiled at {e(kinds[0]['profiled_at'])}</p>" + table(
-                ["kind", "entities", "stale"],
+            body += f"<p class=muted>Profiled at {fmt(kinds[0]['profiled_at'])}</p>" + table(
+                ["entity kind", "entities", "stale entities"],
                 [(k["kind"], k["entities"], k["stale"]) for k in kinds],
                 {1, 2},
             )
@@ -703,7 +718,7 @@ class AdminApp:
         label = f"{e(spec.label)}<br><code>{e(spec.env)}</code>"
         if spec.help:
             label += f"<br><span class=muted>{e(spec.help)}</span>"
-        who = f"{e(stored.changed_by)}, {e(stored.changed_at)}" if stored else ""
+        who = f"{e(stored.changed_by)}, {fmt(stored.changed_at)}" if stored else ""
         return [label, self._shown(spec, spec.default), spec.bounds(), value or None, who, form]
 
     async def analysis_page(
@@ -1137,6 +1152,7 @@ class AdminApp:
         body = (
             "<p class=muted>Each person or device gets its own token. A token is shown once; "
             "only its hash is stored. Revoked tokens stop working within 30 seconds.</p>"
+            + CLIENTS_NOTE
             + token_flow(prefix(), MCPB_FILENAME)
             + form
             + table(
@@ -1257,7 +1273,8 @@ class AdminApp:
         )
         return (
             "<h2>Claude Desktop</h2><ol>"
-            f"<li>Download <a href='{prefix()}/connect/{MCPB_FILENAME}'>{MCPB_FILENAME}</a> "
+            f"<li>Download <a href='{prefix()}/connect/{MCPB_FILENAME}' "
+            f"download='{MCPB_FILENAME}'>{MCPB_FILENAME}</a> "
             f"(address <code>{e(url)}</code> is filled in) and open it: Claude Desktop "
             "shows the extension and asks for the token.</li>"
             + (
@@ -1292,7 +1309,7 @@ class AdminApp:
             return refused
         body = (
             f"<p>Issue a personal token on <a href='{prefix()}/tokens'>Tokens</a> first, one "
-            "per person and device.</p>" + self._connect_help()
+            "per person and device.</p>" + CLIENTS_NOTE + self._connect_help()
         )
         return HTMLResponse(page("Connect clients", body, user.get("username")))
 
@@ -1300,8 +1317,12 @@ class AdminApp:
         data = build_mcpb(self._endpoint())
         return Response(
             data,
-            media_type="application/zip",
-            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(MCPB_FILENAME)}"},
+            # Not application/zip: Safari then saves it as .zip.
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{MCPB_FILENAME}"; '
+                f"filename*=UTF-8''{quote(MCPB_FILENAME)}"
+            },
         )
 
     # ---- app -----------------------------------------------------------------------

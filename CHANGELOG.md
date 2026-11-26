@@ -11,6 +11,40 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Admin GUI, Tokens and Connect clients: a note on which AI assistants can connect to
+  the local access mode (assistants on a computer in the LAN, not cloud connectors
+  such as claude.ai or ChatGPT).
+- Admin GUI footer with the version (links to its release notes), xomtra.com, the
+  documentation and bug reports. The links open in a new tab and send no Referer.
+
+### Changed
+
+- Claude Desktop extension: the xomtra icon and xomtra.com as its homepage.
+- Admin GUI overview: smaller card values that fit on one line, clearer catalog column
+  names (entity kind, entities, stale entities), the profiling time in the local
+  format, and the backup note in one box.
+
+### Fixed
+
+- Claude Desktop extension did not start in Claude Desktop's built-in Node.js
+  ("Unable to connect to extension server"): the bridge only started when run as the
+  main script. It now always starts.
+- Claude Desktop extension: a server it cannot connect to (wrong address, or on macOS
+  Claude not allowed in Local Network) now gives an error with a hint within 10 s
+  instead of Claude Desktop's "Unable to connect to extension server" after a minute.
+- Admin GUI: Safari saved the Claude Desktop extension as `xomtra.zip`. It is now
+  sent as `application/octet-stream` with a plain file name and saves as
+  `xomtra.mcpb`.
+- Admin GUI after an upgrade: the browser kept the previous version's stylesheet and
+  script (cached for an hour or a day) and showed the new pages half unstyled. Their
+  URLs now carry a version (also the tips and the icon), so an upgrade loads the new
+  ones, and the token diagram stays readable without its stylesheet.
+- Home Assistant add-on: the update dialog said "No changelog found". The add-on now
+  ships its own `CHANGELOG.md` with the last five released versions;
+  `scripts/release.py prepare` writes it and `check` refuses a tag without it.
+
 ## [0.6.0] - 2026-11-26
 
 ### Added
