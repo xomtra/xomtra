@@ -1,0 +1,66 @@
+# German wording of the usefulness rubric for the human panel. Same version, scale,
+# answers and meaning as usefulness-rubric.toml (the English source); change both
+# together. The AI raters use the English source only.
+
+version = "1.0.0"
+lang = "de"
+
+intro = """
+Sie bewerten einen Befund einer Smart-Home-Analyse. Die Analyse hat etwa 90 Tage
+stündlicher Daten der Sensoren und Zähler eines Haushalts ausgewertet und meldet
+Zusammenhänge zwischen zwei Zeitreihen (Korrelationen), ungewöhnliche Episoden
+(Anomalien) und dauerhafte Niveauänderungen (Änderungspunkte). Beurteilen Sie den
+Befund aus Sicht der Menschen, die im Haushalt leben und sich um ihn kümmern. Sie
+sehen, was der Befund aussagt, nicht wie stark die Statistik dahinter ist; nehmen Sie
+ihn als zutreffend an und beurteilen Sie, ob er ihre Aufmerksamkeit verdient."""
+
+[usefulness]
+question = "Wie nützlich ist dieser Befund für den Haushalt?"
+levels = [
+  { value = 1, label = "Nichts Neues", text = "Selbstverständlich, unverständlich oder nur darüber, wie die Daten erfasst wurden. Der Haushalt erfährt nichts." },
+  { value = 2, label = "Interessant, keine Maßnahme", text = "Nicht selbstverständlich und lebensnah, aber es gibt nichts zu prüfen oder zu tun." },
+  { value = 3, label = "Prüfenswert", text = "Kann auf einen Defekt, eine Verschwendung, eine Gelegenheit oder eine Gewohnheit hinweisen, die einen Blick wert ist; jemand würde es prüfen." },
+  { value = 4, label = "Handeln", text = "Es folgt ein konkreter Schritt (Reparatur, Einstellung, Automatisierung, geänderte Gewohnheit) mit wahrscheinlichem Nutzen." },
+]
+
+[trivial]
+question = "Ist der Befund trivial?"
+text = """Ja, wenn er sich daraus ergibt, wie der Haushalt oder die Messung aufgebaut ist,
+unabhängig vom Nutzen: ein Gerät doppelt gemessen oder von zwei seiner eigenen
+Sensoren, ein Wert und ein daraus berechneter Hilfssensor, zwei Sensoren derselben
+Größe in einem Raum, bekannte Physik (PV-Ertrag und Sonne, Wärmepumpe und
+Außentemperatur, Batterie und Netz) oder Reihen, die gemeinsam ausfallen, weil sie aus
+einer Integration stammen. Sonst nein."""
+
+[category]
+question = "Welche Art von Maßnahme legt der Befund am ehesten nahe?"
+values = [
+  { value = "fault", label = "Defekt", text = "Etwas ist möglicherweise defekt, falsch eingestellt oder misst falsch." },
+  { value = "savings", label = "Einsparung", text = "Energie oder Geld ließe sich sparen." },
+  { value = "automation", label = "Automatisierung", text = "Etwas ließe sich automatisieren oder eine Automatisierung anpassen." },
+  { value = "behaviour", label = "Verhalten", text = "Eine Gewohnheit, der Komfort oder der Tagesablauf des Haushalts könnte sich ändern." },
+  { value = "none", label = "keine", text = "Keine Maßnahme." },
+]
+
+[describe]
+relation = "Zusammenhang: Wenn '{a}' steigt, {how} '{b}' {when} (Stundendaten über 90 Tage)."
+rises = "steigt"
+falls = "sinkt"
+later = "{lag} h später"
+same_time = "gleichzeitig"
+anomaly = "Ungewöhnliche Episode: Die Reihe '{a}' lag von {start} bis {end} UTC im Mittel bei {observed}; üblich sind zu diesen Stunden der Woche etwa {expected}."
+change = "Dauerhafte Änderung: Die Reihe '{a}' hat am {day} ihr Tagesniveau von etwa {expected} auf etwa {observed} geändert und ist dort geblieben."
+unknown = "unbekannt"
+decimal = ","
+
+[flags]
+same_area = "Beide Reihen befinden sich im selben Raum."
+house_context = "Eine der Reihen beschreibt den ganzen Haushalt (zum Beispiel das Wetter oder den Hauptzähler)."
+weather = "Die Außentemperatur war zur gleichen Zeit ungewöhnlich."
+short = "Die Episode dauerte eine Stunde."
+level_shift = "Die Reihe hat ihr Niveau schon früher im Zeitraum geändert."
+
+[form]
+yes = "ja"
+no = "nein"
+help = "Füllen Sie für jede Zeile aus: usefulness (1–4), trivial (ja/nein), category (eines der Wörter oben) und bei Bedarf eine Anmerkung in note. Ein Befund, den Sie nicht verstehen, ist eine 1."

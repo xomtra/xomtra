@@ -123,11 +123,15 @@ jobs:
             --data "$RUNNER_TEMP/ideal" --dataset-hash "$hash" \
             --out usefulness-sample/sample.csv --pilot-out usefulness-sample/pilot.csv \
             | tee usefulness-sample/summary.json
-          # Blinded forms of the panel (raters r1-r3): the pilot first, then the gate sample.
-          uv run python -m hacore.public.rating_kit forms --sample usefulness-sample/pilot.csv \
-            --raters r1,r2,r3 --out usefulness-sample/forms-pilot
-          uv run python -m hacore.public.rating_kit forms --sample usefulness-sample/sample.csv \
-            --raters r1,r2,r3 --out usefulness-sample/forms-gate
+          # Blinded forms of the panel (raters r1-r3) in Czech and German, the same order
+          # per rater in both: the pilot first, then the gate sample.
+          for lang in cs de; do
+            for set in pilot gate; do
+              src=usefulness-sample/sample.csv; [ "$set" = pilot ] && src=usefulness-sample/pilot.csv
+              uv run python -m hacore.public.rating_kit forms --sample "$src" --lang "$lang" \
+                --raters r1,r2,r3 --out "usefulness-sample/forms-$set/$lang"
+            done
+          done
           python3 - > usefulness-sample/SOURCE.txt <<'PY'
           import json
           d = json.load(open("packages/hacore/src/hacore/public/datasets.json"))["ideal"]

@@ -9,7 +9,7 @@ strength, evidence, score, p- and q-values, the rulebook's verdicts (usefulness,
 category, triviality) and the method's structure flags stay out, and every form and
 request is in a random order of its own. A test checks this.
 
-    python -m hacore.public.rating_kit forms --sample sample.csv --out <dir> --raters a,b,c
+    python -m hacore.public.rating_kit forms --sample sample.csv --out <dir> --raters a,b --lang cs
     python -m hacore.public.rating_kit requests --sample sample.csv --model <id> --out ai.jsonl
     python -m hacore.public.rating_kit adjudicate --ratings <dir> --out adjudication.csv
 
@@ -48,18 +48,9 @@ SHOWN = (
 )
 # The sign of the score is the direction of a relation or a shift; its size is hidden.
 SIGN_OF = "score"
-# Flags that are facts about the home or the data, in plain words. Flags that are the
-# method's own judgement (trivial, duplicate_suspect, same_device, indirect,
-# common_factor) are not shown: raters judge triviality and structure themselves.
-FLAG_TEXT = {
-    "same_area": "Both series are in the same room.",
-    "house_context": (
-        "One of the series describes the whole home (for example the weather or the main meter)."
-    ),
-    "weather": "The outdoor temperature was unusual at the same time.",
-    "short": "The episode lasted one hour.",
-    "level_shift": "The series changed its level earlier in the period.",
-}
+# Context facts of the home or the data are shown in plain words ([flags] of the rubric);
+# flags that are the method's own judgement have no text there and stay hidden.
+LANGS = ("en", "cs", "de")
 ORDER_SEED = 20261126
 FORM_COLUMNS = ("order", "sample_id", "finding", "usefulness", "trivial", "category", "note")
 CATEGORIES = ("fault", "savings", "automation", "behaviour", "none")
@@ -81,17 +72,53 @@ class Rubric:
         lines += [f"  {v['value']} {v['label']}: {v['text']}" for v in d["usefulness"]["levels"]]
         lines += ["", d["trivial"]["question"], "  " + " ".join(d["trivial"]["text"].split())]
         lines += ["", d["category"]["question"]]
-        lines += [f"  {v['value']}: {v['text']}" for v in d["category"]["values"]]
+        lines += [f"  {v['label']}: {v['text']}" for v in d["category"]["values"]]
         return "\n".join(lines)
+
+    def form_text(self) -> str:
+        """The rubric and how to fill in the form, for the human panel."""
+        return f"{self.text()}\n\n{self.data['form']['help']}"
+
+    def normalise(self, usefulness: str, trivial: str, category: str) -> tuple[int, bool, str]:
+        """An answer of the form in this language -> (1-4, trivial, category code);
+        raises ``ValueError`` outside the rubric."""
+        u = int(usefulness.strip())
+        if u not in (1, 2, 3, 4):
+            raise ValueError(f"usefulness {u}")
+        t = trivial.strip().lower()
+        form = self.data["form"]
+        if t not in {form["yes"], form["no"]}:
+            raise ValueError(f"trivial {trivial!r}")
+        c = category.strip().lower()
+        codes = {
+            key.lower(): v["value"]
+            for v in self.data["category"]["values"]
+            for key in (v["value"], v["label"])
+        }
+        if c not in codes:
+            raise ValueError(f"category {category!r}")
+        return u, t == form["yes"], str(codes[c])
 
     def system_prompt(self, role: str) -> str:
         role_text = next(r["text"] for r in self.data["role"] if r["name"] == role)
         return f"{role_text}\n\n{self.text()}\n\n{self.data['answer'].strip()}"
 
 
-def load_rubric() -> Rubric:
-    raw = resources.files("hacore").joinpath("rules/usefulness-rubric.toml").read_text("utf-8")
-    data = tomllib.loads(raw)
+def _rules(name: str) -> dict[str, Any]:
+    return tomllib.loads(resources.files("hacore").joinpath(f"rules/{name}").read_text("utf-8"))
+
+
+def load_rubric(lang: str = "en") -> Rubric:
+    """The rubric; ``lang`` cs or de gives the panel's wording over the English source
+    (the roles and the answer format of the AI raters stay English)."""
+    data = _rules("usefulness-rubric.toml")
+    if lang != "en":
+        if lang not in LANGS:
+            raise ValueError(f"language {lang!r}")
+        local = _rules(f"usefulness-rubric.{lang}.toml")
+        if local["version"] != data["version"]:
+            raise ValueError(f"rubric {lang} {local['version']} != {data['version']}")
+        data = data | local
     return Rubric(str(data["version"]), data)
 
 
@@ -103,12 +130,12 @@ def _name(entity: str | None, house: str | None) -> str:
     return name.replace("_", " ")
 
 
-def _num(v: Any) -> str:
+def _num(v: Any, words: Mapping[str, str]) -> str:
     try:
         x = float(v)
     except (TypeError, ValueError):
-        return "unknown"
-    return f"{x:.3g}"
+        return words["unknown"]
+    return f"{x:.3g}".replace(".", words["decimal"])
 
 
 def _time(v: Any) -> str:
@@ -123,30 +150,33 @@ def _sign(row: Mapping[str, Any]) -> float:
         return 0.0
 
 
-def describe(row: Mapping[str, Any]) -> str:
-    """What the finding says, in plain words, from the fields in ``SHOWN`` and the sign
-    of the score only."""
+def describe(row: Mapping[str, Any], rubric: Rubric | None = None) -> str:
+    """What the finding says, in plain words of the rubric's language, from the fields
+    in ``SHOWN`` and the sign of the score only."""
+    d = (rubric or load_rubric()).data
+    words, flags = d["describe"], d["flags"]
     house = str(row.get("house") or "")
     kind = row.get("finding_type")
-    a = _name(row.get("entity"), house)
     start, end = _time(row.get("period_start")), _time(row.get("period_end"))
+    values = {
+        "a": _name(row.get("entity"), house),
+        "b": _name(row.get("related"), house),
+        "start": start,
+        "end": end,
+        "day": start[:10],
+        "observed": _num(row.get("observed"), words),
+        "expected": _num(row.get("expected"), words),
+    }
     if kind == "correlation":
-        b = _name(row.get("related"), house)
-        how = "rises" if _sign(row) >= 0 else "falls"
         lag = int(float(row.get("lag_hours") or 0))
-        when = f"{lag} h later" if lag else "at the same time"
-        text = f"Relation: when '{a}' rises, '{b}' {how} {when} (hourly data over 90 days)."
+        values["how"] = words["rises"] if _sign(row) >= 0 else words["falls"]
+        values["when"] = words["later"].format(lag=lag) if lag else words["same_time"]
+        text = words["relation"].format(**values)
     elif kind == "anomaly":
-        text = (
-            f"Unusual episode: '{a}' from {start} to {end} UTC averaged {_num(row.get('observed'))}"
-            f" where about {_num(row.get('expected'))} is usual at those hours of the week."
-        )
+        text = words["anomaly"].format(**values)
     else:
-        text = (
-            f"Lasting change: '{a}' changed its daily level on {start[:10]} from about "
-            f"{_num(row.get('expected'))} to about {_num(row.get('observed'))} and stayed there."
-        )
-    facts = [FLAG_TEXT[f] for f in str(row.get("flags") or "").split() if f in FLAG_TEXT]
+        text = words["change"].format(**values)
+    facts = [flags[f] for f in str(row.get("flags") or "").split() if f in flags]
     return " ".join([text, *facts])
 
 
@@ -157,17 +187,18 @@ def _order(n: int, key: str) -> list[int]:
 
 
 def forms(
-    rows: Sequence[Mapping[str, Any]], raters: Iterable[str]
+    rows: Sequence[Mapping[str, Any]], raters: Iterable[str], rubric: Rubric | None = None
 ) -> dict[str, list[dict[str, Any]]]:
-    """One blinded form per rater: the findings in an order of the rater's own, with
-    empty answer columns."""
+    """One blinded form per rater: the findings in an order of the rater's own (the
+    same in every language), with empty answer columns."""
+    rubric = rubric or load_rubric()
     out: dict[str, list[dict[str, Any]]] = {}
     for rater in raters:
         out[rater] = [
             {
                 "order": n + 1,
                 "sample_id": rows[i]["sample_id"],
-                "finding": describe(rows[i]),
+                "finding": describe(rows[i], rubric),
                 "usefulness": "",
                 "trivial": "",
                 "category": "",
@@ -194,7 +225,7 @@ def requests(
                         "max_tokens": max_tokens,
                         "temperature": 0,
                         "system": rubric.system_prompt(role),
-                        "messages": [{"role": "user", "content": describe(rows[i])}],
+                        "messages": [{"role": "user", "content": describe(rows[i], rubric)}],
                     },
                 }
             )
@@ -323,6 +354,7 @@ def main(argv: list[str] | None = None) -> int:
     f.add_argument("--out", type=Path, required=True)
     f.add_argument("--raters", required=True, help="comma-separated, three for the panel")
     f.add_argument("--all", action="store_true", help="every finding, not only the human sample")
+    f.add_argument("--lang", choices=LANGS, default="en", help="language of the form")
     r = sub.add_parser("requests", help="Message Batches requests of the AI raters")
     r.add_argument("--sample", type=Path, required=True)
     r.add_argument("--model", required=True, help="exact model id")
@@ -339,12 +371,13 @@ def main(argv: list[str] | None = None) -> int:
         rows = _read_csv(args.sample)
         rows = rows if args.all else _human(rows)
         args.out.mkdir(parents=True, exist_ok=True)
-        for rater, form in forms(rows, args.raters.split(",")).items():
+        local = load_rubric(args.lang)
+        for rater, form in forms(rows, args.raters.split(","), local).items():
             _write_csv(args.out / f"form-{rater}.csv", form, FORM_COLUMNS)
         (args.out / "rubric.txt").write_text(
-            f"Rubric {rubric.version}\n\n{rubric.text()}\n", encoding="utf-8"
+            f"Rubric {local.version} ({args.lang})\n\n{local.form_text()}\n", encoding="utf-8"
         )
-        print(json.dumps({"rubric": rubric.version, "findings": len(rows)}))
+        print(json.dumps({"rubric": local.version, "lang": args.lang, "findings": len(rows)}))
     elif args.cmd == "requests":
         reqs = requests(_read_csv(args.sample), rubric, args.model)
         with args.out.open("w", encoding="utf-8") as out:

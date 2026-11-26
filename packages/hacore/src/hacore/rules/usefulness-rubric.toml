@@ -43,12 +43,41 @@ no."""
 [category]
 question = "Which kind of action does the finding most call for?"
 values = [
-  { value = "fault", text = "Something may be broken, wrongly set or measuring wrong." },
-  { value = "savings", text = "Energy or money could be saved." },
-  { value = "automation", text = "Something could be automated or an automation adjusted." },
-  { value = "behaviour", text = "A habit, comfort or routine of the household could change." },
-  { value = "none", text = "No action." },
+  { value = "fault", label = "fault", text = "Something may be broken, wrongly set or measuring wrong." },
+  { value = "savings", label = "savings", text = "Energy or money could be saved." },
+  { value = "automation", label = "automation", text = "Something could be automated or an automation adjusted." },
+  { value = "behaviour", label = "behaviour", text = "A habit, comfort or routine of the household could change." },
+  { value = "none", label = "none", text = "No action." },
 ]
+
+# Plain-language description of a finding (hacore.public.rating_kit.describe). Only these
+# placeholders exist: {a} {b} {how} {when} {lag} {start} {end} {day} {observed} {expected}.
+[describe]
+relation = "Relation: when '{a}' rises, '{b}' {how} {when} (hourly data over 90 days)."
+rises = "rises"
+falls = "falls"
+later = "{lag} h later"
+same_time = "at the same time"
+anomaly = "Unusual episode: '{a}' from {start} to {end} UTC averaged {observed} where about {expected} is usual at those hours of the week."
+change = "Lasting change: '{a}' changed its daily level on {day} from about {expected} to about {observed} and stayed there."
+unknown = "unknown"
+decimal = "."
+
+# Context facts of the home or the data. Flags that are the method's own judgement
+# (trivial, duplicate_suspect, same_device, indirect, common_factor) have no text and
+# are never shown: raters judge triviality and structure themselves.
+[flags]
+same_area = "Both series are in the same room."
+house_context = "One of the series describes the whole home (for example the weather or the main meter)."
+weather = "The outdoor temperature was unusual at the same time."
+short = "The episode lasted one hour."
+level_shift = "The series changed its level earlier in the period."
+
+# The human form: answers and how to fill them in.
+[form]
+yes = "yes"
+no = "no"
+help = "Fill in for every row: usefulness (1-4), trivial (yes/no), category (one of the words above) and, if you like, a note. A finding you cannot understand is a 1."
 
 # Roles of the AI raters (prereg section 3): each role answers the same rubric, with the
 # question of its role in mind. The AI consensus is the median of the roles.

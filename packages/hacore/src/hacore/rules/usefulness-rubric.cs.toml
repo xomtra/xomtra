@@ -1,0 +1,65 @@
+# Czech wording of the usefulness rubric for the human panel. Same version, scale,
+# answers and meaning as usefulness-rubric.toml (the English source); change both
+# together. The AI raters use the English source only.
+
+version = "1.0.0"
+lang = "cs"
+
+intro = """
+Hodnotíte jeden nález analýzy chytré domácnosti. Analýza prošla zhruba 90 dní
+hodinových dat ze senzorů a měřičů jedné domácnosti a hlásí vztahy mezi dvěma řadami
+(korelace), neobvyklé epizody (anomálie) a trvalé změny úrovně (body změny). Nález
+posuzujte z pohledu lidí, kteří v domácnosti žijí a starají se o ni. Vidíte, co nález
+říká, ne jak silná je statistika za ním; berte ho jako pravdivý a posuďte, zda si
+zaslouží jejich pozornost."""
+
+[usefulness]
+question = "Jak užitečný je tento nález pro domácnost?"
+levels = [
+  { value = 1, label = "Nic nového", text = "Samozřejmé, nesrozumitelné nebo jen o tom, jak se sbírala data. Domácnost se nic nedozví." },
+  { value = 2, label = "Zajímavé, bez kroku", text = "Není to samozřejmé a odpovídá to životu, ale není co ověřit ani udělat." },
+  { value = 3, label = "Stojí za ověření", text = "Může ukazovat na poruchu, plýtvání, příležitost nebo zvyk, na který se vyplatí podívat; někdo by to ověřil." },
+  { value = 4, label = "Jednat", text = "Plyne z toho konkrétní krok (oprava, nastavení, automatizace, změna zvyku) s pravděpodobným přínosem." },
+]
+
+[trivial]
+question = "Je nález triviální?"
+text = """Ano, pokud plyne z toho, jak je postavená domácnost nebo měření, bez ohledu na
+užitečnost: jedno zařízení měřené dvakrát nebo dvěma jeho vlastními senzory, hodnota
+a z ní vypočtený pomocný senzor, dva senzory stejné veličiny v jedné místnosti, známá
+fyzika (výroba fotovoltaiky a slunce, tepelné čerpadlo a venkovní teplota, baterie a
+síť) nebo řady, které vypadávají společně, protože pocházejí z jedné integrace. Jinak
+ne."""
+
+[category]
+question = "Jaký druh kroku nález nejvíc vyžaduje?"
+values = [
+  { value = "fault", label = "porucha", text = "Něco může být rozbité, špatně nastavené nebo špatně měřit." },
+  { value = "savings", label = "úspora", text = "Dá se ušetřit energie nebo peníze." },
+  { value = "automation", label = "automatizace", text = "Dá se něco automatizovat nebo upravit automatizaci." },
+  { value = "behaviour", label = "chování", text = "Mohl by se změnit zvyk, pohodlí nebo denní režim domácnosti." },
+  { value = "none", label = "žádný", text = "Žádný krok." },
+]
+
+[describe]
+relation = "Vztah: když roste '{a}', '{b}' {how} {when} (hodinová data za 90 dní)."
+rises = "roste"
+falls = "klesá"
+later = "o {lag} h později"
+same_time = "ve stejnou dobu"
+anomaly = "Neobvyklá epizoda: řada '{a}' měla od {start} do {end} UTC průměr {observed}; v tyto hodiny týdne je obvyklá hodnota asi {expected}."
+change = "Trvalá změna: řada '{a}' změnila {day} denní úroveň z asi {expected} na asi {observed} a na ní zůstala."
+unknown = "neznámo"
+decimal = ","
+
+[flags]
+same_area = "Obě řady jsou ve stejné místnosti."
+house_context = "Jedna z řad popisuje celou domácnost (například počasí nebo hlavní elektroměr)."
+weather = "Venkovní teplota byla ve stejnou dobu neobvyklá."
+short = "Epizoda trvala jednu hodinu."
+level_shift = "Řada změnila úroveň už dříve v tomto období."
+
+[form]
+yes = "ano"
+no = "ne"
+help = "U každého řádku vyplňte: usefulness (1–4), trivial (ano/ne), category (jedno ze slov výše) a případně poznámku do note. Nález, kterému nerozumíte, je 1."
