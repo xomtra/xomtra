@@ -345,7 +345,13 @@ def running_local_server() -> Iterator[tuple[str, str, MemoryTokenStore]]:
         thread.join(5)
 
 
-def run_bridge(url: str, token: str, lines: list[dict[str, Any]], wait_for: int) -> list[Any]:
+def run_bridge(
+    url: str,
+    token: str,
+    lines: list[dict[str, Any]],
+    wait_for: int,
+    env: dict[str, str] | None = None,
+) -> list[Any]:
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is not installed")
@@ -356,7 +362,7 @@ def run_bridge(url: str, token: str, lines: list[dict[str, Any]], wait_for: int)
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        env={"XOMTRA_URL": url, "XOMTRA_TOKEN": token, "PATH": ""},
+        env={"XOMTRA_URL": url, "XOMTRA_TOKEN": token, "PATH": "", **(env or {})},
     )
     assert proc.stdin is not None
     assert proc.stdout is not None
@@ -407,6 +413,23 @@ def test_desktop_bridge_reports_a_refused_token(
     url, _, _ = running_local_server
     replies = run_bridge(url, "xmt_wrong_token", [INIT], wait_for=1)
     assert "refused the token" in replies[0]["error"]["message"]
+
+
+def test_desktop_bridge_reports_an_unreachable_server_quickly() -> None:
+    """Claude Desktop waits 60 s for an answer; a connection that does not open (macOS
+    Local Network permission, wrong address) gets an error with a hint well before."""
+    started = time.monotonic()
+    replies = run_bridge(
+        "http://10.255.255.1:8000/mcp",  # not routed: the connection never opens
+        "xmt_x",
+        [INIT],
+        wait_for=1,
+        env={"XOMTRA_ALLOW_HTTP": "true", "XOMTRA_CONNECT_TIMEOUT_MS": "500"},
+    )
+    assert time.monotonic() - started < 20
+    message = replies[0]["error"]["message"]
+    assert message.startswith("Cannot reach xomtra at http://10.255.255.1:8000")
+    assert "Local Network" in message
 
 
 def test_desktop_bridge_refuses_plain_http_to_lan() -> None:

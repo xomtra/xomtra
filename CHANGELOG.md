@@ -25,6 +25,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Fixed
 
+- Claude Desktop extension: a server it cannot connect to (wrong address, or on macOS
+  Claude not allowed in Local Network) now gives an error with a hint within 10 s
+  instead of Claude Desktop's "Unable to connect to extension server" after a minute.
 - Admin GUI: Safari saved the Claude Desktop extension as `xomtra.zip`. It is now
   sent as `application/octet-stream` with a plain file name and saves as
   `xomtra.mcpb`.
