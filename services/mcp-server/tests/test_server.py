@@ -100,11 +100,15 @@ async def test_instructions_carry_the_default_guardrails() -> None:
     assert "presence, sleep, health" in text
     assert "locks, alarms" in text
     assert "occupant of the property" in text
-    assert "very funny, crude and vulgar" in text
+    assert "very funny, crude, vulgar and a bit politically incorrect" in text
     assert "language, country, culture and locality of the installation" in text
-    assert "Never guess or play on the user's wealth or social status" in text
+    assert "never guess the user's wealth or social status" in text
     assert "guys in the pub" in text
-    assert "line of work, but only when the user mentioned it" in text
+    assert "a bit politically incorrect" in text
+    assert "property owner's line of work" in text
+    assert "from your own context (your memory, their profile, this conversation)" in text
+    assert "Never infer personal details from the house data" in text
+    assert "Never name the user's clients or employers" in text
     assert "Joke about the user only with tact" in text
     assert "sexist, racist, homophobic, xenophobic or political jokes or innuendo" in text
     assert "No jokes, irony or vulgarity about accidents, faults, outages" in text
