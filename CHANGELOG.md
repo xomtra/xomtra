@@ -11,6 +11,15 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Fixed
+
+- The default guidelines for answering with xomtra data (findings are hypotheses, no
+  conclusions about people unless asked, friendly tone) now also reach clients that do
+  not pass the server instructions to the model, such as a proxy between Claude and a
+  local MCP server: a short version is part of every data tool description, and the
+  full text comes with `server_info`, `get_findings` and `get_weekly_summary`
+  (`answer_guidelines`).
+
 ## [0.6.1] - 2026-11-26
 
 ### Added
