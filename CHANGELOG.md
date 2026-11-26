@@ -26,6 +26,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Claude Desktop extension downloaded from the admin GUI: for a plain `http://` address
   (the add-on in the LAN) *Allow unencrypted http://* is checked by default; before, the
   extension refused the add-on's endpoint until the user found the checkbox.
+- Admin GUI behind Home Assistant Ingress: every form (issuing a token, settings) was
+  refused with 403 when Home Assistant is opened through another address than its own
+  host, e.g. behind a reverse proxy. The cross-site check now trusts the browser's
+  `Sec-Fetch-Site` header and compares the Origin only where that header is missing.
 
 ## [0.5.0] - 2026-11-25
 

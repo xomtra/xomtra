@@ -258,6 +258,12 @@ class AdminApp:
         return endpoint
 
     def _same_origin(self, request: Request) -> bool:
+        # Sec-Fetch-Site is set by the browser and cannot be set by a page. It decides
+        # where present: behind proxies (Home Assistant Ingress behind a reverse proxy,
+        # Nabu Casa, the companion app) the Origin need not match any forwarded host.
+        fetch_site = request.headers.get("sec-fetch-site")
+        if fetch_site:
+            return fetch_site in {"same-origin", "none"}
         origin = request.headers.get("origin")
         if not origin:
             return True
