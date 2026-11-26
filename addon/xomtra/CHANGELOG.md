@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2 - 2026-11-26
+
+### Fixed
+
+- The default guidelines for answering with xomtra data (findings are hypotheses, no
+  conclusions about people unless asked, friendly tone) now also reach clients that do
+  not pass the server instructions to the model, such as a proxy between Claude and a
+  local MCP server: a short version is part of every data tool description, and the
+  full text comes with `server_info`, `get_findings` and `get_weekly_summary`
+  (`answer_guidelines`).
+
 ## 0.6.1 - 2026-11-26
 
 ### Added
@@ -207,18 +218,5 @@
 
 - `compose.lite.yaml` defaulted to the ingest image 0.3.0, which has no `worker`;
   `scripts/release.py` now keeps it at the release version like `compose.yaml`.
-
-## 0.4.1 - 2026-11-25
-
-### Fixed
-
-- Anomalies v2 found nothing on a real installation: a few nearly constant sensors had
-  a robust scale near 0 and z in the millions, which made the pooled reference so heavy
-  that no episode passed. The scale is now at least the sensor's resolution and the
-  episode statistic caps `|z|` at 50 (`HAMMOND_ANOMALY_Z_CAP`).
-- Correlations: the stored top 100 of a window held only duplicates and same-device
-  pairs after the unflagged ones, so explained relations (`indirect`, `house_context`,
-  ...) were never stored. Explained and unstable pairs now come before the trivial
-  ones.
 
 Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md
