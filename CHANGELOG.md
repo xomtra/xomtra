@@ -15,9 +15,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 - Admin page **Answers** (ADR 090): named sets of answer guidelines kept in the local
   database. Factory sets **Default** (relevant data first, the answer first, then a chart
-  or a table, friendly tone), **Concise** (as short as possible, no jokes) and **Core
-  only** (no guidelines); custom sets are duplicated from any set and edited in the
-  browser, with a preview of exactly what the assistant gets, a history with restore,
+  or a table, friendly tone, with topics: energy with solar, battery, feed-in and costs;
+  security with alarms, cameras and motion, counted per area and never per person;
+  vehicles; heating and indoor climate; water; device health; the weekly overview, each
+  with what to look at, which charts and optional external sources such as spot prices,
+  weather or fuel prices), **Concise** (as short as possible, no jokes) and **Core
+  only** (no guidelines); custom sets (up to 20, 8,000 characters each) are duplicated from any set and edited in
+  the browser, with a preview of exactly what the assistant gets, a history with restore,
   and export and import as JSON. One set is active; a change applies within 30 seconds,
   without a restart.
 

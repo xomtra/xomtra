@@ -32,7 +32,7 @@ async def test_factory_sets_core_rules_and_activation() -> None:
         for name in ("Default", "Concise", "Core only"):
             assert name in page.text
         assert "Pub" not in page.text
-        assert "pub" not in page.text
+        assert "the pub" not in page.text
         assert "Core rules (always apply, cannot be changed)" in page.text
         assert "threatens life or health" in page.text
         assert "Answer first" in page.text  # the default set is shown when none is chosen

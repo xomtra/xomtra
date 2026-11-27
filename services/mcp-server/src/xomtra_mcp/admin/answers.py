@@ -39,7 +39,7 @@ from xomtra_mcp.guidelines import (
 
 TITLE = "Answers"
 EXPORT_FORMAT = 1
-# A form with a whole set (4,000 characters, percent-encoded) or an import of 20 sets.
+# A form with a whole set (8,000 characters, percent-encoded) or an import of 20 sets.
 FORM_LIMIT = 1_000_000
 
 Audit = Callable[..., Awaitable[None]]

@@ -263,7 +263,7 @@
    "exists already.": "už existuje.",
    "Activate": "Aktivovat",
    "Activations": "Aktivace",
-   "At most 4000 characters, plain text. Write it in English or in your language; the assistant answers in the user's language. The core rules come first and cannot be loosened by the set.": "Nejvýš 4000 znaků, prostý text. Pište anglicky nebo svým jazykem; asistent odpovídá jazykem uživatele. Základní pravidla mají přednost a sada je nemůže zmírnit.",
+   "At most 8000 characters, plain text. Write it in English or in your language; the assistant answers in the user's language. The core rules come first and cannot be loosened by the set.": "Nejvýš 8000 znaků, prostý text. Pište anglicky nebo svým jazykem; asistent odpovídá jazykem uživatele. Základní pravidla mají přednost a sada je nemůže zmírnit.",
    "Concise": "Věcná",
    "Core only": "Jen jádro",
    "Default": "Výchozí",
@@ -275,7 +275,7 @@
    "Import as new sets": "Importovat jako nové sady",
    "Name: 1 to 40 letters, digits, spaces and the signs . , ( ) + - _, starting with a letter or digit.": "Název: 1 až 40 písmen, číslic, mezer a znaků . , ( ) + - _, na začátku písmeno nebo číslice.",
    "Text: control characters are not allowed.": "Text: řídicí znaky nejsou povolené.",
-   "Text: at most 4000 characters.": "Text: nejvýš 4000 znaků.",
+   "Text: at most 8000 characters.": "Text: nejvýš 8000 znaků.",
    "Description: at most 200 characters.": "Popis: nejvýš 200 znaků.",
    "At most 20 custom sets.": "Nejvýš 20 vlastních sad.",
    "New empty set": "Nová prázdná sada",
@@ -284,7 +284,6 @@
    "Not valid JSON.": "Neplatný JSON.",
    "Open": "Otevřít",
    "Preview: what the assistant gets": "Náhled: co dostane asistent",
-   "Relevant data first, answer first, then charts or tables; friendly tone.": "Nejdřív relevantní data, odpověď na začátku, pak grafy nebo tabulky; přátelský tón.",
    "Restore": "Obnovit",
    "Sets": "Sady",
    "The factory set this one was copied from has a newer version. Open it to compare and copy what you need.": "Sada z výroby, ze které tato vznikla, má novější verzi. Otevřete ji, porovnejte a převezměte, co potřebujete.",
@@ -306,7 +305,8 @@
    "factory": "z výroby",
    "shown": "zobrazeno",
    "xomtra gives the assistant the core rules and the active set of answer guidelines with the results of server_info, get_findings and get_weekly_summary. A change applies within 30 seconds, without a restart; nothing comes from xomtra.com.": "xomtra předává asistentovi základní pravidla a aktivní sadu pokynů k odpovědím ve výsledcích server_info, get_findings a get_weekly_summary. Změna platí do 30 sekund, bez restartu; z xomtra.com nepřichází nic.",
-   "name": "název"
+   "name": "název",
+   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Nejdřív relevantní data, odpověď na začátku, pak grafy nebo tabulky; témata energie, bezpečnost, vozidla, klima, voda, zařízení; přátelský tón."
   },
   "de": {
    "(address": "(Adresse",
@@ -533,7 +533,7 @@
    "exists already.": "existiert bereits.",
    "Activate": "Aktivieren",
    "Activations": "Aktivierungen",
-   "At most 4000 characters, plain text. Write it in English or in your language; the assistant answers in the user's language. The core rules come first and cannot be loosened by the set.": "Höchstens 4000 Zeichen, reiner Text. Schreiben Sie auf Englisch oder in Ihrer Sprache; der Assistent antwortet in der Sprache des Nutzers. Die Grundregeln gehen vor und können durch das Set nicht gelockert werden.",
+   "At most 8000 characters, plain text. Write it in English or in your language; the assistant answers in the user's language. The core rules come first and cannot be loosened by the set.": "Höchstens 8000 Zeichen, reiner Text. Schreiben Sie auf Englisch oder in Ihrer Sprache; der Assistent antwortet in der Sprache des Nutzers. Die Grundregeln gehen vor und können durch das Set nicht gelockert werden.",
    "Concise": "Knapp",
    "Core only": "Nur Grundregeln",
    "Default": "Standard",
@@ -545,7 +545,7 @@
    "Import as new sets": "Als neue Sets importieren",
    "Name: 1 to 40 letters, digits, spaces and the signs . , ( ) + - _, starting with a letter or digit.": "Name: 1 bis 40 Buchstaben, Ziffern, Leerzeichen und die Zeichen . , ( ) + - _, beginnend mit Buchstabe oder Ziffer.",
    "Text: control characters are not allowed.": "Text: Steuerzeichen sind nicht erlaubt.",
-   "Text: at most 4000 characters.": "Text: höchstens 4000 Zeichen.",
+   "Text: at most 8000 characters.": "Text: höchstens 8000 Zeichen.",
    "Description: at most 200 characters.": "Beschreibung: höchstens 200 Zeichen.",
    "At most 20 custom sets.": "Höchstens 20 eigene Sets.",
    "New empty set": "Neues leeres Set",
@@ -554,7 +554,6 @@
    "Not valid JSON.": "Kein gültiges JSON.",
    "Open": "Öffnen",
    "Preview: what the assistant gets": "Vorschau: was der Assistent erhält",
-   "Relevant data first, answer first, then charts or tables; friendly tone.": "Zuerst relevante Daten, Antwort vorneweg, dann Diagramme oder Tabellen; freundlicher Ton.",
    "Restore": "Wiederherstellen",
    "Sets": "Sets",
    "The factory set this one was copied from has a newer version. Open it to compare and copy what you need.": "Das Werks-Set, aus dem dieses kopiert wurde, hat eine neuere Version. Öffnen Sie es zum Vergleichen und übernehmen Sie, was Sie brauchen.",
@@ -576,7 +575,8 @@
    "factory": "Werk",
    "shown": "angezeigt",
    "xomtra gives the assistant the core rules and the active set of answer guidelines with the results of server_info, get_findings and get_weekly_summary. A change applies within 30 seconds, without a restart; nothing comes from xomtra.com.": "xomtra gibt dem Assistenten die Grundregeln und das aktive Set der Antwortrichtlinien mit den Ergebnissen von server_info, get_findings und get_weekly_summary. Eine Änderung gilt innerhalb von 30 Sekunden ohne Neustart; von xomtra.com kommt nichts.",
-   "name": "Name"
+   "name": "Name",
+   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Zuerst relevante Daten, Antwort vorneweg, dann Diagramme oder Tabellen; Themen Energie, Sicherheit, Fahrzeuge, Klima, Wasser, Geräte; freundlicher Ton."
   },
   "nl": {
    "(address": "(adres",
@@ -802,7 +802,7 @@
    "exists already.": "bestaat al.",
    "Activate": "Activeren",
    "Activations": "Activeringen",
-   "At most 4000 characters, plain text. Write it in English or in your language; the assistant answers in the user's language. The core rules come first and cannot be loosened by the set.": "Hoogstens 4000 tekens, platte tekst. Schrijf in het Engels of in je eigen taal; de assistent antwoordt in de taal van de gebruiker. De basisregels gaan voor en de set kan ze niet versoepelen.",
+   "At most 8000 characters, plain text. Write it in English or in your language; the assistant answers in the user's language. The core rules come first and cannot be loosened by the set.": "Hoogstens 8000 tekens, platte tekst. Schrijf in het Engels of in je eigen taal; de assistent antwoordt in de taal van de gebruiker. De basisregels gaan voor en de set kan ze niet versoepelen.",
    "Concise": "Beknopt",
    "Core only": "Alleen basisregels",
    "Default": "Standaard",
@@ -814,7 +814,7 @@
    "Import as new sets": "Importeren als nieuwe sets",
    "Name: 1 to 40 letters, digits, spaces and the signs . , ( ) + - _, starting with a letter or digit.": "Naam: 1 tot 40 letters, cijfers, spaties en de tekens . , ( ) + - _, beginnend met een letter of cijfer.",
    "Text: control characters are not allowed.": "Tekst: stuurtekens zijn niet toegestaan.",
-   "Text: at most 4000 characters.": "Tekst: hoogstens 4000 tekens.",
+   "Text: at most 8000 characters.": "Tekst: hoogstens 8000 tekens.",
    "Description: at most 200 characters.": "Beschrijving: hoogstens 200 tekens.",
    "At most 20 custom sets.": "Hoogstens 20 eigen sets.",
    "New empty set": "Nieuwe lege set",
@@ -823,7 +823,6 @@
    "Not valid JSON.": "Geen geldige JSON.",
    "Open": "Openen",
    "Preview: what the assistant gets": "Voorbeeld: wat de assistent krijgt",
-   "Relevant data first, answer first, then charts or tables; friendly tone.": "Eerst relevante gegevens, het antwoord vooraan, dan grafieken of tabellen; vriendelijke toon.",
    "Restore": "Herstellen",
    "Sets": "Sets",
    "The factory set this one was copied from has a newer version. Open it to compare and copy what you need.": "De fabrieksset waarvan deze is gekopieerd heeft een nieuwere versie. Open hem om te vergelijken en neem over wat je nodig hebt.",
@@ -845,7 +844,8 @@
    "factory": "fabriek",
    "shown": "getoond",
    "xomtra gives the assistant the core rules and the active set of answer guidelines with the results of server_info, get_findings and get_weekly_summary. A change applies within 30 seconds, without a restart; nothing comes from xomtra.com.": "xomtra geeft de assistent de basisregels en de actieve set antwoordrichtlijnen mee met de resultaten van server_info, get_findings en get_weekly_summary. Een wijziging geldt binnen 30 seconden, zonder herstart; van xomtra.com komt niets.",
-   "name": "naam"
+   "name": "naam",
+   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Eerst relevante gegevens, het antwoord vooraan, dan grafieken of tabellen; onderwerpen energie, beveiliging, voertuigen, klimaat, water, apparaten; vriendelijke toon."
   },
   "pl": {
    "(address": "(adres",
@@ -1075,7 +1075,7 @@
    "exists already.": "już istnieje.",
    "Activate": "Aktywuj",
    "Activations": "Aktywacje",
-   "At most 4000 characters, plain text. Write it in English or in your language; the assistant answers in the user's language. The core rules come first and cannot be loosened by the set.": "Najwyżej 4000 znaków, zwykły tekst. Pisz po angielsku lub w swoim języku; asystent odpowiada w języku użytkownika. Podstawowe zasady mają pierwszeństwo i zestaw nie może ich złagodzić.",
+   "At most 8000 characters, plain text. Write it in English or in your language; the assistant answers in the user's language. The core rules come first and cannot be loosened by the set.": "Najwyżej 8000 znaków, zwykły tekst. Pisz po angielsku lub w swoim języku; asystent odpowiada w języku użytkownika. Podstawowe zasady mają pierwszeństwo i zestaw nie może ich złagodzić.",
    "Concise": "Zwięzły",
    "Core only": "Tylko zasady",
    "Default": "Domyślny",
@@ -1087,7 +1087,7 @@
    "Import as new sets": "Importuj jako nowe zestawy",
    "Name: 1 to 40 letters, digits, spaces and the signs . , ( ) + - _, starting with a letter or digit.": "Nazwa: od 1 do 40 liter, cyfr, spacji i znaków . , ( ) + - _, zaczynając od litery lub cyfry.",
    "Text: control characters are not allowed.": "Tekst: znaki sterujące są niedozwolone.",
-   "Text: at most 4000 characters.": "Tekst: najwyżej 4000 znaków.",
+   "Text: at most 8000 characters.": "Tekst: najwyżej 8000 znaków.",
    "Description: at most 200 characters.": "Opis: najwyżej 200 znaków.",
    "At most 20 custom sets.": "Najwyżej 20 własnych zestawów.",
    "New empty set": "Nowy pusty zestaw",
@@ -1096,7 +1096,6 @@
    "Not valid JSON.": "Nieprawidłowy JSON.",
    "Open": "Otwórz",
    "Preview: what the assistant gets": "Podgląd: co dostaje asystent",
-   "Relevant data first, answer first, then charts or tables; friendly tone.": "Najpierw trafne dane, odpowiedź na początku, potem wykresy lub tabele; przyjazny ton.",
    "Restore": "Przywróć",
    "Sets": "Zestawy",
    "The factory set this one was copied from has a newer version. Open it to compare and copy what you need.": "Zestaw fabryczny, z którego powstał ten, ma nowszą wersję. Otwórz go, porównaj i przejmij to, czego potrzebujesz.",
@@ -1118,7 +1117,8 @@
    "factory": "fabryczny",
    "shown": "wyświetlony",
    "xomtra gives the assistant the core rules and the active set of answer guidelines with the results of server_info, get_findings and get_weekly_summary. A change applies within 30 seconds, without a restart; nothing comes from xomtra.com.": "xomtra przekazuje asystentowi podstawowe zasady i aktywny zestaw wskazówek do odpowiedzi w wynikach server_info, get_findings i get_weekly_summary. Zmiana obowiązuje w ciągu 30 sekund, bez restartu; z xomtra.com nic nie przychodzi.",
-   "name": "nazwa"
+   "name": "nazwa",
+   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Najpierw trafne dane, odpowiedź na początku, potem wykresy lub tabele; tematy energia, bezpieczeństwo, pojazdy, klimat, woda, urządzenia; przyjazny ton."
   }
  },
  "th": {

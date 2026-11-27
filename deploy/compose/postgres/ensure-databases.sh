@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS guidance.answer_set_version (
   set_id      text NOT NULL REFERENCES guidance.answer_set (id),
   name        text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 40),
   description text NOT NULL DEFAULT '' CHECK (char_length(description) <= 200),
-  body        text NOT NULL CHECK (char_length(body) <= 4000),
+  body        text NOT NULL CHECK (char_length(body) <= 8000),
   changed_at  timestamptz NOT NULL DEFAULT now(),
   changed_by  text
 );

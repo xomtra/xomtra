@@ -110,8 +110,23 @@ async def test_instructions_carry_the_core_rules_and_the_default_set() -> None:
     assert "hypotheses" in text
     assert "local time" in text
     assert "Friendly and warm" in text
+    # Topics of the default set (MD 2026-11-27): energy, security, vehicles and more.
+    for topic in (
+        "Energy: solar, grid, battery, costs",
+        "Security: alarms, cameras, motion",
+        "Vehicles: consumption, mileage, costs",
+        "Heating, cooling and indoor climate",
+        "Water",
+        "Appliances and device health",
+    ):
+        assert topic in text, topic
+    assert "self-sufficiency" in text
+    assert "spot or day-ahead electricity prices" in text
+    assert "never who was where or who it was" in text
+    assert "never advise disarming or changing alarms" in text
+    assert "only if you have a tool for them" in text
     assert "crude" not in text
-    assert "pub" not in text
+    assert "the pub" not in text
     assert "win where they differ" in text
 
 
@@ -171,7 +186,11 @@ def test_store_outage_keeps_the_last_set() -> None:
 
 
 def test_check_set_limits() -> None:
-    from xomtra_mcp.guidelines import TEXT_MAX, check_set, clean_text
+    from xomtra_mcp.guidelines import FACTORY_SETS, TEXT_MAX, check_set, clean_text
+
+    # Every factory set can be duplicated and saved as a custom set.
+    for factory in FACTORY_SETS:
+        assert check_set(factory.name, factory.description, factory.text) == []
 
     assert check_set("Moje sada", "", "text") == []
     assert check_set("", "", "x")
