@@ -27,7 +27,7 @@ class AdminSettings(BaseSettings):
     # Address of the Supervisor's Ingress proxy, the only peer trusted with
     # auth_mode=ingress (Home Assistant's fixed address in the hassio network).
     ingress_proxy: str = "172.30.32.2"
-    # Dagster UI under /admin/dagster/ (full edition); the lite edition has none.
+    # Unused since 0.9.2 (no Dagster link in the menu); kept so that old .env files work.
     dagster_ui: bool = True
 
     base_url: AnyHttpUrl | None = None

@@ -1,7 +1,7 @@
 configuration:
   log_level:
     name: Úroveň logování
-    description: Úroveň logování služeb xomtra.
+    description: Úroveň logování služeb xomtry.
   states_retention_days:
     name: Historie stavů (dny)
     description: Kolik dní historie stavů se drží v lake.

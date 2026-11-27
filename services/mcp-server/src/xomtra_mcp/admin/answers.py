@@ -136,13 +136,20 @@ class AnswersPage:
     @staticmethod
     def _intro() -> str:
         return (
+            "<p class=warn><strong>Style of the answers</strong>"
+            "<span class=more>"
+            "By default xomtra asks the assistant for relevant answers with charts or tables "
+            "and a friendly tone. Choose another set below or write your own; a change "
+            "applies within 30 seconds, without a restart."
+            "</span><span class=more>"
+            "Core rules always apply: no jokes about accidents or threats to life and "
+            "health, nothing sexist, racist, homophobic, xenophobic, political or religious."
+            "</span></p>"
             "<p class=muted>xomtra gives the assistant the core rules and the active set "
-            "of answer guidelines with the results of server_info, get_findings and "
-            "get_weekly_summary. A change applies within 30 seconds, without a restart; "
-            "nothing comes from xomtra.com.</p>"
-            "<p class=muted>The sets are guidance for the assistant, not a security "
-            "boundary: roles, hidden entities, read only access and the audit are "
-            "enforced by xomtra itself.</p>"
+            "with the results of server_info, get_findings and get_weekly_summary; nothing "
+            "comes from xomtra.com. The sets are guidance for the assistant, not a security "
+            "boundary: roles, hidden entities, read only access and the audit are enforced "
+            "by xomtra itself.</p>"
             "<details><summary>Core rules (always apply, cannot be changed)</summary>"
             f"<pre class=set>{e(CORE_GUIDELINES)}</pre></details>"
         )
@@ -159,7 +166,7 @@ class AnswersPage:
             if is_active:
                 name += " <span class=badge>active</span>"
             open_link = (
-                "shown"
+                "shown below"
                 if answer_set.id == shown
                 else f"<a href='{prefix()}/answers?set={e(answer_set.id)}'>Open</a>"
             )
@@ -220,7 +227,8 @@ class AnswersPage:
             return (
                 head + "<p class=muted>A factory set comes with xomtra and changes with updates. "
                 "Duplicate it to write your own.</p>"
-                + f"<pre class=set>{e(text)}</pre>"
+                + "<details><summary>Text of the set</summary>"
+                + f"<pre class=set>{e(text)}</pre></details>"
                 + duplicate
             )
         newer = ""

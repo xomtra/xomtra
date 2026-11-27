@@ -17,7 +17,7 @@ from xomtra_mcp.admin.config import PREFIX
 @dataclass(frozen=True, slots=True)
 class View:
     prefix: str = PREFIX
-    dagster: bool = True  # Dagster UI under <prefix>/dagster/ (full edition only)
+    access: bool = False  # the page Access (Claude connector, public mode with HA sign-in)
     sign_out: bool = True  # no own session behind Ingress, HA signs the user in
     endpoint: str | None = None  # MCP endpoint guessed from the request (Ingress)
     lang: str = "en"  # GUI language (cs, de, en, nl, pl), see i18n.py

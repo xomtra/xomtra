@@ -153,7 +153,7 @@ BACKUP_NOTE = (
 )
 
 
-# Shown on the token pages: the local access mode only serves clients in the LAN.
+# Shown on the page Connect clients: the local access mode only serves clients in the LAN.
 CLIENTS_NOTE = (
     "<p class=warn><strong>Which AI assistants can connect</strong>"
     "<span class=more>"
@@ -168,19 +168,6 @@ CLIENTS_NOTE = (
     "and other cloud assistants are not supported yet."
     "</span></p>"
 )
-
-# Shown with CLIENTS_NOTE: the answers follow the active set of the page Answers (ADR 090).
-ANSWERS_NOTE = (
-    "<p class=warn><strong>Style of the answers</strong>"
-    "<span class=more>"
-    "By default xomtra asks the assistant for relevant answers with charts or tables "
-    "and a friendly tone. Choose another set or write your own on the page Answers; it "
-    "applies within 30 seconds. Core rules always apply: no jokes about accidents or "
-    "threats to life and health, nothing sexist, racist, homophobic, xenophobic, "
-    "political or religious."
-    "</span></p>"
-)
-
 
 # Opening tag of a POST form in the GUI's HTML (the CSRF field goes right after it).
 _POST_FORM = re.compile(rb"<form\b[^>]*\bmethod=[\"']?post\b[^>]*>", re.IGNORECASE)
@@ -598,9 +585,9 @@ class AdminApp:
                 {1, 2},
             )
         else:
-            body += "<p class=muted>No profile yet (job catalog_daily).</p>"
+            body += "<p class=muted>No profile yet; the catalog is profiled once a day.</p>"
         drift = lake.get("drift_7d") or []
-        body += "<h2>Drift, last 7 days</h2>" + (
+        body += "<h2>Entity changes, last 7 days</h2>" + (
             table(["type", "count"], [(d["drift_type"], d["n"]) for d in drift], {1})
             if drift
             else "<p class=muted>None.</p>"
@@ -669,35 +656,45 @@ class AdminApp:
     async def drift(self, request: Request, user: dict[str, Any]) -> Response:
         data = self.data
         if data is None:
-            return self._no_data(user, "Drift")
+            return self._no_data(user, "Entity changes")
         rows = await asyncio.to_thread(status.drift_rows, data)
         cols = ["detected_at", "entity_id", "drift_type", "field", "old_value", "new_value"]
         body = "<p class=muted>Last 30 days</p>" + table(cols, [[r[c] for c in cols] for r in rows])
-        return HTMLResponse(page("Drift", body, user.get("username")))
+        return HTMLResponse(page("Entity changes", body, user.get("username")))
 
     async def retention(self, request: Request, user: dict[str, Any]) -> Response:
         s = self.settings
         now = datetime.now(UTC)
         periods = [
-            ("States", "XOMTRA_STATES_RETENTION_DAYS", s.states_retention_days),
+            ("States", "STATES_RETENTION_DAYS", s.states_retention_days),
             (
                 "5-minute statistics",
-                "XOMTRA_STATISTICS_5MIN_RETENTION_DAYS",
+                "STATISTICS_5MIN_RETENTION_DAYS",
                 s.statistics_5min_retention_days,
             ),
             (
                 "Hourly statistics",
-                "XOMTRA_STATISTICS_HOUR_RETENTION_DAYS",
+                "STATISTICS_HOUR_RETENTION_DAYS",
                 s.statistics_hour_retention_days,
             ),
         ]
-        body = (
-            "<p class=muted>Applied daily at 03:30 by the Dagster job retention_daily; data "
-            "files disappear after the snapshot retention (7 days). Change the values in "
-            "<code>.env</code> and restart the ingest containers.</p>"
-        )
+        if self.ingress:
+            # The add-on's options carry the same names in lower case (xomtra-env).
+            periods = [(n, v.lower(), d) for n, v, d in periods]
+            body = (
+                "<p class=muted>Applied daily at 03:30; the data files disappear 7 days "
+                "later. Change the days in the add-on's Configuration tab; the add-on "
+                "restarts with them.</p>"
+            )
+        else:
+            periods = [(n, f"XOMTRA_{v}", d) for n, v, d in periods]
+            body = (
+                "<p class=muted>Applied daily at 03:30 (job retention_daily); the data files "
+                "disappear 7 days later. Change the values in <code>.env</code> and restart "
+                "the ingest containers.</p>"
+            )
         body += table(
-            ["data", "variable", "days", "deleted before"],
+            ["data", "option" if self.ingress else "variable", "days", "deleted before"],
             [(n, v, d, (now - timedelta(days=d)).date().isoformat()) for n, v, d in periods],
             {2},
         )
@@ -725,7 +722,7 @@ class AdminApp:
             "arguments",
             "error",
         ]
-        body = "<p class=muted>Last 200 calls (MCP tools and this GUI)</p>"
+        body = "<p class=muted>Last 200 calls (MCP tools and this admin)</p>"
         if rows is None:
             body += "<p class=warn>The audit database is not configured for the admin GUI.</p>"
         else:
@@ -813,11 +810,12 @@ class AdminApp:
             body = "<p class=bad>The settings store is unavailable.</p>"
             return HTMLResponse(page(title, body, user.get("username")), 503)
         body = note + (
+            "<p class=warn>If the findings work for you, leave these settings as they are."
+            "</p>"
             "<p class=muted>A stored value wins over the ingest's environment variable, which "
-            "wins over the default. The next analysis run (daily) uses it; no restart. "
-            "The thresholds set the rate of false findings, not their number (ADR 060, "
-            "062): a larger home rightly finds more.</p>"
-            "<p class=muted><small>Don't change it, if it works.</small></p>"
+            "wins over the default. The next analysis run (daily) uses it, without a "
+            "restart. The thresholds set the share of false findings, not their number: a "
+            "larger home rightly finds more.</p>"
         )
         if any(k in BY_KEY for k in current):
             body += (
@@ -964,15 +962,14 @@ class AdminApp:
             for t in ("", *FINDING_TYPES)
         )
         body = note + (
-            "<p class=muted>A dismissed finding is flagged <code>dismissed</code> from the "
-            "next analysis run on and hidden like the other flags (Claude sees it only with "
-            "<code>include_flagged</code>). It applies to the pair of entities (correlation) "
-            "or the entity (anomaly, change point) in every window, until undone or the "
-            "chosen date.</p>"
+            "<p class=muted>A dismissed finding is hidden from the next analysis run on, in "
+            "every window, until you undo it or until the chosen date: for a correlation the "
+            "pair of entities, for an anomaly or a change point the entity. Claude sees it "
+            "only when it asks for flagged findings too.</p>"
             "<form class=filters method=get>"
             f"<select name=type>{options}</select>"
             f"<label><input type=checkbox name=flagged value=1{' checked' if flagged else ''}>"
-            " include flagged</label><button>Filter</button></form>"
+            " including flagged</label><button>Filter</button></form>"
         )
         until = "".join(
             f"<option value={d}>{f'{d} days' if d else 'for good'}</option>" for d in DISMISS_DAYS
@@ -1077,7 +1074,7 @@ class AdminApp:
             out += (
                 "<p class=warn>Low power: with few series or few entities in an area the "
                 "false correlations are strong ones with a shared cause the analysis cannot "
-                "see, so a stricter threshold does not help (ADR 067). Assign the entities "
+                "see, so a stricter threshold does not help. Assign the entities "
                 "below to areas in Home Assistant; that measurably lowers the false "
                 "findings.</p>"
             )
@@ -1170,6 +1167,15 @@ class AdminApp:
 
     # ---- personal tokens and client setup (local access, ADR 056/059) ---------------
 
+    def _entra_note(self) -> str:
+        """Who may use xomtra with Entra ID (there is no page Access then)."""
+        if self.settings.auth_mode != "entra":
+            return ""
+        return (
+            "<p class=muted>With Entra ID, who may use xomtra and with which role is set in "
+            "Entra (app roles of the enterprise application). Sign-ins end in Entra too.</p>"
+        )
+
     def _local_only(self, user: dict[str, Any], title: str) -> Response | None:
         if self.settings.access_mode == "local" and self.tokens is not None:
             return None
@@ -1177,7 +1183,7 @@ class AdminApp:
             "<p class=warn>Personal tokens are used only in the local access mode "
             "(<code>XOMTRA_ACCESS_MODE=local</code>, see docs/setup/local-access.md). "
             "In the public mode, Claude connects with OAuth (docs/setup/claude-connector.md)."
-            "</p>"
+            "</p>" + self._entra_note()
         )
         return HTMLResponse(page(title, body, user.get("username")))
 
@@ -1229,16 +1235,18 @@ class AdminApp:
         body = (
             "<p class=muted>Each person or device gets its own token. A token is shown once; "
             "only its hash is stored. Revoked tokens stop working within 30 seconds.</p>"
-            + CLIENTS_NOTE
-            + ANSWERS_NOTE
-            + token_flow(prefix(), MCPB_FILENAME)
+            + self._entra_note()
+            + "<p class=muted>Only assistants on a computer in your local network can "
+            "connect, such as Claude Desktop and Claude Code; claude.ai on the web and ChatGPT "
+            f"cannot. <a href='{prefix()}/connect'>How to connect Claude and other MCP "
+            "clients</a></p>"
+            + token_flow()
             + form
             + table(
                 ["id", "for", "description", "role", "created", "expires", "last used", ""],
                 rows,
                 trusted_html={7},
             )
-            + f"<p><a href='{prefix()}/connect'>How to connect Claude and other MCP clients</a></p>"
         )
         return HTMLResponse(page("Tokens", body, user.get("username")))
 
@@ -1296,6 +1304,8 @@ class AdminApp:
             "<strong>Copy it now, it is not shown again.</strong></p>"
             f"<p><input class=token readonly size=80 value='{e(token)}'></p>"
             + self._connect_help(token)
+            + "<p class=muted>claude.ai on the web and on phones connects through Anthropic's "
+            "servers and needs the public access mode (docs/setup/claude-connector.md).</p>"
             + f"<p><a href='{prefix()}/tokens'>Back to tokens</a></p>"
         )
         return HTMLResponse(page("New token", body, user.get("username")))
@@ -1327,24 +1337,23 @@ class AdminApp:
 
     # ---- access of the Claude connector (ADR 081) ------------------------------------
 
+    def has_access_page(self) -> bool:
+        """The page Access exists for the Claude connector with Home Assistant sign-in
+        (public mode, ADR 081); otherwise its few words are on the page Tokens."""
+        return (
+            self.settings.auth_mode != "entra"
+            and self.settings.access_mode == "public"
+            and not self.ingress
+        )
+
     def _access_refused(self, user: dict[str, Any]) -> Response | None:
-        if self.settings.auth_mode == "entra":
-            text = (
-                "With Entra ID, who may use xomtra and with which role is set in Entra "
-                "(app roles of the enterprise application). Sign-ins end in Entra too."
-            )
-        elif self.settings.access_mode == "local" or self.ingress:
-            text = (
-                "In the local access mode, Claude and other MCP clients connect with "
-                "personal tokens; issue and revoke them on the page Tokens."
-            )
-        elif self.access is None:
+        if not self.has_access_page():
+            return RedirectResponse(f"{prefix()}/tokens", status_code=303)
+        if self.access is None:
             return HTMLResponse(
                 page("Access", "<p class=bad>The access store is unavailable.</p>", None), 503
             )
-        else:
-            return None
-        return HTMLResponse(page("Access", f"<p class=muted>{e(text)}</p>", user.get("username")))
+        return None
 
     async def access_page(self, request: Request, user: dict[str, Any]) -> Response:
         refused = self._access_refused(user)
@@ -1558,8 +1567,6 @@ class AdminApp:
             + "<h2>Other MCP clients</h2>"
             "<p>Streamable HTTP endpoint with a bearer token, e.g.:</p>"
             f"<pre>{e(server)}</pre>"
-            "<p class=muted>claude.ai on the web and on phones connects through Anthropic's "
-            "servers and needs the public access mode (docs/setup/claude-connector.md).</p>"
         )
 
     async def connect_page(self, request: Request, user: dict[str, Any]) -> Response:
@@ -1568,7 +1575,7 @@ class AdminApp:
             return refused
         body = (
             f"<p>Issue a personal token on <a href='{prefix()}/tokens'>Tokens</a> first, one "
-            "per person and device.</p>" + CLIENTS_NOTE + ANSWERS_NOTE + self._connect_help()
+            "per person and device.</p>" + CLIENTS_NOTE + self._connect_help()
         )
         return HTMLResponse(page("Connect clients", body, user.get("username")))
 
@@ -1828,7 +1835,7 @@ class AdminApp:
             Route(f"{PREFIX}/auth/check", self.check),
             Route(f"{PREFIX}/logout", self.logout, methods=["POST"]),
         ]
-        return RequestView(Starlette(routes=routes), self.settings)
+        return RequestView(Starlette(routes=routes), self.settings, self.has_access_page())
 
 
 def _lang(scope: Scope) -> str:
@@ -1850,11 +1857,11 @@ class RequestView:
     ``/admin`` prefix, which is put back here so that the routes stay the same.
     """
 
-    def __init__(self, app: ASGIApp, settings: AdminSettings) -> None:
+    def __init__(self, app: ASGIApp, settings: AdminSettings, access_page: bool) -> None:
         self.app = app
         self.ingress = settings.auth_mode == "ingress"
         self.proxy = settings.ingress_proxy
-        self.base = View(dagster=settings.dagster_ui and not self.ingress)
+        self.base = View(access=access_page)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         lang = _lang(scope)
@@ -1883,7 +1890,7 @@ class RequestView:
         token = view.current.set(
             View(
                 prefix=ingress_path,
-                dagster=False,
+                access=False,
                 sign_out=False,
                 endpoint=endpoint,
                 lang=lang,

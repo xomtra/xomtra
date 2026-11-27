@@ -265,7 +265,9 @@ async def test_tokens_page_explains_the_flow_with_actions() -> None:
     async with client_for(app) as client:
         resp = await client.get("/tokens", headers=HA)
     assert "<figure class='flow'>" in resp.text
-    assert f"href='{INGRESS}/connect/xomtra.mcpb' download" in resp.text
+    # The download is on the page of a new token, not in the picture.
+    assert "xomtra.mcpb" not in resp.text
+    assert "Style of the answers" not in resp.text  # on the page Answers
     assert "href='#issue'" in resp.text
     assert "<form id=issue " in resp.text
     # Readable without the stylesheet too (a stale cache): every shape has its own
@@ -303,7 +305,7 @@ async def test_gui_follows_the_language_cookie_and_accept_language() -> None:
         en = await client.get("/", headers={**HA, "accept-language": "fr-FR"})
     assert "<html lang=cs>" in cs.text
     assert "<h1>Přehled</h1>" in cs.text
-    assert "Zálohy Home Assistantu neobsahují analytiku xomtra" in cs.text
+    assert "Zálohy Home Assistantu neobsahují analytiku xomtry" in cs.text
     assert "Home Assistant backups do not include" not in cs.text
     assert ">Vydat token</button>" in tokens.text
     assert "placeholder='pro koho'" in tokens.text

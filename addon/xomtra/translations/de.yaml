@@ -14,8 +14,8 @@ configuration:
   mcp_url:
     name: MCP-Adresse
     description: >-
-      MCP-Endpunkt, wie Clients in Ihrem Netz ihn erreichen, zum Beispiel
+      MCP-Endpunkt, wie Clients in deinem Netz ihn erreichen, zum Beispiel
       http://homeassistant.local:8000/mcp. Leer: Die Verwaltung leitet ihn aus der
-      Adresse ab, unter der Sie Home Assistant geöffnet haben.
+      Adresse ab, unter der du Home Assistant geöffnet hast.
 network:
   8000/tcp: MCP-Endpunkt im LAN (persönliche Zugriffstokens)

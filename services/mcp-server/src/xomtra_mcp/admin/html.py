@@ -215,18 +215,19 @@ MARK = (
     'stroke="var(--surface)" stroke-width="2"/></svg>'
 )
 
+# Most used first: what xomtra found, how it answers and who may ask; then the data
+# behind it and the settings.
 NAV = (
     ("/", "Overview"),
-    ("/catalog", "Catalog"),
-    ("/drift", "Drift"),
-    ("/retention", "Retention"),
     ("/findings", "Findings"),
-    ("/analysis", "Analysis settings"),
     ("/answers", "Answers"),
-    ("/audit", "Audit"),
     ("/tokens", "Tokens"),
     ("/access", "Access"),
-    ("/dagster/", "Dagster"),
+    ("/catalog", "Catalog"),
+    ("/drift", "Entity changes"),
+    ("/retention", "Retention"),
+    ("/analysis", "Analysis settings"),
+    ("/audit", "Audit"),
 )
 
 
@@ -262,7 +263,7 @@ FOOTER = (
 
 def page(title: str, body: str, user: str | None) -> str:
     v = view.current.get()
-    nav = (item for item in NAV if v.dagster or item[0] != "/dagster/")
+    nav = (item for item in NAV if v.access or item[0] != "/access")
     links = "".join(
         f'<a href="{v.prefix}{path}"{" aria-current=page" if label == title else ""}>'
         f"{escape(label)}</a>"
@@ -449,39 +450,35 @@ XOMTRA = (
 HA = ("Home Assistant", ("entities, states", "and statistics"), "read only")
 
 
-def token_flow(prefix: str, mcpb: str) -> str:
+def token_flow() -> str:
     """How a token connects an LLM agent, xomtra and Home Assistant (Tokens page).
 
-    The boxes carry the page's actions: download the Claude Desktop extension on the
-    agent, issue a token on xomtra (jumps to the form, ``#issue``).
+    The xomtra box carries the page's action: issue a token (jumps to the form,
+    ``#issue``); the page of the new token has the Claude Desktop download. The arrow
+    labels sit above and below the boxes (``top``), so that longer translations run
+    over the gap between the boxes, never into a box.
     """
-    get = _hotspot(
-        22, 144, 210, f"{prefix}/connect/{mcpb}", "↓ Claude Desktop extension", download=True
-    )
-    issue = _hotspot(363, 144, 170, "#issue", "+ Issue a token")
-    get_t = _hotspot(
-        38, 86, 210, f"{prefix}/connect/{mcpb}", "↓ Claude Desktop extension", download=True
-    )
+    top = 58
+    issue = _hotspot(363, top + 104, 170, "#issue", "+ Issue a token")
     issue_t = _hotspot(38, 316, 170, "#issue", "+ Issue a token")
     wide = (
-        "<svg class='wide' viewBox='0 0 960 236' role='img' aria-labelledby='flow-t'>"
+        f"<svg class='wide' viewBox='0 0 960 {top + 214}' role='img' aria-labelledby='flow-t'>"
         "<title id='flow-t'>LLM agent sends requests with the token to xomtra; xomtra answers "
         "from its own copy of the Home Assistant history, which it reads from Home Assistant."
         "</title>"
         + _defs("w")
-        + _box(4, 40, 270, 150, title=AGENT[0], lines=AGENT[1], mono=AGENT[2])
-        + _box(345, 40, 270, 150, title=XOMTRA[0], lines=XOMTRA[1], us=True, mono=XOMTRA[2])
-        + _box(686, 40, 270, 150, title=HA[0], lines=HA[1], mono=HA[2])
-        + get
+        + _box(4, top, 270, 150, title=AGENT[0], lines=AGENT[1], mono=AGENT[2])
+        + _box(345, top, 270, 150, title=XOMTRA[0], lines=XOMTRA[1], us=True, mono=XOMTRA[2])
+        + _box(686, top, 270, 150, title=HA[0], lines=HA[1], mono=HA[2])
         + issue
-        + _line("ln req", "wb", "M278 88H339")
-        + _label(280, 24, "1 request")
+        + _line("ln req", "wb", f"M278 {top + 48}H339")
+        + _label(280, 22, "1 request")
         + _label(280, 38, "+ Bearer token")
-        + _line("ln", "wa", "M341 142H282")
-        + _label(280, 212, "2 answer: data,")
-        + _label(280, 226, "findings")
-        + _line("ln ro", "wa", "M682 115H621")
-        + _label(621, 24, "3 reads")
+        + _line("ln", "wa", f"M341 {top + 102}H282")
+        + _label(280, top + 176, "2 answer: data,")
+        + _label(280, top + 192, "findings")
+        + _line("ln ro", "wa", f"M682 {top + 75}H621")
+        + _label(621, 22, "3 reads")
         + _label(621, 38, "continuously")
         + "</svg>"
     )
@@ -495,7 +492,6 @@ def token_flow(prefix: str, mcpb: str) -> str:
         + _box(20, 0, 290, 130, title=AGENT[0], lines=AGENT[1], mono=AGENT[2])
         + _box(20, 210, 290, 150, title=XOMTRA[0], lines=XOMTRA[1], us=True, mono=XOMTRA[2])
         + _box(20, 440, 290, 120, title=HA[0], lines=HA[1], mono=HA[2])
-        + get_t
         + issue_t
         + _line("ln req", "tb", "M110 134V204")
         + _label(120, 165, "1 request")
@@ -508,7 +504,7 @@ def token_flow(prefix: str, mcpb: str) -> str:
     )
     return (
         f"<figure class='flow'>{wide}{tall}<figcaption>Issue a token and paste it into the "
-        "agent; for Claude Desktop download the extension, it asks for the token. The agent "
+        "agent; the page of the new token has the download for Claude Desktop. The agent "
         "sends every request with it to xomtra (1); xomtra checks it and answers with data "
         "and findings within the token's role (2). xomtra reads Home Assistant on its own "
         "and only reads (3): the agent never talks to Home Assistant and cannot switch "

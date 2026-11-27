@@ -162,6 +162,8 @@ async def test_tokens_issue_list_revoke_and_mcpb(fake_ha: tuple[FakeHA, str]) ->
         token = issued.text.split("value='", 1)[1].split("'", 1)[0]
         assert token.startswith("xmt_")
         assert "claude mcp add --transport http xomtra https://xomtra.lan/mcp" in issued.text
+        assert "href='/admin/connect/xomtra.mcpb' download" in issued.text
+        assert "Download for Claude Desktop" in issued.text
         assert "&lt;laptop&gt;" in issued.text
         assert issued.headers["cache-control"] == "no-store"
         info = store.verify(token_hash(token))
@@ -295,6 +297,7 @@ async def test_access_page_roles_and_disconnect(fake_ha: tuple[FakeHA, str]) -> 
         await sign_in(client)
         page = await client.get("/admin/access")
         assert page.status_code == 200
+        assert 'href="/admin/access"' in page.text  # in the menu in the public mode
         assert "Home Assistant administrator" in page.text
         assert "Petr" in page.text
         assert "Disconnect" in page.text
@@ -323,15 +326,18 @@ async def test_access_page_roles_and_disconnect(fake_ha: tuple[FakeHA, str]) -> 
     assert "admin:access_disconnect" in tools
 
 
-async def test_access_page_explains_other_modes(fake_ha: tuple[FakeHA, str]) -> None:
+async def test_no_access_page_in_the_local_mode(fake_ha: tuple[FakeHA, str]) -> None:
+    """With personal tokens the page Access had only a sentence: Tokens is enough."""
     fake, url = fake_ha
     fake.results["auth/current_user"] = {"id": "u1", "name": "Jana", "is_admin": True}
     app, _, _ = make_app(url, FakeHAHttp())  # local access mode
     async with client_for(app) as client:
         await sign_in(client)
         page = await client.get("/admin/access")
-        assert page.status_code == 200
-        assert "personal tokens" in page.text
+        assert page.status_code == 303
+        assert page.headers["location"] == "/admin/tokens"
+        tokens = await client.get("/admin/tokens")
+        assert "/admin/access" not in tokens.text  # not in the menu
 
 
 PEM = b"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"

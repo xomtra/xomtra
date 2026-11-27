@@ -11,6 +11,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-27
+
 ### Added
 
 - Claude Desktop without trusting a certificate: in the local access mode the extension
@@ -23,8 +25,30 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   before a new installation of the server says to download it again. Claude Code and
   other clients still need the CA trusted as described in docs/setup/local-access.md.
 
+  Upgrade note (Docker compose): take the new `deploy/compose/compose.yaml` together
+  with the new images (it sets `XOMTRA_LOCAL_CA_URL`), then `docker compose up -d`.
+  With an older compose file the download keeps working, only without the certificate.
+
 ### Changed
 
+- Admin GUI, clearer structure and texts: the menu starts with Findings, Answers and
+  Tokens; Drift is called Entity changes; the page Answers has one introduction and folds
+  the text of a factory set; Tokens says in one line which assistants can connect (the
+  details stay on Connect clients); Analysis settings opens with the advice to leave
+  working settings alone and no longer cites ADR numbers; Retention in the add-on names
+  the add-on's options instead of Dagster and `.env`; Findings explains a dismissal
+  without internal names and translates its columns and types. Czech and German texts
+  reviewed (German now uses "du", as Home Assistant does).
+- Admin GUI, Tokens: the picture of the flow no longer has the Claude Desktop button
+  (the page of a new token has the download), and the arrow labels sit above and below
+  the boxes, so that longer translations no longer run into them. The note on the style
+  of the answers moved from Tokens and Connect clients to the page Answers.
+- Admin GUI (Docker compose): the menu no longer links to the Dagster UI; it stays
+  reachable for administrators at `/admin/dagster/`.
+- Admin GUI: the page Access is in the menu only where it has something to manage (the
+  Claude connector with Home Assistant sign-in, public mode). With personal tokens, the
+  add-on or Entra ID it had only a sentence; `/admin/access` leads to Tokens, which
+  carries the Entra note.
 - Admin GUI: when Home Assistant cannot be reached (setup page and Overview), a sentence
   says why and what to try, in every language of the admin GUI: `https://` on a plain
   HTTP port ("try http://"), an untrusted certificate, a name this server cannot
@@ -592,7 +616,8 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/xomtra/xomtra/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/xomtra/xomtra/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/xomtra/xomtra/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/xomtra/xomtra/compare/v0.7.1...v0.8.0

@@ -136,7 +136,7 @@ SPECS: tuple[Spec, ...] = (
         "v2",
         CORR,
         "Method",
-        "v2 = calibrated significance and structural flags (ADR 062); v1 = ADR 042.",
+        "v2 = calibrated significance and structural flags; v1 = the original method.",
         choices=("v2", "v1"),
     ),
     Spec(
@@ -145,8 +145,8 @@ SPECS: tuple[Spec, ...] = (
         "hide",
         CORR,
         "Indirect and common-factor relations",
-        "hide = like the other flags; lower = shown after the unflagged findings; "
-        "show = among them (ADR 068).",
+        "hide = like the other flags; lower = shown after the findings without flags; "
+        "show = among them.",
         choices=("hide", "lower", "show"),
     ),
     Spec("anomalies_enabled", "bool", True, ANOM, "Anomalies and change points"),
@@ -199,7 +199,8 @@ SPECS: tuple[Spec, ...] = (
         "v2",
         ANOM,
         "Method",
-        "v2 = conformal p-values and FDR over series (ADR 062); v1 = ADR 046.",
+        "v2 = conformal p-values and FDR over series; v1 = the original method "
+        "(fixed |z| threshold).",
         choices=("v2", "v1"),
     ),
     Spec(
