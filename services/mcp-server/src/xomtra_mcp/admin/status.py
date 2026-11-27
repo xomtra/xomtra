@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import socket
+import ssl
 import time
+from collections.abc import Callable
 from typing import Any
 
 import duckdb
+from websockets.exceptions import InvalidMessage, InvalidStatus, InvalidURI
 
-from hacore import HAClient, HAError, fetch_registries
+from hacore import HAAuthError, HAClient, HAError, HAProtocolError, fetch_registries
 from xomtra_mcp.data import DataAccess, jsonable
 
 type Row = dict[str, Any]
@@ -23,7 +28,12 @@ async def ha_status(url: str | None, token: str | None) -> Row:
             snapshot = await fetch_registries(ha)
             version = ha.ha_version
     except (HAError, TimeoutError, OSError) as err:
-        return {"configured": True, "ok": False, "error": f"{type(err).__name__}: {err}"[:300]}
+        return {
+            "configured": True,
+            "ok": False,
+            "error": explain(err),
+            "detail": f"{type(err).__name__}: {err}"[:300],
+        }
     return {
         "configured": True,
         "ok": True,
@@ -33,6 +43,84 @@ async def ha_status(url: str | None, token: str | None) -> Row:
         "devices": len(snapshot.devices),
         "entities": sum(snapshot.domain_counts().values()),
     }
+
+
+def _causes(err: BaseException) -> list[BaseException]:
+    chain: list[BaseException] = []
+    current: BaseException | None = err
+    while current is not None and current not in chain:
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    return chain
+
+
+# OpenSSL reasons when an https:// address reaches a plain HTTP server.
+_PLAIN_HTTP = {"WRONG_VERSION_NUMBER", "RECORD_LAYER_FAILURE", "PACKET_LENGTH_TOO_LONG"}
+
+
+def _timed_out(c: BaseException) -> bool:
+    return isinstance(c, TimeoutError) or (
+        isinstance(c, OSError) and c.errno in (errno.EHOSTUNREACH, errno.ENETUNREACH)
+    )
+
+
+# The first cause in the chain that matches decides the sentence (translated in the GUI).
+_EXPLANATIONS: list[tuple[Callable[[BaseException], bool], str]] = [
+    (
+        lambda c: isinstance(c, HAAuthError),
+        "Home Assistant rejected the access token. Create a new long-lived access token "
+        "and paste it whole.",
+    ),
+    (
+        lambda c: isinstance(c, ssl.SSLCertVerificationError),
+        "This server does not trust the certificate of Home Assistant (self-signed, or "
+        "issued for another name). Use the http:// address in your network, or the name "
+        "the certificate was issued for.",
+    ),
+    (
+        lambda c: isinstance(c, ssl.SSLError) and c.reason in _PLAIN_HTTP,
+        "Home Assistant does not use HTTPS at this address. Try the same address with "
+        "http:// instead of https://.",
+    ),
+    (
+        lambda c: isinstance(c, socket.gaierror),
+        "This server cannot resolve the name in the address. Use the IP address of Home "
+        "Assistant instead, for example http://192.168.1.10:8123.",
+    ),
+    (
+        lambda c: isinstance(c, ConnectionRefusedError),
+        "Nothing answers on this address and port. Home Assistant normally uses the port 8123.",
+    ),
+    (
+        lambda c: isinstance(c, InvalidURI),
+        "The address is not valid. Enter it like http://192.168.1.10:8123.",
+    ),
+    (
+        lambda c: isinstance(
+            c, (InvalidStatus, InvalidMessage, HAProtocolError, ConnectionResetError)
+        ),
+        "Something other than Home Assistant answered at this address. Check the address "
+        "and the port; if Home Assistant uses HTTPS, use https://, and a reverse proxy "
+        "must pass WebSockets.",
+    ),
+    (
+        _timed_out,
+        "Home Assistant did not answer in time. Check that this server can reach it: the "
+        "address, the port and a firewall between them.",
+    ),
+]
+
+
+def explain(err: BaseException) -> str:
+    """A sentence for the admin GUI on why Home Assistant cannot be reached (translated).
+
+    The technical message stays next to it as a detail.
+    """
+    for cause in _causes(err):
+        for matches, sentence in _EXPLANATIONS:
+            if matches(cause):
+                return sentence
+    return "Home Assistant cannot be reached at this address."
 
 
 def _rows(cur: duckdb.DuckDBPyConnection, sql: str, params: Any = None) -> list[Row]:

@@ -101,7 +101,6 @@
    "History": "Historie",
    "Home Assistant URL": "URL Home Assistantu",
    "Home Assistant backups do not include xomtra's analytics. They keep the tokens, the settings and the dismissed findings, but not the lake: the history, the findings and the weekly summaries, which take tens of GB. After a restore xomtra starts a new lake and loads the history again from Home Assistant, only as far back as Home Assistant still keeps it, and computes the findings again.": "Zálohy Home Assistantu neobsahují analytiku xomtra. Uchovají tokeny, nastavení a odmítnuté nálezy, ale ne lake: historii, nálezy a týdenní shrnutí, které zabírají desítky GB. Po obnově xomtra založí nový lake, znovu načte historii z Home Assistantu, jen tak daleko, kolik ji Home Assistant ještě drží, a nálezy spočítá znovu.",
-   "Home Assistant did not accept the connection:": "Home Assistant spojení nepřijal:",
    "Home Assistant did not name an administrator for this request. Open xomtra from the Home Assistant sidebar as an administrator.": "Home Assistant pro tento požadavek neuvedl správce. Otevřete xomtra z bočního panelu Home Assistantu jako správce.",
    "Home Assistant is connected.": "Home Assistant je připojený.",
    "Home Assistant is not configured.": "Home Assistant není nastavený.",
@@ -306,7 +305,17 @@
    "shown": "zobrazeno",
    "xomtra gives the assistant the core rules and the active set of answer guidelines with the results of server_info, get_findings and get_weekly_summary. A change applies within 30 seconds, without a restart; nothing comes from xomtra.com.": "xomtra předává asistentovi základní pravidla a aktivní sadu pokynů k odpovědím ve výsledcích server_info, get_findings a get_weekly_summary. Změna platí do 30 sekund, bez restartu; z xomtra.com nepřichází nic.",
    "name": "název",
-   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Nejdřív relevantní data, odpověď na začátku, pak grafy nebo tabulky; témata energie, bezpečnost, vozidla, klima, voda, zařízení; přátelský tón."
+   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Nejdřív relevantní data, odpověď na začátku, pak grafy nebo tabulky; témata energie, bezpečnost, vozidla, klima, voda, zařízení; přátelský tón.",
+   "Home Assistant rejected the access token. Create a new long-lived access token and paste it whole.": "Home Assistant odmítl přístupový token. Vytvořte nový dlouhodobý přístupový token a vložte ho celý.",
+   "This server does not trust the certificate of Home Assistant (self-signed, or issued for another name). Use the http:// address in your network, or the name the certificate was issued for.": "Tento server nedůvěřuje certifikátu Home Assistantu (je podepsaný sám sebou nebo vydaný pro jiné jméno). Použijte adresu http:// ve vaší síti, nebo jméno, pro které byl certifikát vydán.",
+   "Home Assistant does not use HTTPS at this address. Try the same address with http:// instead of https://.": "Home Assistant na této adrese nepoužívá HTTPS. Zkuste stejnou adresu s http:// místo https://.",
+   "This server cannot resolve the name in the address. Use the IP address of Home Assistant instead, for example http://192.168.1.10:8123.": "Tento server nedokáže přeložit jméno v adrese. Použijte místo něj IP adresu Home Assistantu, například http://192.168.1.10:8123.",
+   "Nothing answers on this address and port. Home Assistant normally uses the port 8123.": "Na této adrese a portu nic neodpovídá. Home Assistant obvykle používá port 8123.",
+   "The address is not valid. Enter it like http://192.168.1.10:8123.": "Adresa není platná. Zadejte ji ve tvaru http://192.168.1.10:8123.",
+   "Something other than Home Assistant answered at this address. Check the address and the port; if Home Assistant uses HTTPS, use https://, and a reverse proxy must pass WebSockets.": "Na této adrese odpověděl někdo jiný než Home Assistant. Zkontrolujte adresu a port; pokud Home Assistant používá HTTPS, použijte https://, a reverzní proxy musí propouštět WebSockety.",
+   "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant neodpověděl včas. Zkontrolujte, že se k němu tento server dostane: adresu, port a firewall mezi nimi.",
+   "Home Assistant cannot be reached at this address.": "Home Assistant na této adrese není dostupný.",
+   "Details:": "Podrobnosti:"
   },
   "de": {
    "(address": "(Adresse",
@@ -370,7 +379,6 @@
    "History": "Verlauf",
    "Home Assistant URL": "Home-Assistant-URL",
    "Home Assistant backups do not include xomtra's analytics. They keep the tokens, the settings and the dismissed findings, but not the lake: the history, the findings and the weekly summaries, which take tens of GB. After a restore xomtra starts a new lake and loads the history again from Home Assistant, only as far back as Home Assistant still keeps it, and computes the findings again.": "Home-Assistant-Backups enthalten die Analysen von xomtra nicht. Sie sichern die Tokens, die Einstellungen und die verworfenen Befunde, aber nicht den Lake: den Verlauf, die Befunde und die Wochenübersichten, die Dutzende GB belegen. Nach einer Wiederherstellung legt xomtra einen neuen Lake an, lädt den Verlauf erneut aus Home Assistant, nur so weit zurück, wie Home Assistant ihn noch hat, und berechnet die Befunde neu.",
-   "Home Assistant did not accept the connection:": "Home Assistant hat die Verbindung nicht angenommen:",
    "Home Assistant did not name an administrator for this request. Open xomtra from the Home Assistant sidebar as an administrator.": "Home Assistant hat für diese Anfrage keinen Administrator genannt. Öffnen Sie xomtra als Administrator über die Seitenleiste von Home Assistant.",
    "Home Assistant is connected.": "Home Assistant ist verbunden.",
    "Home Assistant is not configured.": "Home Assistant ist nicht eingerichtet.",
@@ -576,7 +584,17 @@
    "shown": "angezeigt",
    "xomtra gives the assistant the core rules and the active set of answer guidelines with the results of server_info, get_findings and get_weekly_summary. A change applies within 30 seconds, without a restart; nothing comes from xomtra.com.": "xomtra gibt dem Assistenten die Grundregeln und das aktive Set der Antwortrichtlinien mit den Ergebnissen von server_info, get_findings und get_weekly_summary. Eine Änderung gilt innerhalb von 30 Sekunden ohne Neustart; von xomtra.com kommt nichts.",
    "name": "Name",
-   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Zuerst relevante Daten, Antwort vorneweg, dann Diagramme oder Tabellen; Themen Energie, Sicherheit, Fahrzeuge, Klima, Wasser, Geräte; freundlicher Ton."
+   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Zuerst relevante Daten, Antwort vorneweg, dann Diagramme oder Tabellen; Themen Energie, Sicherheit, Fahrzeuge, Klima, Wasser, Geräte; freundlicher Ton.",
+   "Home Assistant rejected the access token. Create a new long-lived access token and paste it whole.": "Home Assistant hat das Zugriffstoken abgelehnt. Erstelle ein neues langlebiges Zugriffstoken und füge es vollständig ein.",
+   "This server does not trust the certificate of Home Assistant (self-signed, or issued for another name). Use the http:// address in your network, or the name the certificate was issued for.": "Dieser Server vertraut dem Zertifikat von Home Assistant nicht (selbstsigniert oder für einen anderen Namen ausgestellt). Verwende die http://-Adresse in deinem Netzwerk oder den Namen, für den das Zertifikat ausgestellt wurde.",
+   "Home Assistant does not use HTTPS at this address. Try the same address with http:// instead of https://.": "Home Assistant verwendet unter dieser Adresse kein HTTPS. Versuche dieselbe Adresse mit http:// statt https://.",
+   "This server cannot resolve the name in the address. Use the IP address of Home Assistant instead, for example http://192.168.1.10:8123.": "Dieser Server kann den Namen in der Adresse nicht auflösen. Verwende stattdessen die IP-Adresse von Home Assistant, zum Beispiel http://192.168.1.10:8123.",
+   "Nothing answers on this address and port. Home Assistant normally uses the port 8123.": "Unter dieser Adresse und diesem Port antwortet nichts. Home Assistant verwendet normalerweise den Port 8123.",
+   "The address is not valid. Enter it like http://192.168.1.10:8123.": "Die Adresse ist ungültig. Gib sie in der Form http://192.168.1.10:8123 ein.",
+   "Something other than Home Assistant answered at this address. Check the address and the port; if Home Assistant uses HTTPS, use https://, and a reverse proxy must pass WebSockets.": "Unter dieser Adresse hat etwas anderes als Home Assistant geantwortet. Prüfe Adresse und Port; verwendet Home Assistant HTTPS, nimm https://, und ein Reverse Proxy muss WebSockets durchlassen.",
+   "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant hat nicht rechtzeitig geantwortet. Prüfe, ob dieser Server ihn erreicht: Adresse, Port und eine Firewall dazwischen.",
+   "Home Assistant cannot be reached at this address.": "Home Assistant ist unter dieser Adresse nicht erreichbar.",
+   "Details:": "Details:"
   },
   "nl": {
    "(address": "(adres",
@@ -640,7 +658,6 @@
    "History": "Geschiedenis",
    "Home Assistant URL": "Home Assistant-URL",
    "Home Assistant backups do not include xomtra's analytics. They keep the tokens, the settings and the dismissed findings, but not the lake: the history, the findings and the weekly summaries, which take tens of GB. After a restore xomtra starts a new lake and loads the history again from Home Assistant, only as far back as Home Assistant still keeps it, and computes the findings again.": "Back-ups van Home Assistant bevatten de analyses van xomtra niet. Ze bewaren de tokens, de instellingen en de afgewezen bevindingen, maar niet het lake: de geschiedenis, de bevindingen en de weekoverzichten, samen tientallen GB. Na een herstel begint xomtra een nieuw lake, laadt de geschiedenis opnieuw uit Home Assistant, alleen zo ver terug als Home Assistant die nog bewaart, en berekent de bevindingen opnieuw.",
-   "Home Assistant did not accept the connection:": "Home Assistant heeft de verbinding niet geaccepteerd:",
    "Home Assistant did not name an administrator for this request. Open xomtra from the Home Assistant sidebar as an administrator.": "Home Assistant noemde geen beheerder voor dit verzoek. Open xomtra als beheerder via de zijbalk van Home Assistant.",
    "Home Assistant is connected.": "Home Assistant is verbonden.",
    "Home Assistant is not configured.": "Home Assistant is niet ingesteld.",
@@ -845,7 +862,17 @@
    "shown": "getoond",
    "xomtra gives the assistant the core rules and the active set of answer guidelines with the results of server_info, get_findings and get_weekly_summary. A change applies within 30 seconds, without a restart; nothing comes from xomtra.com.": "xomtra geeft de assistent de basisregels en de actieve set antwoordrichtlijnen mee met de resultaten van server_info, get_findings en get_weekly_summary. Een wijziging geldt binnen 30 seconden, zonder herstart; van xomtra.com komt niets.",
    "name": "naam",
-   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Eerst relevante gegevens, het antwoord vooraan, dan grafieken of tabellen; onderwerpen energie, beveiliging, voertuigen, klimaat, water, apparaten; vriendelijke toon."
+   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Eerst relevante gegevens, het antwoord vooraan, dan grafieken of tabellen; onderwerpen energie, beveiliging, voertuigen, klimaat, water, apparaten; vriendelijke toon.",
+   "Home Assistant rejected the access token. Create a new long-lived access token and paste it whole.": "Home Assistant heeft het toegangstoken geweigerd. Maak een nieuw langlevend toegangstoken aan en plak het volledig.",
+   "This server does not trust the certificate of Home Assistant (self-signed, or issued for another name). Use the http:// address in your network, or the name the certificate was issued for.": "Deze server vertrouwt het certificaat van Home Assistant niet (zelfondertekend of uitgegeven voor een andere naam). Gebruik het http://-adres in je netwerk, of de naam waarvoor het certificaat is uitgegeven.",
+   "Home Assistant does not use HTTPS at this address. Try the same address with http:// instead of https://.": "Home Assistant gebruikt op dit adres geen HTTPS. Probeer hetzelfde adres met http:// in plaats van https://.",
+   "This server cannot resolve the name in the address. Use the IP address of Home Assistant instead, for example http://192.168.1.10:8123.": "Deze server kan de naam in het adres niet opzoeken. Gebruik in plaats daarvan het IP-adres van Home Assistant, bijvoorbeeld http://192.168.1.10:8123.",
+   "Nothing answers on this address and port. Home Assistant normally uses the port 8123.": "Op dit adres en deze poort antwoordt niets. Home Assistant gebruikt normaal poort 8123.",
+   "The address is not valid. Enter it like http://192.168.1.10:8123.": "Het adres is niet geldig. Vul het in als http://192.168.1.10:8123.",
+   "Something other than Home Assistant answered at this address. Check the address and the port; if Home Assistant uses HTTPS, use https://, and a reverse proxy must pass WebSockets.": "Op dit adres antwoordde iets anders dan Home Assistant. Controleer het adres en de poort; gebruikt Home Assistant HTTPS, gebruik dan https://, en een reverse proxy moet WebSockets doorlaten.",
+   "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant antwoordde niet op tijd. Controleer of deze server hem kan bereiken: het adres, de poort en een firewall daartussen.",
+   "Home Assistant cannot be reached at this address.": "Home Assistant is op dit adres niet bereikbaar.",
+   "Details:": "Details:"
   },
   "pl": {
    "(address": "(adres",
@@ -911,7 +938,6 @@
    "History": "Historia",
    "Home Assistant URL": "URL Home Assistant",
    "Home Assistant backups do not include xomtra's analytics. They keep the tokens, the settings and the dismissed findings, but not the lake: the history, the findings and the weekly summaries, which take tens of GB. After a restore xomtra starts a new lake and loads the history again from Home Assistant, only as far back as Home Assistant still keeps it, and computes the findings again.": "Kopie zapasowe Home Assistant nie obejmują analiz xomtra. Zachowują tokeny, ustawienia i odrzucone wyniki, ale nie lake: historii, wyników i podsumowań tygodniowych, które zajmują dziesiątki GB. Po przywróceniu xomtra zakłada nowy lake, ponownie wczytuje historię z Home Assistant, tylko tak daleko wstecz, jak Home Assistant ją jeszcze przechowuje, i oblicza wyniki od nowa.",
-   "Home Assistant did not accept the connection:": "Home Assistant nie przyjął połączenia:",
    "Home Assistant did not name an administrator for this request. Open xomtra from the Home Assistant sidebar as an administrator.": "Home Assistant nie wskazał administratora dla tego żądania. Otwórz xomtra z paska bocznego Home Assistant jako administrator.",
    "Home Assistant is connected.": "Home Assistant jest połączony.",
    "Home Assistant is not configured.": "Home Assistant nie jest skonfigurowany.",
@@ -1118,7 +1144,17 @@
    "shown": "wyświetlony",
    "xomtra gives the assistant the core rules and the active set of answer guidelines with the results of server_info, get_findings and get_weekly_summary. A change applies within 30 seconds, without a restart; nothing comes from xomtra.com.": "xomtra przekazuje asystentowi podstawowe zasady i aktywny zestaw wskazówek do odpowiedzi w wynikach server_info, get_findings i get_weekly_summary. Zmiana obowiązuje w ciągu 30 sekund, bez restartu; z xomtra.com nic nie przychodzi.",
    "name": "nazwa",
-   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Najpierw trafne dane, odpowiedź na początku, potem wykresy lub tabele; tematy energia, bezpieczeństwo, pojazdy, klimat, woda, urządzenia; przyjazny ton."
+   "Relevant data first, answer first, then charts or tables; topics energy, security, vehicles, climate, water, devices; friendly tone.": "Najpierw trafne dane, odpowiedź na początku, potem wykresy lub tabele; tematy energia, bezpieczeństwo, pojazdy, klimat, woda, urządzenia; przyjazny ton.",
+   "Home Assistant rejected the access token. Create a new long-lived access token and paste it whole.": "Home Assistant odrzucił token dostępu. Utwórz nowy token dostępu długoterminowego i wklej go w całości.",
+   "This server does not trust the certificate of Home Assistant (self-signed, or issued for another name). Use the http:// address in your network, or the name the certificate was issued for.": "Ten serwer nie ufa certyfikatowi Home Assistanta (samopodpisany lub wystawiony dla innej nazwy). Użyj adresu http:// w swojej sieci albo nazwy, dla której wystawiono certyfikat.",
+   "Home Assistant does not use HTTPS at this address. Try the same address with http:// instead of https://.": "Home Assistant nie używa HTTPS pod tym adresem. Spróbuj tego samego adresu z http:// zamiast https://.",
+   "This server cannot resolve the name in the address. Use the IP address of Home Assistant instead, for example http://192.168.1.10:8123.": "Ten serwer nie może rozwiązać nazwy w adresie. Użyj zamiast niej adresu IP Home Assistanta, na przykład http://192.168.1.10:8123.",
+   "Nothing answers on this address and port. Home Assistant normally uses the port 8123.": "Pod tym adresem i portem nic nie odpowiada. Home Assistant zwykle używa portu 8123.",
+   "The address is not valid. Enter it like http://192.168.1.10:8123.": "Adres jest nieprawidłowy. Wpisz go w postaci http://192.168.1.10:8123.",
+   "Something other than Home Assistant answered at this address. Check the address and the port; if Home Assistant uses HTTPS, use https://, and a reverse proxy must pass WebSockets.": "Pod tym adresem odpowiedziało coś innego niż Home Assistant. Sprawdź adres i port; jeśli Home Assistant używa HTTPS, użyj https://, a reverse proxy musi przepuszczać WebSockety.",
+   "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant nie odpowiedział na czas. Sprawdź, czy ten serwer może się z nim połączyć: adres, port i zaporę między nimi.",
+   "Home Assistant cannot be reached at this address.": "Home Assistant jest niedostępny pod tym adresem.",
+   "Details:": "Szczegóły:"
   }
  },
  "th": {

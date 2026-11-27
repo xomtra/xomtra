@@ -114,6 +114,14 @@ def _same_address(peer: str, expected: str) -> bool:
         return False
 
 
+def connection_error(ha: dict[str, Any]) -> str:
+    """Why Home Assistant cannot be reached: a sentence, then the technical detail."""
+    detail = ha.get("detail")
+    return f"<p class=bad>{e(ha['error'])}</p>" + (
+        f"<p class=muted>Details: <code>{e(detail)}</code></p>" if detail else ""
+    )
+
+
 def _url_host(hostname: str) -> str:
     return f"[{hostname}]" if ":" in hostname else hostname
 
@@ -563,7 +571,7 @@ class AdminApp:
             ]
         )
         if ha.get("error"):
-            body += f"<p class=bad>{e(ha['error'])}</p>"
+            body += connection_error(ha)
         if self.ha.storable:
             body += (
                 f"<p class=muted><a href='{prefix()}{setup.PATH}'>Change the Home Assistant "
@@ -1619,8 +1627,7 @@ class AdminApp:
             return HTMLResponse(page(title, body, who), 400, headers=self.headers)
         ha = await status.ha_status(url, token)
         if not ha.get("ok"):
-            error = f"Home Assistant did not accept the connection: {ha.get('error')}"
-            body = self._setup_form(code, current, error)
+            body = connection_error(ha) + self._setup_form(code, current, None)
             return HTMLResponse(page(title, body, who), 400, headers=self.headers)
         actor = self._setup_actor(user)
         dsn, key = self.settings.audit_dsn, self._settings_key()

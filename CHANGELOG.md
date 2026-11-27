@@ -11,6 +11,19 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Changed
+
+- Admin GUI: when Home Assistant cannot be reached (setup page and Overview), a sentence
+  says why and what to try, in every language of the admin GUI: `https://` on a plain
+  HTTP port ("try http://"), an untrusted certificate, a name this server cannot
+  resolve, nothing listening on the port, another server or a proxy without WebSockets
+  answering, a timeout, or a rejected token. The technical message follows as a detail.
+
+### Fixed
+
+- An address that answers HTTP but not with a WebSocket upgrade no longer ends in an
+  internal error on the setup page; it is reported like any other connection error.
+
 ## [0.9.1] - 2026-11-27
 
 ### Added

@@ -1,3 +1,5 @@
+import asyncio
+import socket
 import time
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -209,3 +211,53 @@ async def test_ha_status() -> None:
     assert ok["ok"] is True
     assert ok["entities"] == 1
     assert bad["ok"] is False
+    assert bad["error"].startswith("Home Assistant rejected the access token.")
+    assert "HAAuthError" in bad["detail"]
+
+
+async def _plain_http_server() -> tuple[asyncio.Server, int]:
+    async def answer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.read(1024)
+        writer.write(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n")
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_server(answer, "127.0.0.1", 0)
+    return server, server.sockets[0].getsockname()[1]
+
+
+async def test_ha_status_explains_https_on_a_plain_http_port() -> None:
+    server, port = await _plain_http_server()
+    async with server:
+        https = await status.ha_status(f"https://127.0.0.1:{port}", "t")
+        http = await status.ha_status(f"http://127.0.0.1:{port}", "t")
+    assert https["error"].startswith("Home Assistant does not use HTTPS at this address.")
+    assert "SSL" in https["detail"]
+    # A plain HTTP answer that is not a WebSocket upgrade: no crash, a clear sentence.
+    assert http["error"].startswith("Something other than Home Assistant answered")
+
+
+async def test_ha_status_explains_refused_and_unknown_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for var in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY"):
+        monkeypatch.delenv(var, raising=False)  # websockets would ask the proxy instead
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    refused = await status.ha_status(f"http://127.0.0.1:{port}", "t")
+    assert refused["error"].startswith("Nothing answers on this address and port.")
+    unknown = await status.ha_status("http://xomtra-test.invalid:8123", "t")
+    assert unknown["error"].startswith("This server cannot resolve the name")
+
+
+def test_connection_errors_are_translated() -> None:
+    from xomtra_mcp.admin import i18n
+
+    for sentence in (
+        status.explain(OSError()),
+        "Home Assistant does not use HTTPS at this address. Try the same address with "
+        "http:// instead of https://.",
+    ):
+        for lang in ("cs", "de", "pl", "nl"):
+            assert i18n.translate(f"<p>{sentence}</p>", lang) != f"<p>{sentence}</p>", lang
