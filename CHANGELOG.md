@@ -11,6 +11,41 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Admin page **Answers** (ADR 090): named sets of answer guidelines kept in the local
+  database. Factory sets **Default** (relevant data first, the answer first, then a chart
+  or a table, friendly tone, with topics: energy with solar, battery, feed-in and costs;
+  security with alarms, cameras and motion, counted per area and never per person;
+  vehicles; heating and indoor climate; water; device health; the weekly overview, each
+  with what to look at, which charts and optional external sources such as spot prices,
+  weather or fuel prices), **Concise** (as short as possible, no jokes) and **Core
+  only** (no guidelines); custom sets (up to 20, 8,000 characters each) are duplicated from any set and edited in
+  the browser, with a preview of exactly what the assistant gets, a history with restore,
+  and export and import as JSON. One set is active; a change applies within 30 seconds,
+  without a restart.
+
+### Changed
+
+- The default answer guidelines aim at relevant results and readable answers: search
+  before answering, compare periods, rank findings, answer first, charts or compact
+  tables, "what to check" at the end.
+- The core rules also cover conclusions about persons, invented values and read only
+  access; they come before every set and cannot be changed or turned off.
+- Tool descriptions carry only the short core rules; `answer_guidelines` in the results
+  of `server_info`, `get_findings` and `get_weekly_summary` carry the core rules and the
+  active set; other data results name the active set (`answer_guidelines_set`).
+
+### Removed
+
+- Add-on options `answer_style` and `default_guidelines` and the variables
+  `XOMTRA_ANSWER_STYLE` and `XOMTRA_DEFAULT_GUIDELINES`, including the pub style.
+  **Upgrade note:** every installation starts with the set Default (also those that had
+  the pub style). If you had turned the guidelines off, activate **Core only** on the
+  page Answers; a pub-like tone can be written as a custom set (within the core rules).
+- The place for a central theme from xomtra.com (ADR 075): no text for the assistant ever
+  comes from a central service.
+
 ## [0.8.0] - 2026-11-27
 
 ### Added

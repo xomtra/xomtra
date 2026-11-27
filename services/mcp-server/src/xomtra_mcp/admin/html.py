@@ -121,7 +121,7 @@ td.num { text-align:right; font-family:var(--mono); font-size:12.5px;
   font-variant-numeric:tabular-nums; }
 code, pre, input.token { font-family:var(--mono); }
 code { font-size:12.5px; color:var(--signal); }
-input, select, button { font:inherit; font-size:14px; padding:7px 10px;
+input, select, button, textarea { font:inherit; font-size:14px; padding:7px 10px;
   border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); }
 input[type=checkbox] { accent-color:var(--accent); padding:0; }
 button { cursor:pointer; font-weight:500; background:var(--ink); color:var(--bg);
@@ -135,6 +135,14 @@ label { display:inline-flex; gap:6px; align-items:center; }
 pre { background:var(--surface); border:1px solid var(--line); border-radius:10px;
   padding:12px 14px; overflow-x:auto; font-size:12.5px; }
 pre code { color:inherit; }
+textarea.set { width:100%; min-height:420px; font-family:var(--mono); font-size:12.5px;
+  line-height:1.5; resize:vertical; }
+textarea.import { min-height:120px; }
+form.set { display:grid; gap:10px; margin-bottom:14px; }
+form.set input[name=description] { width:100%; }
+pre.set { white-space:pre-wrap; }
+.badge { font:500 11px/1 var(--mono); letter-spacing:.07em; text-transform:uppercase;
+  padding:4px 7px; border-radius:6px; background:var(--accent); color:var(--bg); }
 input.token { max-width:100%; width:100%; color:var(--signal); }
 details { border-top:1px solid var(--line); border-bottom:1px solid var(--line);
   padding-block:10px; margin-bottom:12px; }
@@ -211,6 +219,7 @@ NAV = (
     ("/retention", "Retention"),
     ("/findings", "Findings"),
     ("/analysis", "Analysis settings"),
+    ("/answers", "Answers"),
     ("/audit", "Audit"),
     ("/tokens", "Tokens"),
     ("/access", "Access"),

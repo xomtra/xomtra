@@ -91,91 +91,110 @@ def test_identity_from_flat_claims() -> None:
     assert ident.roles == ()
 
 
-async def test_instructions_carry_the_default_guardrails() -> None:
-    """ADR 073: the client puts the server instructions in the model's context."""
+async def test_instructions_carry_the_core_rules_and_the_default_set() -> None:
+    """ADR 073, 090: the client puts the server instructions in the model's context."""
     text = " ".join((create_server(dev_settings()).instructions or "").split())
-    assert "hypotheses, not as causes" in text
-    assert "Do not invent values" in text
-    assert "local time" in text
-    assert "presence, sleep, health" in text
-    assert "locks, alarms" in text
-    assert "occupant of the property" in text
-    # Default style: friendly with light humour; the pub style is an option.
-    assert "friendly and warm" in text
-    assert "crude" not in text
-    assert "Joke about the user only with tact" in text
-    assert "sexist, racist, homophobic or xenophobic jokes or innuendo" in text
-    assert "no politically or religiously tinged jokes" in text
+    # Core rules (not editable)
     assert "No jokes, irony or vulgarity about accidents, faults, outages" in text
     assert "threatens life or health" in text
-
-
-async def test_pub_style_is_an_option() -> None:
-    """ADR 080: the crude pub style, personal humour included, only when chosen."""
-    settings = dev_settings().model_copy(update={"answer_style": "pub"})
-    text = " ".join((create_server(settings).instructions or "").split())
-    assert "very funny, crude, vulgar and a bit politically incorrect" in text
-    assert "never in the areas of the core rules" in text
-    assert "language, country, culture and locality of the installation" in text
-    assert "never guess the user's wealth or social status" in text
-    assert "guys in the pub" in text
-    assert "property owner's line of work" in text
-    assert "from your own context (your memory, their profile, this conversation)" in text
-    assert "Never infer personal details from the house data" in text
-    assert "Never name the user's clients or employers" in text
-    assert "no politically or religiously tinged jokes" in text
-    assert "friendly and warm" not in text
+    assert "sexist, racist, homophobic or xenophobic jokes or innuendo" in text
+    assert "nothing politically or religiously tinged" in text
+    assert "presence, sleep, health or habits" in text
+    assert "never invent data" in text
+    assert "only reads data and cannot control the house" in text
+    assert "locks, alarms" in text
+    # The default factory set: relevance and readable presentation, friendly tone.
+    assert 'Answer guidelines set "Default"' in text
+    assert "Answer first" in text
+    assert "line chart" in text
+    assert "hypotheses" in text
+    assert "local time" in text
+    assert "Friendly and warm" in text
+    # Topics of the default set (MD 2026-11-27): energy, security, vehicles and more.
+    for topic in (
+        "Energy: solar, grid, battery, costs",
+        "Security: alarms, cameras, motion",
+        "Vehicles: consumption, mileage, costs",
+        "Heating, cooling and indoor climate",
+        "Water",
+        "Appliances and device health",
+    ):
+        assert topic in text, topic
+    assert "self-sufficiency" in text
+    assert "spot or day-ahead electricity prices" in text
+    assert "never who was where or who it was" in text
+    assert "never advise disarming or changing alarms" in text
+    assert "only if you have a tool for them" in text
+    assert "crude" not in text
+    assert "the pub" not in text
+    assert "win where they differ" in text
 
 
 async def test_guidelines_reach_the_model_without_instructions() -> None:
     """ADR 080: proxies may drop the instructions; server_info carries the guidelines."""
-    from fastmcp import Client
-
     async with Client(create_server(dev_settings())) as client:
         info = (await client.call_tool("server_info", {})).data
         tools = {t.name: t for t in await client.list_tools()}
-    assert "hypotheses, not as causes" in info["answer_guidelines"]
+    assert "Answer first" in info["answer_guidelines"]
     assert "guidelines" in (tools["server_info"].description or "")
 
 
-async def test_default_guidelines_can_be_turned_off() -> None:
-    """ADR 080: the operator may turn the default answer style and rules off."""
-    from fastmcp import Client
+async def test_active_set_is_read_for_every_call() -> None:
+    """ADR 090: a set chosen in the admin GUI applies without a restart; core first."""
+    from xomtra_mcp.answer_sets import MemoryAnswerSetStore
+    from xomtra_mcp.guidelines import CORE_ONLY_SET_ID, Guidelines
 
-    settings = dev_settings().model_copy(update={"default_guidelines": False})
-    srv = create_server(settings)
-    assert "crude" not in (srv.instructions or "")
-    instructions = " ".join((srv.instructions or "").split())
-    assert "politically or religiously tinged" in instructions
-    assert "threatens life or health" in instructions
+    store = MemoryAnswerSetStore()
+    guidelines = Guidelines(store.active_set, ttl=0)
+    srv = create_server(dev_settings(), guidelines=guidelines)
+    set_id = store.create("Haiku", "", "Answer in a haiku.", by="admin")
+    store.activate(set_id, by="admin")
     async with Client(srv) as client:
-        info = (await client.call_tool("server_info", {})).data
-    # The core rules stay, the default style goes.
-    assert "politically or religiously tinged" in " ".join(info["answer_guidelines"].split())
-    assert "crude" not in info["answer_guidelines"]
+        text = (await client.call_tool("server_info", {})).data["answer_guidelines"]
+        assert 'set "Haiku"' in text
+        assert text.index("threatens life") < text.index("haiku")
+        store.update(set_id, "Haiku", "", "Answer in two haiku.", by="admin")
+        text = (await client.call_tool("server_info", {})).data["answer_guidelines"]
+        assert "two haiku" in text
+        store.activate(CORE_ONLY_SET_ID, by="admin")
+        text = (await client.call_tool("server_info", {})).data["answer_guidelines"]
+        assert "haiku" not in text
+        assert "Answer first" not in text
+        assert "threatens life or health" in text
+        # A deleted custom set falls back to the default set.
+        store.activate(set_id, by="admin")
+        store.delete(set_id, by="admin")
+        text = (await client.call_tool("server_info", {})).data["answer_guidelines"]
+        assert "Answer first" in text
 
 
-async def test_central_theme_takes_precedence_and_expires() -> None:
-    """ADR 080: a central theme (ADR 075) comes first and is forgotten after 24 hours."""
-    from datetime import UTC, datetime, timedelta
+def test_store_outage_keeps_the_last_set() -> None:
+    from xomtra_mcp.guidelines import FACTORY_BY_ID, Guidelines
 
-    from xomtra_mcp.guidelines import Guidelines, Theme
+    calls = {"n": 0}
 
-    now = datetime(2026, 12, 1, 12, tzinfo=UTC)
-    theme = Theme("Christmas: add a festive touch.", received_at=now)
-    guidelines = Guidelines(defaults=True, theme=lambda: theme)
-    text = guidelines.text(now) or ""
-    assert text.index("religiously tinged") < text.index("Christmas")
-    assert text.index("Christmas") < text.index("occupant of the property")
-    assert "never over the core" in " ".join(text.split())
-    assert "2026-12-02 12:00 UTC" in text
-    assert "Christmas" not in (guidelines.text(now + timedelta(hours=24)) or "")
-    # A longer validity from the centre does not extend the 24 hours.
-    long = Theme("x", received_at=now, valid_until=now + timedelta(days=7))
-    assert not long.active(now + timedelta(hours=25))
-    # The theme applies even with the default guidelines off.
-    off = Guidelines(defaults=False, theme=lambda: theme)
-    assert "politically or religiously tinged" in off.tool_rules
-    assert "Christmas" in off.text(now)
-    assert "occupant" not in off.text(now)
-    assert "Christmas" not in off.text(now + timedelta(days=2))
+    def source():  # type: ignore[no-untyped-def]
+        calls["n"] += 1
+        if calls["n"] > 1:
+            raise RuntimeError("down")
+        return FACTORY_BY_ID["factory:concise"]
+
+    guidelines = Guidelines(source, ttl=0)
+    assert guidelines.active().name == "Concise"
+    assert guidelines.active().name == "Concise"
+    assert calls["n"] == 2
+
+
+def test_check_set_limits() -> None:
+    from xomtra_mcp.guidelines import FACTORY_SETS, TEXT_MAX, check_set, clean_text
+
+    # Every factory set can be duplicated and saved as a custom set.
+    for factory in FACTORY_SETS:
+        assert check_set(factory.name, factory.description, factory.text) == []
+
+    assert check_set("Moje sada", "", "text") == []
+    assert check_set("", "", "x")
+    assert check_set("<b>", "", "x")
+    assert check_set("ok", "", "x" * (TEXT_MAX + 1))
+    assert check_set("ok", "", "a\x00b")
+    assert clean_text("a  \r\n\r\n\r\n\nb ") == "a\n\nb"
