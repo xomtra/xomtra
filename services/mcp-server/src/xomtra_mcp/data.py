@@ -114,7 +114,9 @@ VIEWS: dict[str, View] = {
             "in [0, 1] (strength of the effect, evidence from q_value); action_category = "
             "fault, savings, automation, behaviour, none or unclassified (public "
             "rulebook, rules_version); rank 1 = most useful within type and window "
-            "(unflagged first; ranking_version).",
+            "(unflagged first; ranking_version). Provenance: analyzer (correlations or "
+            "anomalies), pack and pack_version (parameter pack, here home), source_instance "
+            "(data source instance, here ha); NULL in rows written by earlier versions.",
             ("entity_group", "related_group", "explained_by"),
         ),
         View(

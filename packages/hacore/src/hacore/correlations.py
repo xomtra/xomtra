@@ -51,6 +51,7 @@ from hacore import significance as sig
 from hacore.context import EMPTY, Context
 from hacore.exclusions import DEFAULT_LABELS, ExclusionLabels, load_no_analysis
 from hacore.lake import LAKE_ALIAS, sql_literal
+from hacore.pack import PACK, PACK_VERSION, SOURCE_INSTANCE
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,8 @@ RUN_COLUMNS = """
     ungrouped VARCHAR[]
 """
 FINDING_TYPE = "correlation"
+# Analyzer that writes the correlation findings (ADR 089: provenance of a finding).
+ANALYZER = "correlations"
 
 FINDING_COLUMNS = """
     finding_id VARCHAR NOT NULL,
@@ -112,7 +115,11 @@ FINDING_COLUMNS = """
     ranking_version VARCHAR,
     hidden BOOLEAN,
     first_detected_at TIMESTAMPTZ,
-    detected_at TIMESTAMPTZ NOT NULL
+    detected_at TIMESTAMPTZ NOT NULL,
+    analyzer VARCHAR,
+    pack VARCHAR,
+    pack_version VARCHAR,
+    source_instance VARCHAR
 """
 
 ADDED_COLUMNS = (
@@ -133,6 +140,11 @@ ADDED_COLUMNS = (
     ("ranking_version", "VARCHAR"),
     # Hidden by default in get_findings (ADR 068 point 7); NULL in older rows = flagged.
     ("hidden", "BOOLEAN"),
+    # Provenance (ADR 089, P0): NULL in rows written by earlier versions.
+    ("analyzer", "VARCHAR"),
+    ("pack", "VARCHAR"),
+    ("pack_version", "VARCHAR"),
+    ("source_instance", "VARCHAR"),
 )
 # Columns of one finding as produced by an analysis (the rest is set when writing).
 _ROW_DEFAULTS: dict[str, Any] = {
@@ -1251,19 +1263,22 @@ def write_findings(
     method: str,
     now: datetime,
     finding_type: str = FINDING_TYPE,
+    analyzer: str = ANALYZER,
     alias: str = LAKE_ALIAS,
 ) -> None:
     """Replace the findings of ``finding_type`` and ``window_days`` in one transaction.
 
     ``period_start``/``period_end`` of a finding default to the given ones (the data
-    window); an anomaly or a change point carries its own.
+    window); an anomaly or a change point carries its own. Every row records its
+    provenance: ``analyzer``, the parameter pack and its version and the source
+    instance (ADR 089).
     """
     ensure_schema(con, alias)
     t = f"{alias}.{SCHEMA}.{FINDING}"
     con.execute(
         "CREATE OR REPLACE TEMP TABLE new_finding AS "
         f"SELECT * EXCLUDE (finding_type, window_days, method, first_detected_at, "
-        f"detected_at) FROM {t} WHERE FALSE"
+        f"detected_at, analyzer, pack, pack_version, source_instance) FROM {t} WHERE FALSE"
     )
     try:
         if findings:
@@ -1303,7 +1318,9 @@ def write_findings(
                 f"""
 INSERT INTO {t} BY NAME
 SELECT n.*, $type AS finding_type, $window AS window_days, $method AS method,
-       coalesce(o.first_detected_at, $now) AS first_detected_at, $now AS detected_at
+       coalesce(o.first_detected_at, $now) AS first_detected_at, $now AS detected_at,
+       $analyzer AS analyzer, $pack AS pack, $pack_version AS pack_version,
+       $source_instance AS source_instance
 FROM new_finding AS n
 LEFT JOIN (
   SELECT finding_id, min(first_detected_at) AS first_detected_at FROM {t}
@@ -1315,6 +1332,10 @@ LEFT JOIN (
                     "window": window_days,
                     "method": method,
                     "now": now,
+                    "analyzer": analyzer,
+                    "pack": PACK,
+                    "pack_version": PACK_VERSION,
+                    "source_instance": SOURCE_INSTANCE,
                 },
             )
             con.execute(

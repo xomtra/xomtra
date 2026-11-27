@@ -25,6 +25,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   and export and import as JSON. One set is active; a change applies within 30 seconds,
   without a restart.
 
+- Findings record their provenance in `catalog.finding` and the weekly snapshots:
+  `analyzer` (`correlations` or `anomalies`), `pack` and `pack_version` (the parameter
+  pack, `home`) and `source_instance` (`ha`). The columns are added to existing lakes on
+  the next analysis run; older rows stay empty (ADR 089, preparation for data plugins).
+- Development: `uv run lint-imports` checks the boundaries between the domain-neutral
+  modules and the Home Assistant modules (import-linter contracts, also in CI).
+
 ### Changed
 
 - The default answer guidelines aim at relevant results and readable answers: search
