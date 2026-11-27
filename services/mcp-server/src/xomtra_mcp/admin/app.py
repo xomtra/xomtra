@@ -89,7 +89,8 @@ STATIC_TYPES = {
     "ui.js": "text/javascript",
 }
 TOKEN_ROLES = ("xomtra.Reader", "xomtra.Admin")
-TOKEN_DAYS = (30, 90, 365, 0)
+# No token without expiry: at most a year, 90 days by default.
+TOKEN_DAYS = (30, 90, 365)
 DISMISS_DAYS = (0, 30, 90, 365)
 # X-Ingress-Path as Home Assistant sets it: /api/hassio_ingress/<token>
 INGRESS_PATH = re.compile(r"/api/hassio_ingress/[A-Za-z0-9_-]{1,128}")
@@ -141,22 +142,26 @@ CLIENTS_NOTE = (
     " (the extension below), Claude Code and other MCP clients that send a bearer"
     " token, such as VS Code or Cursor."
     "</span><span class=more>"
-    "Assistants that connect from the cloud cannot reach it: claude.ai on the web"
-    " and on phones, or ChatGPT connectors. Claude on the web and on phones needs a "
-    "public https:// address with sign-in, which the installation on its own virtual "
-    "machine provides. ChatGPT and other cloud assistants are not supported yet."
+    "Assistants that connect from the cloud cannot reach it: claude.ai on the web "
+    "and on phones, or ChatGPT. claude.ai can connect only to an installation on "
+    "its own virtual machine with a public https:// address and sign-in. ChatGPT "
+    "and other cloud assistants are not supported yet."
     "</span></p>"
 )
 
-# Shown with CLIENTS_NOTE: the default answer style can be turned off (ADR 080).
+# Shown with CLIENTS_NOTE: the answer style can be changed or turned off (ADR 080).
 ANSWERS_NOTE = (
     "<p class=warn><strong>Style of the answers</strong>"
     "<span class=more>"
-    "By default xomtra asks the assistant for very funny, crude and vulgar answers, "
-    "fitted to your language and country. If this form of the answers does not suit "
-    "you, you can turn it off: in Home Assistant with the add-on option Default "
-    "answer style (Configuration tab), in other installations with "
-    "XOMTRA_DEFAULT_GUIDELINES=false in .env. Then restart xomtra."
+    "By default xomtra asks the assistant for friendly answers with light humour. "
+    "If you prefer very funny, crude and vulgar answers like from a mate in the "
+    "pub, choose the pub answer style; if you do not want any style, turn the "
+    "answer guidelines off. In Home Assistant use the add-on options Answer style "
+    "and Answer guidelines (Configuration tab), in other installations "
+    "XOMTRA_ANSWER_STYLE=pub or XOMTRA_DEFAULT_GUIDELINES=false in .env. Then "
+    "restart xomtra. Core rules always apply: no jokes about accidents or threats "
+    "to life and health, nothing sexist, racist, homophobic, xenophobic, political "
+    "or religious."
     "</span></p>"
 )
 
@@ -1168,8 +1173,7 @@ class AdminApp:
             )
         roles = "".join(f"<option>{e(r)}</option>" for r in TOKEN_ROLES)
         days = "".join(
-            f"<option value={d}{' selected' if d == 365 else ''}>"
-            f"{f'{d} days' if d else 'never'}</option>"
+            f"<option value={d}{' selected' if d == 90 else ''}>{d} days</option>"
             for d in TOKEN_DAYS
         )
         form = (

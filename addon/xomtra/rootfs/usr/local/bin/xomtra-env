@@ -41,6 +41,7 @@ XOMTRA_STATISTICS_5MIN_RETENTION_DAYS=$(opt statistics_5min_retention_days 90)
 XOMTRA_STATISTICS_HOUR_RETENTION_DAYS=$(opt statistics_hour_retention_days 1825)
 XOMTRA_MCP_URL=$(opt mcp_url "")
 XOMTRA_DEFAULT_GUIDELINES=$(opt default_guidelines true)
+XOMTRA_ANSWER_STYLE=$(opt answer_style friendly)
 XOMTRA_DUCKDB_THREADS=2
 XOMTRA_DUCKDB_TEMP_DIR=/data/duckdb-tmp
 XOMTRA_DUCKDB_MAX_TEMP_SIZE=8GB

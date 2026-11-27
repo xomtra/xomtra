@@ -56,6 +56,8 @@ from xomtra_mcp.audit import AuditError, AuditRecord, AuditSink
 logger = logging.getLogger(__name__)
 
 IDP = "ha"
+# Only Home Assistant administrators by default; other users are refused until an
+# administrator maps them (e.g. user=xomtra.Reader).
 DEFAULT_ROLE_MAP = "admin=xomtra.Admin,user="
 USER_CACHE_SECONDS = 60
 
@@ -72,7 +74,7 @@ class RoleMap:
     """
 
     admin: str | None = "xomtra.Admin"
-    user: str | None = "xomtra.Reader"
+    user: str | None = None
 
     @classmethod
     def parse(cls, text: str) -> RoleMap:

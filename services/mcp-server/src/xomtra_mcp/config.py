@@ -88,6 +88,8 @@ class Settings(BaseSettings):
     # Default guidelines for answering (tone, role, data rules; ADR 073, 080). The
     # operator may turn them off; a central theme (ADR 075) still applies.
     default_guidelines: bool = True
+    # Style of the default guidelines: friendly (light humour) or pub (crude, ADR 080).
+    answer_style: Literal["friendly", "pub"] = "friendly"
 
     # Audit database (ADR 040). Required with Entra auth: every call must be audited.
     audit_pg_host: str | None = None

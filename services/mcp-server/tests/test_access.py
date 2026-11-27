@@ -28,6 +28,7 @@ from xomtra_mcp.access import MemoryAccessStore, expiry_warning
 from xomtra_mcp.audit import MemoryAuditSink
 from xomtra_mcp.config import Settings
 from xomtra_mcp.ha_auth import (
+    DEFAULT_ROLE_MAP,
     HAUser,
     HomeAssistantProvider,
     HomeAssistantTokenVerifier,
@@ -61,8 +62,9 @@ async def fake_ha() -> AsyncIterator[tuple[FakeHA, str]]:
 
 
 def test_role_map_parse() -> None:
-    assert RoleMap.parse("admin=xomtra.Admin,user=xomtra.Reader") == RoleMap()
-    assert RoleMap.parse("admin=xomtra.Admin,user=") == RoleMap(user=None)
+    assert RoleMap.parse("admin=xomtra.Admin,user=") == RoleMap()
+    assert RoleMap.parse(DEFAULT_ROLE_MAP) == RoleMap(user=None)
+    assert RoleMap.parse("admin=xomtra.Admin,user=xomtra.Reader") == RoleMap(user="xomtra.Reader")
     with pytest.raises(ValueError, match="XOMTRA_HA_ROLE_MAP"):
         RoleMap.parse("system-admin=xomtra.Admin")
 
@@ -72,11 +74,12 @@ def test_roles_for() -> None:
     owner = HAUser("u0", "Owner", is_owner=True, is_admin=False)
     assert roles_for(admin, RoleMap()) == ["xomtra.Admin"]
     assert roles_for(owner, RoleMap()) == ["xomtra.Admin"]
-    assert roles_for(plain, RoleMap()) == ["xomtra.Reader"]
-    assert roles_for(plain, RoleMap(user=None)) == []
-    assert roles_for(plain, RoleMap(), ["jana", "u9"]) == []
-    assert roles_for(admin, RoleMap(), ["JANA"]) == ["xomtra.Admin"]
-    assert roles_for(plain, RoleMap(), ["u2"]) == ["xomtra.Reader"]
+    assert roles_for(plain, RoleMap()) == []  # by default only administrators
+    readers = RoleMap(user="xomtra.Reader")
+    assert roles_for(plain, readers) == ["xomtra.Reader"]
+    assert roles_for(plain, readers, ["jana", "u9"]) == []
+    assert roles_for(admin, readers, ["JANA"]) == ["xomtra.Admin"]
+    assert roles_for(plain, readers, ["u2"]) == ["xomtra.Reader"]
 
 
 # ---- configuration -------------------------------------------------------------------

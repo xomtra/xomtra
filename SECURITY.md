@@ -17,6 +17,10 @@ Development builds of `main` are not supported for production use.
   people in a household. Treat any data exposure as a high severity issue.
 - Never attach real Home Assistant data, tokens, tenant/client IDs or hostnames to reports.
 
+## How xomtra is secured
+
+The security principles as the code implements them: [docs/security.md](docs/security.md).
+
 ## Supply chain
 
 - GitHub Actions are pinned to commit SHAs; dependencies are updated by Renovate.

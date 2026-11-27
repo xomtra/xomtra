@@ -21,6 +21,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Guide [which installation to choose](docs/setup/choose-edition.md): limits of the
   add-on and of an own machine, supported AI assistants, what the external connector
   needs (domain, A record, port 443, certificate, sign-in).
+- Answer style option (add-on option `answer_style`, `XOMTRA_ANSWER_STYLE`): `friendly`
+  (default) or `pub`, the crude style of 0.7.x with personal humour (ADR 080).
 
 ### Changed
 
@@ -34,6 +36,14 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   need that role on the page Access.
 - Claude connector with Home Assistant sign-in requires two-factor authentication in
   HA (`XOMTRA_HA_REQUIRE_MFA`, default `true`).
+- Default answer style is friendly with light humour; the crude pub style is an option.
+- Core rules also forbid politically or religiously tinged jokes and innuendo, in every
+  style and theme.
+- Personal tokens expire after at most a year (30, 90 or 365 days, 90 by default); the
+  option "never" is gone. Existing tokens keep their expiry.
+- Admin GUI: the note on AI assistants says plainly that claude.ai needs an installation
+  on its own virtual machine with a public address and that ChatGPT and other cloud
+  assistants are not supported yet.
 
 ### Security
 
@@ -42,11 +52,6 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   session, the access list and, with an administrator token in xomtra's HA connection,
   HA's user directory. Audit records `connector:sign_in` (with `ha_token_revoked`) and
   `connector:session_refused`.
-
-### Fixed
-
-- The note on supported AI assistants no longer says that ChatGPT connectors work with
-  an own machine: Caddy lets `/mcp` through only from Claude's IP ranges.
 
 ## [0.7.1] - 2026-11-26
 

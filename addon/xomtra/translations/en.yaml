@@ -18,13 +18,19 @@ configuration:
       http://homeassistant.local:8000/mcp. Empty: the admin page guesses it from the
       address you opened Home Assistant on.
   default_guidelines:
-    name: Default answer style
+    name: Answer guidelines
     description: >-
-      Ask the assistant for very funny, crude and vulgar answers, like a mate in the
-      pub, fitted to your language, country and culture, with the default rules for
-      answering (role, work with data). Off: only the core rules stay (no jokes about
-      accidents, outages or threats to life and health; no sexist, racist, homophobic,
-      xenophobic or political jokes); a current theme from xomtra.com still applies.
+      Send the assistant the default rules for answering (role, work with data, tact) in
+      the chosen style. Off: only the core rules stay (no jokes about accidents, outages
+      or threats to life and health; no sexist, racist, homophobic, xenophobic,
+      political or religious jokes); a current theme from xomtra.com still applies.
       Takes effect after a restart.
+  answer_style:
+    name: Answer style
+    description: >-
+      friendly: warm answers with light humour (default). pub: very funny, crude and
+      vulgar answers, like a mate in the pub, fitted to your language, country and
+      culture and personal from what the assistant knows about you; the core rules still
+      apply. Takes effect after a restart.
 network:
   8000/tcp: MCP endpoint in the LAN (personal access tokens)

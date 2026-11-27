@@ -30,7 +30,7 @@ from xomtra_mcp.audit import AuditSink, LogAuditSink, PostgresAuditSink
 from xomtra_mcp.config import Settings
 from xomtra_mcp.data import DataAccess, parse_time
 from xomtra_mcp.guard import PolicyMiddleware
-from xomtra_mcp.guidelines import CORE_GUIDELINES, DEFAULT_GUIDELINES, Guidelines, ThemeSource
+from xomtra_mcp.guidelines import CORE_GUIDELINES, Guidelines, ThemeSource
 from xomtra_mcp.ha_auth import HAUserDirectory, HomeAssistantProvider
 from xomtra_mcp.identity import Identity, current_identity
 from xomtra_mcp.policy import Policy, current_access
@@ -57,7 +57,7 @@ def build_instructions(guidelines: Guidelines) -> str:
     text = f"{OVERVIEW}\nCore rules (always apply):\n{CORE_GUIDELINES}"
     if not guidelines.defaults:
         return text
-    return f"{text}\nHow to answer with this data (ADR 073):\n{DEFAULT_GUIDELINES}"
+    return f"{text}\nHow to answer with this data (ADR 073):\n{guidelines.default_text}"
 
 
 def rules_decorator(guidelines: Guidelines) -> Callable[[Any], Any]:
@@ -163,7 +163,9 @@ def create_server(
     theme: ThemeSource | None = None,
     access: AccessStore | None = None,
 ) -> FastMCP:
-    guidelines = Guidelines(defaults=settings.default_guidelines, theme=theme)
+    guidelines = Guidelines(
+        defaults=settings.default_guidelines, style=settings.answer_style, theme=theme
+    )
     with_guidelines = guidelines_attacher(guidelines)
     mcp = FastMCP(
         name="xomtra",
