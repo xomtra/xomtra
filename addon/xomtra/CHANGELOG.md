@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.9.1 - 2026-11-27
+
+### Added
+
+- Findings record their provenance in `catalog.finding` and the weekly snapshots:
+  `analyzer` (`correlations` or `anomalies`), `pack` and `pack_version` (the parameter
+  pack, `home`) and `source_instance` (`ha`). The columns are added to existing lakes on
+  the next analysis run; older rows stay empty (ADR 089, preparation for data plugins).
+- Development: `uv run lint-imports` checks the boundaries between the domain-neutral
+  modules and the Home Assistant modules (import-linter contracts, also in CI).
+
+### Changed
+
+- Docker compose: the installation ends with the one-time setup link on the terminal,
+  `docker compose up -d && docker compose exec admin xomtra-admin setup-link`, instead of
+  searching for it in `docker compose logs admin` (where it stays as well). The new
+  command `xomtra-admin setup-link` prints the link while Home Assistant is not
+  connected, and where to sign in once it is.
+- Docs (Docker compose): new step "0. Address" (the LAN address works without settings;
+  a name goes into `.env` before the first start and only has to resolve on the
+  clients). Changing the address later needs `docker compose up -d --force-recreate`,
+  not just `up -d`, so that every service takes the new address.
+
+### Fixed
+
+- Docker compose: the first `docker compose up -d` of a new installation could stop with
+  "dependency failed to start: container xomtra-seaweedfs-1 is unhealthy". SeaweedFS
+  started alongside `secrets-init`, exited before its S3 keys were written, and compose
+  gave up although the container came up healthy a few seconds later. SeaweedFS now
+  waits for `secrets-init`; a test checks that every service reading the secrets volume
+  does (full and lite edition).
+
 ## 0.9.0 - 2026-11-27
 
 ### Added
@@ -142,16 +174,5 @@
   gets read-only tools over xomtra's own data. Home Assistant has no read-only tokens,
   so this is guaranteed by xomtra's code; the Docker guide explains why a separate
   non-admin user is still recommended (access can be revoked at any time).
-
-## 0.6.2 - 2026-11-26
-
-### Fixed
-
-- The default guidelines for answering with xomtra data (findings are hypotheses, no
-  conclusions about people unless asked, friendly tone) now also reach clients that do
-  not pass the server instructions to the model, such as a proxy between Claude and a
-  local MCP server: a short version is part of every data tool description, and the
-  full text comes with `server_info`, `get_findings` and `get_weekly_summary`
-  (`answer_guidelines`).
 
 Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md

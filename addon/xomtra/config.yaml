@@ -2,7 +2,7 @@
 # Postgres (DuckLake catalog, audit, tokens), the worker (live stream + scheduled jobs),
 # the MCP server for the LAN (local access, ADR 056) and the admin GUI (Ingress, ADR 070).
 name: xomtra
-version: "0.9.0"
+version: "0.9.1"
 slug: xomtra
 description: History and analyses of your Home Assistant for Claude (MCP server)
 url: https://xomtra.com
