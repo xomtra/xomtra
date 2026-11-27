@@ -6,7 +6,8 @@ first start, and Home Assistant is connected in the browser afterwards.
 
 Requirements: Docker Engine with the Compose plugin (`docker compose version`), 2 CPU
 cores and 4 GB RAM for the full edition (2 GB for the lite edition), a few GB of disk,
-and Home Assistant reachable from this machine.
+and Home Assistant reachable from this machine, usually on port 8123
+(`http://<ha-address>:8123`).
 
 ## 0. Address (optional, before the first start)
 
