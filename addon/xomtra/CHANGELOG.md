@@ -14,6 +14,10 @@
   before a new installation of the server says to download it again. Claude Code and
   other clients still need the CA trusted as described in docs/setup/local-access.md.
 
+  Upgrade note (Docker compose): take the new `deploy/compose/compose.yaml` together
+  with the new images (it sets `XOMTRA_LOCAL_CA_URL`), then `docker compose up -d`.
+  With an older compose file the download keeps working, only without the certificate.
+
 ### Changed
 
 - Admin GUI: when Home Assistant cannot be reached (setup page and Overview), a sentence
