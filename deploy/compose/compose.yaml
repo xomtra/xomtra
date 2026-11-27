@@ -1,7 +1,8 @@
 # xomtra stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
 # + Postgres (DuckLake catalog, Dagster and SQLMesh state) + SeaweedFS (S3).
-# Usage (ADR 077): docker compose up -d, then open the setup link from
-# `docker compose logs admin` and enter the Home Assistant URL and token there. No .env is
+# Usage (ADR 077): docker compose up -d && docker compose exec admin xomtra-admin setup-link
+# prints the setup link (also in `docker compose logs admin`); open it and enter the
+# Home Assistant URL and token there. No .env is
 # needed: the one-shot service secrets-init generates every internal password and key
 # into the volume "secrets" (back it up with the data). An optional .env only overrides
 # defaults (.env.example).

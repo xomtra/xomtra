@@ -1585,8 +1585,8 @@ class AdminApp:
             body = (
                 ("<p class=bad>This setup code is not valid.</p>" if code else "")
                 + "<p>xomtra is not connected to Home Assistant yet. Open the setup link from "
-                "the log of the admin container, or enter its code here:</p>"
-                "<pre>docker compose logs admin</pre>"
+                "the server, or enter its code here:</p>"
+                "<pre>docker compose exec admin xomtra-admin setup-link</pre>"
                 f"<form class=filters method=get action='{prefix()}{setup.PATH}'>"
                 "<input name=code required maxlength=40 size=24 placeholder='XXXX-XXXX-XXXX-XXXX'"
                 " autocomplete=off><button>Continue</button></form>"

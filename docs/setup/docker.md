@@ -10,15 +10,21 @@ and Home Assistant reachable from this machine.
 
 ## 1. Start
 
-Download the release (or clone the repository) and start the stack:
+Download the release (or clone the repository), start the stack and print the setup
+link:
 
 ```bash
 git clone --depth 1 --branch v<version> https://github.com/xomtra/xomtra.git
 cd xomtra/deploy/compose
-docker compose up -d                                        # full edition
-# or, on a small machine (no SeaweedFS, no Dagster):
-docker compose -f compose.yaml -f compose.lite.yaml up -d   # lite edition
+# full edition
+docker compose up -d && docker compose exec admin xomtra-admin setup-link
+# or, on a small machine (lite edition: no SeaweedFS, no Dagster)
+docker compose -f compose.yaml -f compose.lite.yaml up -d && docker compose exec admin xomtra-admin setup-link
 ```
+
+`docker compose up -d` returns once the admin GUI is up (it waits for the databases,
+which takes a minute or two on the first start); the second command then prints the
+one-time setup link for step 2.
 
 On the first start the service `secrets-init`:
 
@@ -31,17 +37,16 @@ Later starts keep everything; a new version only adds keys it introduces.
 
 ## 2. Connect Home Assistant
 
-The admin container prints a one-time setup link:
-
-```bash
-docker compose logs admin | grep -A2 "setup"
-```
+The installation ends with the one-time setup link:
 
 ```text
-xomtra is not connected to Home Assistant yet. Finish the setup in a browser on your network:
+Finish the setup of xomtra in a browser on your network:
 
     https://192.168.1.20/admin/setup?code=ABCD-EFGH-IJKL-MNOP
 ```
+
+Print it again at any time with `docker compose exec admin xomtra-admin setup-link`; it
+is also in the log of the admin container (`docker compose logs admin`).
 
 Open it in a browser in your LAN. The browser warns about the certificate (xomtra uses
 its own certificate authority in the LAN, see [local access](local-access.md#2-trust-the-servers-certificate));

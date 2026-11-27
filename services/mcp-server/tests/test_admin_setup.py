@@ -13,7 +13,7 @@ from hacore.ha_connection import HAConnection
 from hacore.testing import VALID_TOKEN, FakeHA, running_fake_ha
 from xomtra_mcp.admin import app as app_module
 from xomtra_mcp.admin import setup
-from xomtra_mcp.admin.__main__ import _announce_setup
+from xomtra_mcp.admin.__main__ import _announce_setup, main
 from xomtra_mcp.admin.app import AdminApp
 from xomtra_mcp.admin.config import AdminSettings
 from xomtra_mcp.audit import MemoryAuditSink
@@ -118,7 +118,7 @@ async def test_setup_with_code_then_sign_in(
         assert login.headers["location"].endswith("/admin/setup")
         ask = await client.get("/admin/setup")
         assert ask.status_code == 200
-        assert "docker compose logs admin" in ask.text
+        assert "xomtra-admin setup-link" in ask.text
         assert "name=url" not in ask.text
         bad = await client.get("/admin/setup", params={"code": "AAAA-BBBB-CCCC-DDDD"})
         assert bad.status_code == 403
@@ -194,3 +194,36 @@ def test_setup_link_is_logged(
     with caplog.at_level(logging.WARNING):
         _announce_setup(settings())
     assert f"{BASE}/admin/setup?code={setup.setup_code(SESSION_KEY)}" in caplog.text
+
+
+def test_setup_link_command_prints_the_link(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(AdminSettings, "ha_resolver", lambda self: MemoryResolver())
+    monkeypatch.setattr("xomtra_mcp.admin.__main__.AdminSettings", settings)
+    with pytest.raises(SystemExit) as exit_info:
+        main(["setup-link"])
+    assert exit_info.value.code == 0
+    out = capsys.readouterr().out
+    assert f"{BASE}/admin/setup?code={setup.setup_code(SESSION_KEY)}" in out
+
+
+def test_setup_link_command_once_connected(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    resolver = MemoryResolver()
+    resolver.current = HAConnection("http://ha:8123", "t", "stored")
+    monkeypatch.setattr(AdminSettings, "ha_resolver", lambda self: resolver)
+    monkeypatch.setattr("xomtra_mcp.admin.__main__.AdminSettings", settings)
+    with pytest.raises(SystemExit) as exit_info:
+        main(["setup-link"])
+    assert exit_info.value.code == 0
+    out = capsys.readouterr().out
+    assert "code=" not in out
+    assert f"{BASE}/admin/" in out
+
+
+def test_unknown_argument_is_refused() -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        main(["nonsense"])
+    assert "usage" in str(exit_info.value.code)

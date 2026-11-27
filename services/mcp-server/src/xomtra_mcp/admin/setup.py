@@ -2,8 +2,10 @@
 
 Until Home Assistant is connected nobody can sign in with a Home Assistant account, so
 the setup page accepts a one-time code instead. The code is derived from the admin
-session key (stable across restarts, nothing to store) and is printed only to the log
-of the admin container (``docker compose logs admin``), with the whole link. It stops
+session key (stable across restarts, nothing to store). The whole link is written to the
+log of the admin container (``docker compose logs admin``) and printed on demand by
+``docker compose exec admin xomtra-admin setup-link``, which the installation runs
+right after ``docker compose up -d``. It stops
 working as soon as a connection is stored: from then on the page is for signed-in
 administrators only (to change the URL or the token).
 """
@@ -35,8 +37,11 @@ def code_matches(session_key: str, offered: str) -> bool:
     )
 
 
-def log_setup_link(base_url: str, prefix: str, session_key: str) -> None:
-    url = f"{base_url.rstrip('/')}{prefix}{PATH}?code={setup_code(session_key)}"
+def setup_url(base_url: str, prefix: str, session_key: str) -> str:
+    return f"{base_url.rstrip('/')}{prefix}{PATH}?code={setup_code(session_key)}"
+
+
+def log_setup_link(url: str) -> None:
     bar = "=" * 78
     logger.warning(
         "\n%s\nxomtra is not connected to Home Assistant yet. Finish the setup in a browser"

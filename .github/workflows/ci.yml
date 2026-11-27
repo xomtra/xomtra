@@ -462,6 +462,9 @@ jobs:
           if grep -q "taken over" /tmp/secrets-init.log; then exit 1; fi
           code=$(docker compose logs admin | grep -o 'code=[A-Z0-9-]*' | tail -n 1 | cut -d= -f2)
           test -n "$code"
+          # The installation prints the same link on the terminal.
+          docker compose exec -T admin xomtra-admin setup-link | tee /tmp/setup-link.txt
+          grep -q "/admin/setup?code=$code" /tmp/setup-link.txt
           docker network connect xomtra-fresh_egress ha
           docker compose up -d ingest-stream
           # The stream must wait for the connection, not fail, before the setup.
@@ -497,6 +500,8 @@ jobs:
           print("setup ok")
           PY
           docker compose exec -T mcp python -c "from xomtra_mcp.config import Settings; c = Settings().ha_resolver().get(); assert c and c.url == 'http://ha:8123', c"
+          docker compose exec -T admin xomtra-admin setup-link | tee /tmp/setup-link.txt
+          if grep -q "code=" /tmp/setup-link.txt; then exit 1; fi
           docker compose exec -T postgres psql -U postgres -d audit -tAc \
             "SELECT count(*) FROM audit.tool_call WHERE tool = 'admin:setup' AND idp = 'setup'" | grep -qx 1
           for i in $(seq 1 30); do
