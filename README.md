@@ -19,6 +19,7 @@ Microsoft Entra ID.
 | `deploy/caddy` | Caddy image (TLS via ACME DNS-01) and Caddyfile with the public access rules |
 | `deploy/vm` | Bootstrap script for the Debian 13 host VM |
 | `docs/setup` | Step-by-step guides (Entra app registration, host VM, Claude connector) |
+| `docs/security.md` | Security principles as the code implements them |
 
 ## Quick start (local development)
 
