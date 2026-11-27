@@ -55,7 +55,7 @@ def wait_for_ha(
         if waited % 600 == 0:
             logger.warning(
                 "Waiting for the Home Assistant connection: enter its URL and token in the "
-                "admin GUI (the setup link is in `docker compose logs admin`)"
+                "admin GUI (setup link: `docker compose exec admin xomtra-admin setup-link`)"
             )
         # Healthy while waiting: the container works as intended (healthcheck).
         if settings.heartbeat_file is not None:

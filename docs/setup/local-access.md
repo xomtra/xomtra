@@ -14,7 +14,7 @@ needs the [public access mode](claude-connector.md) instead.
 ```bash
 cd deploy/compose
 docker compose up -d
-docker compose logs admin    # one-time setup link: connect Home Assistant in the browser
+docker compose exec admin xomtra-admin setup-link   # one-time link: connect Home Assistant
 ```
 
 Nothing has to be prepared (ADR 077): the internal passwords and keys are generated

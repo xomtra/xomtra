@@ -35,7 +35,7 @@ docker run -d --name ha -p 127.0.0.1:8123:8123 \
   -v "$PWD/packages/hacore/tests/contract/ha-config:/config" homeassistant/home-assistant:stable
 XOMTRA_CONTRACT_HA_URL=http://127.0.0.1:8123 uv run pytest -m contract
 
-# No .env needed (ADR 077); the setup link is in `docker compose logs admin`.
+# No .env needed (ADR 077); then `docker compose exec admin xomtra-admin setup-link`.
 docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.dev.yaml up -d --build
 ```
 

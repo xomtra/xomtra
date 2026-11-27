@@ -1,7 +1,8 @@
 # xomtra stack: Caddy (TLS) + MCP server + ingest (live stream, Dagster, SQLMesh)
 # + Postgres (DuckLake catalog, Dagster and SQLMesh state) + SeaweedFS (S3).
-# Usage (ADR 077): docker compose up -d, then open the setup link from
-# `docker compose logs admin` and enter the Home Assistant URL and token there. No .env is
+# Usage (ADR 077): docker compose up -d && docker compose exec admin xomtra-admin setup-link
+# prints the setup link (also in `docker compose logs admin`); open it and enter the
+# Home Assistant URL and token there. No .env is
 # needed: the one-shot service secrets-init generates every internal password and key
 # into the volume "secrets" (back it up with the data). An optional .env only overrides
 # defaults (.env.example).
@@ -167,6 +168,11 @@ services:
       - seaweedfs-data:/data
       - ./seaweedfs/start.sh:/start.sh:ro
       - secrets:/secrets:ro
+    # Reads its S3 keys from the secrets volume: without this, it starts alongside
+    # secrets-init on the first `up`, exits before the file exists and compose reports
+    # it unhealthy.
+    depends_on:
+      secrets-init: { condition: service_completed_successfully }
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:8333/healthz"]
       interval: 10s

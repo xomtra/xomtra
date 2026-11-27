@@ -20,6 +20,27 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Development: `uv run lint-imports` checks the boundaries between the domain-neutral
   modules and the Home Assistant modules (import-linter contracts, also in CI).
 
+### Changed
+
+- Docker compose: the installation ends with the one-time setup link on the terminal,
+  `docker compose up -d && docker compose exec admin xomtra-admin setup-link`, instead of
+  searching for it in `docker compose logs admin` (where it stays as well). The new
+  command `xomtra-admin setup-link` prints the link while Home Assistant is not
+  connected, and where to sign in once it is.
+- Docs (Docker compose): new step "0. Address" (the LAN address works without settings;
+  a name goes into `.env` before the first start and only has to resolve on the
+  clients). Changing the address later needs `docker compose up -d --force-recreate`,
+  not just `up -d`, so that every service takes the new address.
+
+### Fixed
+
+- Docker compose: the first `docker compose up -d` of a new installation could stop with
+  "dependency failed to start: container xomtra-seaweedfs-1 is unhealthy". SeaweedFS
+  started alongside `secrets-init`, exited before its S3 keys were written, and compose
+  gave up although the container came up healthy a few seconds later. SeaweedFS now
+  waits for `secrets-init`; a test checks that every service reading the secrets volume
+  does (full and lite edition).
+
 ## [0.9.0] - 2026-11-27
 
 ### Added
