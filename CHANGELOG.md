@@ -30,6 +30,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Admin GUI: dates are written as the language of the admin writes them (for example
   27. 11. 2025 in Czech, 27.11.2025 in German) already on the server, and the cut-off
   date on Retention is formatted like every other date (it was ISO).
+- Admin GUI: the page Catalog of a new installation explains that the catalog is
+  profiled once a day at 04:15 (in `XOMTRA_TIMEZONE`) and shows its entities after the
+  first night, instead of an empty table; the empty choice of the kind filter reads
+  "all kinds". To profile right away: `docker compose exec dagster-daemon xomtra-ingest
+  catalog`.
 
 ## [0.9.2] - 2026-11-27
 

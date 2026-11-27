@@ -335,7 +335,10 @@
    "new days": "nově dní",
    "Shortening the period deletes the older data at the next run. It cannot be undone; xomtra can only load again what Home Assistant still keeps in its own history.": "Zkrácení doby smaže starší data při příštím běhu. Nejde to vrátit; xomtra dokáže znovu načíst jen to, co Home Assistant ještě drží ve své vlastní historii.",
    "delete the older data": "smazat starší data",
-   "Shorten": "Zkrátit"
+   "Shorten": "Zkrátit",
+   "all kinds": "všechny druhy",
+   "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Zatím žádný profil. Katalog se profiluje jednou denně ve 4:15; nová instalace ukáže entity po první noci.",
+   "Time zone:": "Časové pásmo:"
   },
   "de": {
    "(max 300)": "(max. 300)",
@@ -634,7 +637,10 @@
    "new days": "Tage neu",
    "Shortening the period deletes the older data at the next run. It cannot be undone; xomtra can only load again what Home Assistant still keeps in its own history.": "Eine kürzere Dauer löscht die älteren Daten beim nächsten Lauf. Das lässt sich nicht rückgängig machen; xomtra kann nur das wieder laden, was Home Assistant noch in seiner eigenen Historie hat.",
    "delete the older data": "ältere Daten löschen",
-   "Shorten": "Verkürzen"
+   "Shorten": "Verkürzen",
+   "all kinds": "alle Arten",
+   "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Noch kein Profil. Der Katalog wird einmal am Tag um 04:15 profiliert; eine neue Installation zeigt ihre Entitäten nach der ersten Nacht.",
+   "Time zone:": "Zeitzone:"
   },
   "nl": {
    "(max 300)": "(max. 300)",
@@ -932,7 +938,10 @@
    "new days": "dagen nieuw",
    "Shortening the period deletes the older data at the next run. It cannot be undone; xomtra can only load again what Home Assistant still keeps in its own history.": "Een kortere periode verwijdert de oudere gegevens bij de volgende run. Dat kan niet ongedaan worden gemaakt; xomtra kan alleen opnieuw laden wat Home Assistant nog in zijn eigen geschiedenis bewaart.",
    "delete the older data": "oudere gegevens verwijderen",
-   "Shorten": "Inkorten"
+   "Shorten": "Inkorten",
+   "all kinds": "alle soorten",
+   "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Nog geen profiel. De catalogus wordt eens per dag om 04:15 geprofileerd; een nieuwe installatie toont haar entiteiten na de eerste nacht.",
+   "Time zone:": "Tijdzone:"
   },
   "pl": {
    "(max 300)": "(maks. 300)",
@@ -1233,7 +1242,10 @@
    "new days": "dni po zmianie",
    "Shortening the period deletes the older data at the next run. It cannot be undone; xomtra can only load again what Home Assistant still keeps in its own history.": "Skrócenie okresu usunie starsze dane przy następnym uruchomieniu. Nie da się tego cofnąć; xomtra może ponownie wczytać tylko to, co Home Assistant wciąż przechowuje we własnej historii.",
    "delete the older data": "usuń starsze dane",
-   "Shorten": "Skróć"
+   "Shorten": "Skróć",
+   "all kinds": "wszystkie rodzaje",
+   "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Jeszcze brak profilu. Katalog jest profilowany raz dziennie o 04:15; nowa instalacja pokaże swoje encje po pierwszej nocy.",
+   "Time zone:": "Strefa czasowa:"
   }
  },
  "th": {
