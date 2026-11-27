@@ -633,7 +633,7 @@ class AdminApp:
         stale = request.query_params.get("stale") == "1"
         rows = await asyncio.to_thread(status.catalog_rows, data, q, kind, stale)
         options = "".join(
-            f"<option value='{k}'{' selected' if k == kind else ''}>{k}</option>"
+            f"<option value='{k}'{' selected' if k == kind else ''}>{k or 'all kinds'}</option>"
             for k in ("", *KINDS)
         )
         form = (
@@ -650,6 +650,15 @@ class AdminApp:
             if c.startswith(("value_", "changes", "numeric", "missing"))
         }
         body = form + f"<p class=muted>{len(rows)} entities (max 500)</p>"
+        if not rows and not await asyncio.to_thread(status.catalog_profiled, data):
+            # A new installation: the daily profile fills the catalog, not the ingest,
+            # so explain the empty page instead of showing an empty table.
+            body += (
+                "<p class=muted>No profile yet. The catalog is profiled once a day at "
+                "04:15; a new installation shows its entities after the first night.</p>"
+                f"<p class=muted>Time zone: <bdi>{e(self.settings.timezone)}</bdi></p>"
+            )
+            return HTMLResponse(page("Catalog", body, user.get("username")))
         body += table(cols, [list(r.values()) for r in rows], numeric)
         return HTMLResponse(page("Catalog", body, user.get("username")))
 

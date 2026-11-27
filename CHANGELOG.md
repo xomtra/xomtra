@@ -21,6 +21,14 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   tag, covered by `SHA256SUMS`: Docker Compose installs and upgrades without git.
 - Docs: cosign runs in its official container pinned by digest, no installation needed.
 
+### Fixed
+
+- Admin GUI: the page Catalog of a new installation explains that the catalog is
+  profiled once a day at 04:15 (in `XOMTRA_TIMEZONE`) and shows its entities after the
+  first night, instead of an empty table; the empty choice of the kind filter reads
+  "all kinds". To profile right away: `docker compose exec dagster-daemon xomtra-ingest
+  catalog`.
+
 ## [0.9.2] - 2026-11-27
 
 ### Added
