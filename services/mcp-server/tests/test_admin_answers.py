@@ -34,6 +34,7 @@ async def test_factory_sets_core_rules_and_activation() -> None:
         assert "Pub" not in page.text
         assert "the pub" not in page.text
         assert "Core rules (always apply, cannot be changed)" in page.text
+        assert "Style of the answers" in page.text  # the note lives here (not on Tokens)
         assert "threatens life or health" in page.text
         assert "Answer first" in page.text  # the default set is shown when none is chosen
 

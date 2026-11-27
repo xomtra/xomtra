@@ -169,19 +169,6 @@ CLIENTS_NOTE = (
     "</span></p>"
 )
 
-# Shown with CLIENTS_NOTE: the answers follow the active set of the page Answers (ADR 090).
-ANSWERS_NOTE = (
-    "<p class=warn><strong>Style of the answers</strong>"
-    "<span class=more>"
-    "By default xomtra asks the assistant for relevant answers with charts or tables "
-    "and a friendly tone. Choose another set or write your own on the page Answers; it "
-    "applies within 30 seconds. Core rules always apply: no jokes about accidents or "
-    "threats to life and health, nothing sexist, racist, homophobic, xenophobic, "
-    "political or religious."
-    "</span></p>"
-)
-
-
 # Opening tag of a POST form in the GUI's HTML (the CSRF field goes right after it).
 _POST_FORM = re.compile(rb"<form\b[^>]*\bmethod=[\"']?post\b[^>]*>", re.IGNORECASE)
 
@@ -1230,8 +1217,7 @@ class AdminApp:
             "<p class=muted>Each person or device gets its own token. A token is shown once; "
             "only its hash is stored. Revoked tokens stop working within 30 seconds.</p>"
             + CLIENTS_NOTE
-            + ANSWERS_NOTE
-            + token_flow(prefix(), MCPB_FILENAME)
+            + token_flow()
             + form
             + table(
                 ["id", "for", "description", "role", "created", "expires", "last used", ""],
@@ -1568,7 +1554,7 @@ class AdminApp:
             return refused
         body = (
             f"<p>Issue a personal token on <a href='{prefix()}/tokens'>Tokens</a> first, one "
-            "per person and device.</p>" + CLIENTS_NOTE + ANSWERS_NOTE + self._connect_help()
+            "per person and device.</p>" + CLIENTS_NOTE + self._connect_help()
         )
         return HTMLResponse(page("Connect clients", body, user.get("username")))
 

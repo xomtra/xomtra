@@ -31,6 +31,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Changed
 
+- Admin GUI, Tokens: the picture of the flow no longer has the Claude Desktop button
+  (the page of a new token has the download), and the arrow labels sit above and below
+  the boxes, so that longer translations no longer run into them. The note on the style
+  of the answers moved from Tokens and Connect clients to the page Answers.
+- Admin GUI (Docker compose): the menu no longer links to the Dagster UI; it stays
+  reachable for administrators at `/admin/dagster/`.
 - Admin GUI: when Home Assistant cannot be reached (setup page and Overview), a sentence
   says why and what to try, in every language of the admin GUI: `https://` on a plain
   HTTP port ("try http://"), an untrusted certificate, a name this server cannot

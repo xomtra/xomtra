@@ -109,7 +109,6 @@
    "Invalid finding.": "Neplatný nález.",
    "Invalid request.": "Neplatný požadavek.",
    "Issue a personal token on": "Nejdřív vydejte osobní token na stránce",
-   "Issue a token and paste it into the agent; for Claude Desktop download the extension, it asks for the token. The agent sends every request with it to xomtra (1); xomtra checks it and answers with data and findings within the token's role (2). xomtra reads Home Assistant on its own and only reads (3): the agent never talks to Home Assistant and cannot switch anything. The model sees only the answers it asked for.": "Vydejte token a vložte ho do agenta; pro Claude Desktop stáhněte rozšíření, to se na token zeptá. Agent s ním posílá každý požadavek do xomtra (1); xomtra ho ověří a odpoví daty a nálezy v rámci role tokenu (2). xomtra čte Home Assistant sama a jen čte (3): agent s Home Assistantem nikdy nemluví a nemůže nic přepnout. Model vidí jen odpovědi, o které požádal.",
    "Issue token": "Vydat token",
    "LLM agent sends requests with the token to xomtra; xomtra answers from its own copy of the Home Assistant history, which it reads from Home Assistant.": "LLM agent posílá požadavky s tokenem do xomtra; xomtra odpovídá z vlastní kopie historie Home Assistantu, kterou z Home Assistantu čte.",
    "LLM agent, xomtra and Home Assistant": "LLM agent, xomtra a Home Assistant",
@@ -232,7 +231,6 @@
    "xomtra reads your Home Assistant with a long-lived access token of its own user. In Home Assistant, create a user for xomtra (it does not need to be an administrator), sign in as that user and create a long-lived access token on its profile page (Security tab).": "xomtra čte váš Home Assistant dlouhodobým přístupovým tokenem vlastního uživatele. V Home Assistantu vytvořte uživatele pro xomtra (nemusí být administrátor), přihlaste se jako on a na stránce jeho profilu (karta Zabezpečení) vytvořte dlouhodobý přístupový token.",
    "xomtra starts loading the history now; the first findings come after the next nightly run.": "xomtra teď začne načítat historii; první zjištění přijdou po nejbližším nočním běhu.",
    "z cap of the episode statistic": "Strop z statistiky epizody",
-   "↓ Claude Desktop extension": "↓ rozšíření Claude Desktop",
    "Access": "Přístup",
    "Home Assistant users": "Uživatelé Home Assistantu",
    "Connected Claude connectors": "Připojené konektory Claude",
@@ -252,7 +250,6 @@
    "Unknown role.": "Neznámá role.",
    "With Entra ID, who may use xomtra and with which role is set in Entra (app roles of the enterprise application). Sign-ins end in Entra too.": "S Entra ID se nastavuje v Entra, kdo smí xomtra používat a s jakou rolí (role aplikace v podnikové aplikaci). Přihlášení se ukončují také v Entra.",
    "In the local access mode, Claude and other MCP clients connect with personal tokens; issue and revoke them on the page Tokens.": "V lokálním režimu se Claude a další MCP klienti připojují osobními tokeny; vystavíte a zneplatníte je na stránce Tokeny.",
-   "By default xomtra asks the assistant for relevant answers with charts or tables and a friendly tone. Choose another set or write your own on the page Answers; it applies within 30 seconds. Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Ve výchozím stavu xomtra žádá asistenta o relevantní odpovědi s grafy nebo tabulkami a přátelským tónem. Jinou sadu zvolíte nebo vlastní napíšete na stránce Odpovědi; platí do 30 sekund. Základní pravidla platí vždy: žádné vtipy o haváriích ani o ohrožení života a zdraví, nic sexistického, rasistického, homofobního, xenofobního, politického ani náboženského.",
    "Answers": "Odpovědi",
    "A factory set comes with xomtra and changes with updates. Duplicate it to write your own.": "Sada z výroby je součástí xomtry a mění se s aktualizacemi. Pro vlastní úpravy ji zduplikujte.",
    "A set called": "Sada s názvem",
@@ -320,7 +317,9 @@
    "and the certificate of this server are filled in; the extension trusts only this certificate, so nothing has to be imported into the computer.": "a certifikát tohoto serveru jsou vyplněné; rozšíření důvěřuje jen tomuto certifikátu, takže do počítače není potřeba nic importovat.",
    "Paste the token and install. The token is not part of the file, Claude Desktop keeps it as a secret.": "Vložte token a nainstalujte. Token v souboru není, Claude Desktop si ho uloží jako tajný údaj.",
    "Open the downloaded xomtra.mcpb: Claude Desktop shows the extension and asks for the token. The address": "Otevřete stažený xomtra.mcpb: Claude Desktop zobrazí rozšíření a zeptá se na token. Adresa",
-   "is filled in.": "je vyplněná."
+   "is filled in.": "je vyplněná.",
+   "Issue a token and paste it into the agent; the page of the new token has the download for Claude Desktop. The agent sends every request with it to xomtra (1); xomtra checks it and answers with data and findings within the token's role (2). xomtra reads Home Assistant on its own and only reads (3): the agent never talks to Home Assistant and cannot switch anything. The model sees only the answers it asked for.": "Vydejte token a vložte ho do agenta; na stránce nového tokenu je stažení pro Claude Desktop. Agent s ním posílá každý požadavek do xomtra (1); xomtra ho ověří a odpoví daty a nálezy v rámci role tokenu (2). xomtra čte Home Assistant sama a jen čte (3): agent s Home Assistantem nikdy nemluví a nemůže nic přepnout. Model vidí jen odpovědi, o které požádal.",
+   "By default xomtra asks the assistant for relevant answers with charts or tables and a friendly tone. Choose another set or write your own below; it applies within 30 seconds. Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Ve výchozím stavu xomtra žádá asistenta o relevantní odpovědi s grafy nebo tabulkami a přátelským tónem. Jinou sadu zvolíte nebo vlastní napíšete níže; platí do 30 sekund. Základní pravidla platí vždy: žádné vtipy o haváriích ani o ohrožení života a zdraví, nic sexistického, rasistického, homofobního, xenofobního, politického ani náboženského."
   },
   "de": {
    "(max 300)": "(max. 300)",
@@ -392,7 +391,6 @@
    "Invalid finding.": "Ungültiger Befund.",
    "Invalid request.": "Ungültige Anfrage.",
    "Issue a personal token on": "Stellen Sie zuerst einen persönlichen Token aus unter",
-   "Issue a token and paste it into the agent; for Claude Desktop download the extension, it asks for the token. The agent sends every request with it to xomtra (1); xomtra checks it and answers with data and findings within the token's role (2). xomtra reads Home Assistant on its own and only reads (3): the agent never talks to Home Assistant and cannot switch anything. The model sees only the answers it asked for.": "Stellen Sie einen Token aus und fügen Sie ihn im Agenten ein; für Claude Desktop laden Sie die Erweiterung herunter, sie fragt nach dem Token. Der Agent sendet jede Anfrage damit an xomtra (1); xomtra prüft ihn und antwortet mit Daten und Befunden im Rahmen der Rolle des Tokens (2). xomtra liest Home Assistant selbst und liest nur (3): Der Agent spricht nie mit Home Assistant und kann nichts schalten. Das Modell sieht nur die Antworten, die es angefragt hat.",
    "Issue token": "Token ausstellen",
    "LLM agent": "LLM-Agent",
    "LLM agent sends requests with the token to xomtra; xomtra answers from its own copy of the Home Assistant history, which it reads from Home Assistant.": "Der LLM-Agent sendet Anfragen mit dem Token an xomtra; xomtra antwortet aus der eigenen Kopie des Home-Assistant-Verlaufs, die es aus Home Assistant liest.",
@@ -516,7 +514,6 @@
    "xomtra reads your Home Assistant with a long-lived access token of its own user. In Home Assistant, create a user for xomtra (it does not need to be an administrator), sign in as that user and create a long-lived access token on its profile page (Security tab).": "xomtra liest Ihr Home Assistant mit einem langlebigen Zugriffstoken eines eigenen Benutzers. Legen Sie in Home Assistant einen Benutzer für xomtra an (er muss kein Administrator sein), melden Sie sich als dieser Benutzer an und erstellen Sie auf seiner Profilseite (Reiter Sicherheit) ein langlebiges Zugriffstoken.",
    "xomtra starts loading the history now; the first findings come after the next nightly run.": "xomtra beginnt jetzt, den Verlauf zu laden; die ersten Befunde kommen nach dem nächsten nächtlichen Lauf.",
    "z cap of the episode statistic": "z-Obergrenze der Episodenstatistik",
-   "↓ Claude Desktop extension": "↓ Claude-Desktop-Erweiterung",
    "Access": "Zugriff",
    "Home Assistant users": "Home-Assistant-Benutzer",
    "Connected Claude connectors": "Verbundene Claude-Konnektoren",
@@ -536,7 +533,6 @@
    "Unknown role.": "Unbekannte Rolle.",
    "With Entra ID, who may use xomtra and with which role is set in Entra (app roles of the enterprise application). Sign-ins end in Entra too.": "Mit Entra ID wird in Entra festgelegt, wer xomtra mit welcher Rolle nutzen darf (App-Rollen der Unternehmensanwendung). Anmeldungen werden ebenfalls in Entra beendet.",
    "In the local access mode, Claude and other MCP clients connect with personal tokens; issue and revoke them on the page Tokens.": "Im lokalen Zugriffsmodus verbinden sich Claude und andere MCP-Clients mit persönlichen Tokens; Sie stellen sie auf der Seite Tokens aus und widerrufen sie dort.",
-   "By default xomtra asks the assistant for relevant answers with charts or tables and a friendly tone. Choose another set or write your own on the page Answers; it applies within 30 seconds. Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Standardmäßig bittet xomtra den Assistenten um relevante Antworten mit Diagrammen oder Tabellen und einem freundlichen Ton. Auf der Seite Antworten wählen Sie ein anderes Set oder schreiben Ihr eigenes; es gilt innerhalb von 30 Sekunden. Die Grundregeln gelten immer: keine Witze über Unfälle oder Gefahren für Leben und Gesundheit, nichts Sexistisches, Rassistisches, Homophobes, Fremdenfeindliches, Politisches oder Religiöses.",
    "Answers": "Antworten",
    "A factory set comes with xomtra and changes with updates. Duplicate it to write your own.": "Ein Werks-Set gehört zu xomtra und ändert sich mit Updates. Duplizieren Sie es, um Ihr eigenes zu schreiben.",
    "A set called": "Ein Set namens",
@@ -604,7 +600,9 @@
    "and the certificate of this server are filled in; the extension trusts only this certificate, so nothing has to be imported into the computer.": "und das Zertifikat dieses Servers sind eingetragen; die Erweiterung vertraut nur diesem Zertifikat, daher muss nichts in den Computer importiert werden.",
    "Paste the token and install. The token is not part of the file, Claude Desktop keeps it as a secret.": "Fügen Sie den Token ein und installieren Sie. Der Token ist nicht Teil der Datei, Claude Desktop speichert ihn als Geheimnis.",
    "Open the downloaded xomtra.mcpb: Claude Desktop shows the extension and asks for the token. The address": "Öffnen Sie die heruntergeladene xomtra.mcpb: Claude Desktop zeigt die Erweiterung und fragt nach dem Token. Die Adresse",
-   "is filled in.": "ist eingetragen."
+   "is filled in.": "ist eingetragen.",
+   "Issue a token and paste it into the agent; the page of the new token has the download for Claude Desktop. The agent sends every request with it to xomtra (1); xomtra checks it and answers with data and findings within the token's role (2). xomtra reads Home Assistant on its own and only reads (3): the agent never talks to Home Assistant and cannot switch anything. The model sees only the answers it asked for.": "Stellen Sie einen Token aus und fügen Sie ihn im Agenten ein; die Seite des neuen Tokens hat den Download für Claude Desktop. Der Agent sendet jede Anfrage damit an xomtra (1); xomtra prüft ihn und antwortet mit Daten und Befunden im Rahmen der Rolle des Tokens (2). xomtra liest Home Assistant selbst und liest nur (3): Der Agent spricht nie mit Home Assistant und kann nichts schalten. Das Modell sieht nur die Antworten, die es angefragt hat.",
+   "By default xomtra asks the assistant for relevant answers with charts or tables and a friendly tone. Choose another set or write your own below; it applies within 30 seconds. Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Standardmäßig bittet xomtra den Assistenten um relevante Antworten mit Diagrammen oder Tabellen und einem freundlichen Ton. Unten wählen Sie ein anderes Set oder schreiben Ihr eigenes; es gilt innerhalb von 30 Sekunden. Die Grundregeln gelten immer: keine Witze über Unfälle oder Gefahren für Leben und Gesundheit, nichts Sexistisches, Rassistisches, Homophobes, Fremdenfeindliches, Politisches oder Religiöses."
   },
   "nl": {
    "(max 300)": "(max. 300)",
@@ -676,7 +674,6 @@
    "Invalid finding.": "Ongeldige bevinding.",
    "Invalid request.": "Ongeldig verzoek.",
    "Issue a personal token on": "Geef eerst een persoonlijk token uit op",
-   "Issue a token and paste it into the agent; for Claude Desktop download the extension, it asks for the token. The agent sends every request with it to xomtra (1); xomtra checks it and answers with data and findings within the token's role (2). xomtra reads Home Assistant on its own and only reads (3): the agent never talks to Home Assistant and cannot switch anything. The model sees only the answers it asked for.": "Geef een token uit en plak het in de agent; download voor Claude Desktop de extensie, die vraagt om het token. De agent stuurt elk verzoek daarmee naar xomtra (1); xomtra controleert het en antwoordt met data en bevindingen binnen de rol van het token (2). xomtra leest Home Assistant zelf en leest alleen (3): de agent praat nooit met Home Assistant en kan niets schakelen. Het model ziet alleen de antwoorden waar het om vroeg.",
    "Issue token": "Token uitgeven",
    "LLM agent": "LLM-agent",
    "LLM agent sends requests with the token to xomtra; xomtra answers from its own copy of the Home Assistant history, which it reads from Home Assistant.": "De LLM-agent stuurt verzoeken met het token naar xomtra; xomtra antwoordt uit zijn eigen kopie van de Home Assistant-historie, die het uit Home Assistant leest.",
@@ -799,7 +796,6 @@
    "xomtra reads your Home Assistant with a long-lived access token of its own user. In Home Assistant, create a user for xomtra (it does not need to be an administrator), sign in as that user and create a long-lived access token on its profile page (Security tab).": "xomtra leest je Home Assistant met een langlevend toegangstoken van een eigen gebruiker. Maak in Home Assistant een gebruiker voor xomtra aan (die hoeft geen beheerder te zijn), log in als die gebruiker en maak op zijn profielpagina (tabblad Beveiliging) een langlevend toegangstoken aan.",
    "xomtra starts loading the history now; the first findings come after the next nightly run.": "xomtra begint nu de geschiedenis te laden; de eerste bevindingen komen na de volgende nachtelijke run.",
    "z cap of the episode statistic": "z-plafond van de episodestatistiek",
-   "↓ Claude Desktop extension": "↓ Claude Desktop-extensie",
    "Access": "Toegang",
    "Home Assistant users": "Home Assistant-gebruikers",
    "Connected Claude connectors": "Verbonden Claude-connectoren",
@@ -819,7 +815,6 @@
    "Unknown role.": "Onbekende rol.",
    "With Entra ID, who may use xomtra and with which role is set in Entra (app roles of the enterprise application). Sign-ins end in Entra too.": "Met Entra ID stel je in Entra in wie xomtra mag gebruiken en met welke rol (app-rollen van de bedrijfstoepassing). Aanmeldingen worden ook in Entra beëindigd.",
    "In the local access mode, Claude and other MCP clients connect with personal tokens; issue and revoke them on the page Tokens.": "In de lokale toegangsmodus verbinden Claude en andere MCP-clients met persoonlijke tokens; je geeft ze uit en trekt ze in op de pagina Tokens.",
-   "By default xomtra asks the assistant for relevant answers with charts or tables and a friendly tone. Choose another set or write your own on the page Answers; it applies within 30 seconds. Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Standaard vraagt xomtra de assistent om relevante antwoorden met grafieken of tabellen en een vriendelijke toon. Kies een andere set of schrijf je eigen set op de pagina Antwoorden; die geldt binnen 30 seconden. De basisregels gelden altijd: geen grappen over ongelukken of gevaar voor leven en gezondheid, niets seksistisch, racistisch, homofoob, xenofoob, politiek of religieus.",
    "Answers": "Antwoorden",
    "A factory set comes with xomtra and changes with updates. Duplicate it to write your own.": "Een fabrieksset hoort bij xomtra en verandert met updates. Dupliceer hem om je eigen set te schrijven.",
    "A set called": "Een set met de naam",
@@ -887,7 +882,9 @@
    "and the certificate of this server are filled in; the extension trusts only this certificate, so nothing has to be imported into the computer.": "en het certificaat van deze server zijn ingevuld; de extensie vertrouwt alleen dit certificaat, dus er hoeft niets in de computer te worden geïmporteerd.",
    "Paste the token and install. The token is not part of the file, Claude Desktop keeps it as a secret.": "Plak het token en installeer. Het token zit niet in het bestand, Claude Desktop bewaart het als geheim.",
    "Open the downloaded xomtra.mcpb: Claude Desktop shows the extension and asks for the token. The address": "Open het gedownloade xomtra.mcpb: Claude Desktop toont de extensie en vraagt om het token. Het adres",
-   "is filled in.": "is ingevuld."
+   "is filled in.": "is ingevuld.",
+   "Issue a token and paste it into the agent; the page of the new token has the download for Claude Desktop. The agent sends every request with it to xomtra (1); xomtra checks it and answers with data and findings within the token's role (2). xomtra reads Home Assistant on its own and only reads (3): the agent never talks to Home Assistant and cannot switch anything. The model sees only the answers it asked for.": "Geef een token uit en plak het in de agent; de pagina van het nieuwe token heeft de download voor Claude Desktop. De agent stuurt elk verzoek daarmee naar xomtra (1); xomtra controleert het en antwoordt met data en bevindingen binnen de rol van het token (2). xomtra leest Home Assistant zelf en leest alleen (3): de agent praat nooit met Home Assistant en kan niets schakelen. Het model ziet alleen de antwoorden waar het om vroeg.",
+   "By default xomtra asks the assistant for relevant answers with charts or tables and a friendly tone. Choose another set or write your own below; it applies within 30 seconds. Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Standaard vraagt xomtra de assistent om relevante antwoorden met grafieken of tabellen en een vriendelijke toon. Kies hieronder een andere set of schrijf je eigen set; die geldt binnen 30 seconden. De basisregels gelden altijd: geen grappen over ongelukken of gevaar voor leven en gezondheid, niets seksistisch, racistisch, homofoob, xenofoob, politiek of religieus."
   },
   "pl": {
    "(max 300)": "(maks. 300)",
@@ -961,7 +958,6 @@
    "Invalid finding.": "Nieprawidłowy wynik.",
    "Invalid request.": "Nieprawidłowe żądanie.",
    "Issue a personal token on": "Najpierw wydaj osobisty token na stronie",
-   "Issue a token and paste it into the agent; for Claude Desktop download the extension, it asks for the token. The agent sends every request with it to xomtra (1); xomtra checks it and answers with data and findings within the token's role (2). xomtra reads Home Assistant on its own and only reads (3): the agent never talks to Home Assistant and cannot switch anything. The model sees only the answers it asked for.": "Wydaj token i wklej go do agenta; dla Claude Desktop pobierz rozszerzenie, które zapyta o token. Agent wysyła z nim każde żądanie do xomtra (1); xomtra go sprawdza i odpowiada danymi i wynikami w ramach roli tokenu (2). xomtra sama czyta Home Assistant i tylko czyta (3): agent nigdy nie rozmawia z Home Assistant i nie może niczego przełączyć. Model widzi tylko odpowiedzi, o które poprosił.",
    "Issue token": "Wydaj token",
    "LLM agent": "Agent LLM",
    "LLM agent sends requests with the token to xomtra; xomtra answers from its own copy of the Home Assistant history, which it reads from Home Assistant.": "Agent LLM wysyła żądania z tokenem do xomtra; xomtra odpowiada z własnej kopii historii Home Assistant, którą czyta z Home Assistant.",
@@ -1086,7 +1082,6 @@
    "xomtra reads your Home Assistant with a long-lived access token of its own user. In Home Assistant, create a user for xomtra (it does not need to be an administrator), sign in as that user and create a long-lived access token on its profile page (Security tab).": "xomtra odczytuje Twój Home Assistant za pomocą długoterminowego tokenu dostępu własnego użytkownika. W Home Assistant utwórz użytkownika dla xomtra (nie musi być administratorem), zaloguj się jako ten użytkownik i utwórz długoterminowy token dostępu na stronie jego profilu (karta Bezpieczeństwo).",
    "xomtra starts loading the history now; the first findings come after the next nightly run.": "xomtra zaczyna teraz wczytywać historię; pierwsze wyniki pojawią się po najbliższym nocnym przebiegu.",
    "z cap of the episode statistic": "Limit z statystyki epizody",
-   "↓ Claude Desktop extension": "↓ rozszerzenie Claude Desktop",
    "Access": "Dostęp",
    "Home Assistant users": "Użytkownicy Home Assistanta",
    "Connected Claude connectors": "Połączone konektory Claude",
@@ -1106,7 +1101,6 @@
    "Unknown role.": "Nieznana rola.",
    "With Entra ID, who may use xomtra and with which role is set in Entra (app roles of the enterprise application). Sign-ins end in Entra too.": "Przy Entra ID w Entra ustawia się, kto może używać xomtry i z jaką rolą (role aplikacji w aplikacji przedsiębiorstwa). Logowania kończy się również w Entra.",
    "In the local access mode, Claude and other MCP clients connect with personal tokens; issue and revoke them on the page Tokens.": "W trybie dostępu lokalnego Claude i inni klienci MCP łączą się osobistymi tokenami; wystawiasz je i unieważniasz na stronie Tokeny.",
-   "By default xomtra asks the assistant for relevant answers with charts or tables and a friendly tone. Choose another set or write your own on the page Answers; it applies within 30 seconds. Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Domyślnie xomtra prosi asystenta o trafne odpowiedzi z wykresami lub tabelami i przyjaznym tonem. Inny zestaw wybierzesz albo własny napiszesz na stronie Odpowiedzi; obowiązuje w ciągu 30 sekund. Podstawowe zasady obowiązują zawsze: żadnych żartów o awariach ani o zagrożeniu życia i zdrowia, nic seksistowskiego, rasistowskiego, homofobicznego, ksenofobicznego, politycznego ani religijnego.",
    "Answers": "Odpowiedzi",
    "A factory set comes with xomtra and changes with updates. Duplicate it to write your own.": "Zestaw fabryczny jest częścią xomtry i zmienia się z aktualizacjami. Zduplikuj go, aby napisać własny.",
    "A set called": "Zestaw o nazwie",
@@ -1174,7 +1168,9 @@
    "and the certificate of this server are filled in; the extension trusts only this certificate, so nothing has to be imported into the computer.": "i certyfikat tego serwera są wpisane; rozszerzenie ufa tylko temu certyfikatowi, więc do komputera nie trzeba niczego importować.",
    "Paste the token and install. The token is not part of the file, Claude Desktop keeps it as a secret.": "Wklej token i zainstaluj. Tokenu nie ma w pliku, Claude Desktop przechowuje go jako sekret.",
    "Open the downloaded xomtra.mcpb: Claude Desktop shows the extension and asks for the token. The address": "Otwórz pobrany xomtra.mcpb: Claude Desktop pokaże rozszerzenie i zapyta o token. Adres",
-   "is filled in.": "jest wpisany."
+   "is filled in.": "jest wpisany.",
+   "Issue a token and paste it into the agent; the page of the new token has the download for Claude Desktop. The agent sends every request with it to xomtra (1); xomtra checks it and answers with data and findings within the token's role (2). xomtra reads Home Assistant on its own and only reads (3): the agent never talks to Home Assistant and cannot switch anything. The model sees only the answers it asked for.": "Wydaj token i wklej go do agenta; na stronie nowego tokenu jest pobieranie dla Claude Desktop. Agent wysyła z nim każde żądanie do xomtra (1); xomtra go sprawdza i odpowiada danymi i wynikami w ramach roli tokenu (2). xomtra sama czyta Home Assistant i tylko czyta (3): agent nigdy nie rozmawia z Home Assistant i nie może niczego przełączyć. Model widzi tylko odpowiedzi, o które poprosił.",
+   "By default xomtra asks the assistant for relevant answers with charts or tables and a friendly tone. Choose another set or write your own below; it applies within 30 seconds. Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Domyślnie xomtra prosi asystenta o trafne odpowiedzi z wykresami lub tabelami i przyjaznym tonem. Inny zestaw wybierzesz albo własny napiszesz poniżej; obowiązuje w ciągu 30 sekund. Podstawowe zasady obowiązują zawsze: żadnych żartów o awariach ani o zagrożeniu życia i zdrowia, nic seksistowskiego, rasistowskiego, homofobicznego, ksenofobicznego, politycznego ani religijnego."
   }
  },
  "th": {

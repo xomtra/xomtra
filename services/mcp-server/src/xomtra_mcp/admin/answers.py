@@ -136,6 +136,14 @@ class AnswersPage:
     @staticmethod
     def _intro() -> str:
         return (
+            "<p class=warn><strong>Style of the answers</strong>"
+            "<span class=more>"
+            "By default xomtra asks the assistant for relevant answers with charts or tables "
+            "and a friendly tone. Choose another set or write your own below; it applies "
+            "within 30 seconds. Core rules always apply: no jokes about accidents or threats "
+            "to life and health, nothing sexist, racist, homophobic, xenophobic, political or "
+            "religious."
+            "</span></p>"
             "<p class=muted>xomtra gives the assistant the core rules and the active set "
             "of answer guidelines with the results of server_info, get_findings and "
             "get_weekly_summary. A change applies within 30 seconds, without a restart; "

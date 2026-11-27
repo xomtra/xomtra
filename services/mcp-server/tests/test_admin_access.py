@@ -162,6 +162,8 @@ async def test_tokens_issue_list_revoke_and_mcpb(fake_ha: tuple[FakeHA, str]) ->
         token = issued.text.split("value='", 1)[1].split("'", 1)[0]
         assert token.startswith("xmt_")
         assert "claude mcp add --transport http xomtra https://xomtra.lan/mcp" in issued.text
+        assert "href='/admin/connect/xomtra.mcpb' download" in issued.text
+        assert "Download for Claude Desktop" in issued.text
         assert "&lt;laptop&gt;" in issued.text
         assert issued.headers["cache-control"] == "no-store"
         info = store.verify(token_hash(token))

@@ -265,7 +265,9 @@ async def test_tokens_page_explains_the_flow_with_actions() -> None:
     async with client_for(app) as client:
         resp = await client.get("/tokens", headers=HA)
     assert "<figure class='flow'>" in resp.text
-    assert f"href='{INGRESS}/connect/xomtra.mcpb' download" in resp.text
+    # The download is on the page of a new token, not in the picture.
+    assert "xomtra.mcpb" not in resp.text
+    assert "Style of the answers" not in resp.text  # on the page Answers
     assert "href='#issue'" in resp.text
     assert "<form id=issue " in resp.text
     # Readable without the stylesheet too (a stale cache): every shape has its own
