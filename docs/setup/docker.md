@@ -21,11 +21,11 @@ Nothing is needed: without settings xomtra uses this machine's LAN address
 (`https://192.168.1.20/`). Reserve that address in your router so that DHCP does not
 change it.
 
-If you want a name instead (`https://xomtra.lan/`), set it in step 1 after the download
+If you want a name instead (`https://xomtra.home.arpa/`), set it in step 1 after the download
 and before the first `docker compose up`:
 
 ```bash
-echo 'XOMTRA_LOCAL_HOST=xomtra.lan' >> .env   # in xomtra/deploy/compose
+echo 'XOMTRA_LOCAL_HOST=xomtra.home.arpa' >> .env   # in xomtra/deploy/compose
 ```
 
 The name only has to resolve to this machine on the clients (browser, Claude Desktop,
@@ -106,7 +106,7 @@ what you need, for example:
 
 | Setting | Default | When to change it |
 | --- | --- | --- |
-| `XOMTRA_LOCAL_HOST` | the LAN address found at start | a DNS name (`xomtra.lan`), or the address changes (DHCP) |
+| `XOMTRA_LOCAL_HOST` | the LAN address found at start | a DNS name (`xomtra.home.arpa`), or the address changes (DHCP) |
 | `ADMIN_CIDR` | all private ranges | limit the admin GUI to your admin machine's network |
 | `LAN_CIDR` | all private ranges | limit who may use the MCP endpoint |
 | `XOMTRA_HA_URL`, `XOMTRA_HA_TOKEN` | entered in the admin GUI | non-interactive install (they win over the GUI) |

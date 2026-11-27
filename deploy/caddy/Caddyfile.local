@@ -4,7 +4,7 @@
 # importing https://<host>/xomtra-ca.crt (or pin it in the Claude Desktop extension).
 #
 # Required environment:
-#   XOMTRA_LOCAL_HOST  name or IP address clients use, e.g. xomtra.lan or 192.168.1.20
+#   XOMTRA_LOCAL_HOST  name or IP address clients use, e.g. xomtra.home.arpa or 192.168.1.20
 #   LAN_CIDR            space separated CIDRs allowed to use the MCP endpoint
 #   ADMIN_CIDR          space separated CIDRs allowed to open the admin GUI
 #

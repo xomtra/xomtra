@@ -7,7 +7,7 @@
 // so nothing is downloaded at install time.
 //
 // Environment (set by the extension manifest from the values entered at install):
-//   XOMTRA_URL      MCP endpoint, e.g. https://xomtra.lan/mcp
+//   XOMTRA_URL      MCP endpoint, e.g. https://xomtra.home.arpa/mcp
 //   XOMTRA_TOKEN    personal token from the admin GUI (xmt_...)
 //   XOMTRA_CA_FILE  optional PEM file of the server's local CA (self-signed setups)
 //
@@ -91,7 +91,7 @@ function fail(message) {
 function config(env) {
   const raw = (env.XOMTRA_URL || "").trim();
   const token = (env.XOMTRA_TOKEN || "").trim();
-  if (!raw) fail("XOMTRA_URL is not set (MCP endpoint, e.g. https://xomtra.lan/mcp)");
+  if (!raw) fail("XOMTRA_URL is not set (MCP endpoint, e.g. https://xomtra.home.arpa/mcp)");
   if (!token) fail("XOMTRA_TOKEN is not set (personal token from the xomtra admin GUI)");
   let url;
   try {
