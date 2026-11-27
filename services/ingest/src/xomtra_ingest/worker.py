@@ -430,8 +430,8 @@ class Scheduler:
         if ratio >= self.min_free_ratio:
             return
         logger.warning(
-            "Only %.0f %% free on the lake's disk (%s); shorten XOMTRA_*_RETENTION_DAYS "
-            "or add space",
+            "Only %.0f %% free on the lake's disk (%s); shorten the retention (admin "
+            "GUI, page Retention) or add space",
             ratio * 100,
             self.disk_path,
         )

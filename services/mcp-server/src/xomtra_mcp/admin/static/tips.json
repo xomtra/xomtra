@@ -46,7 +46,6 @@
   "new_value": "Hodnota po změně.",
   "numeric_share": "Podíl stavů, které jsou čísla.",
   "old_value": "Hodnota před změnou.",
-  "option": "Název volby na kartě Konfigurace doplňku.",
   "outcome": "Výsledek volání: ok nebo chyba.",
   "period start": "Začátek období, ke kterému se nález vztahuje.",
   "q": "Míra falešných objevů (q): očekávaný podíl falešných nálezů při této síle. Menší je jistější.",
@@ -77,10 +76,12 @@
   "value_max": "Největší číselná hodnota v okně profilu.",
   "value_min": "Nejmenší číselná hodnota v okně profilu.",
   "value_p50": "Medián: polovina hodnot je nižší, polovina vyšší.",
-  "variable": "Proměnná prostředí, která nastavuje dobu uchování.",
   "when": "Čas změny.",
   "window": "Délka analyzovaného období ve dnech.",
-  "with area": "Podíl analyzovaných entit, které mají v Home Assistantu oblast."
+  "with area": "Podíl analyzovaných entit, které mají v Home Assistantu oblast.",
+  "configured": "Počet dní z konfigurace instalace (volby doplňku nebo prostředí); platí, když tu není nic uloženo.",
+  "current days": "Kolik dní se uchovává teď.",
+  "new days": "Kolik dní se bude uchovávat po změně."
  },
  "de": {
   "Entities in HA": "Anzahl der Entitäten, die Home Assistant gerade meldet.",
@@ -129,7 +130,6 @@
   "new_value": "Wert nach der Änderung.",
   "numeric_share": "Anteil der Zustände, die Zahlen sind.",
   "old_value": "Wert vor der Änderung.",
-  "option": "Name der Option im Reiter Konfiguration des Add-ons.",
   "outcome": "Ergebnis des Aufrufs: ok oder Fehler.",
   "period start": "Beginn des Zeitraums, auf den sich der Befund bezieht.",
   "q": "Falscherkennungsrate (q-Wert): erwarteter Anteil falscher Befunde bei dieser Stärke. Kleiner ist sicherer.",
@@ -160,10 +160,12 @@
   "value_max": "Größter Zahlenwert im Profilfenster.",
   "value_min": "Kleinster Zahlenwert im Profilfenster.",
   "value_p50": "Median: die Hälfte der Werte liegt darunter, die Hälfte darüber.",
-  "variable": "Umgebungsvariable, die die Aufbewahrung festlegt.",
   "when": "Zeitpunkt der Änderung.",
   "window": "Länge des analysierten Zeitraums in Tagen.",
-  "with area": "Anteil der analysierten Entitäten mit einem Bereich in Home Assistant."
+  "with area": "Anteil der analysierten Entitäten mit einem Bereich in Home Assistant.",
+  "configured": "Tage aus der Konfiguration der Installation (Optionen des Add-ons oder Umgebung); gilt, wenn hier nichts gespeichert ist.",
+  "current days": "So viele Tage werden jetzt aufbewahrt.",
+  "new days": "So viele Tage werden nach der Änderung aufbewahrt."
  },
  "en": {
   "Entities in HA": "Number of entities Home Assistant reports now.",
@@ -212,7 +214,6 @@
   "new_value": "Value after the change.",
   "numeric_share": "Share of states that are numbers.",
   "old_value": "Value before the change.",
-  "option": "Name of the option in the add-on's Configuration tab.",
   "outcome": "Result of the call: ok or error.",
   "period start": "Start of the period the finding refers to.",
   "q": "False discovery rate (q value): the expected share of false findings at this strength. Smaller is more certain.",
@@ -243,10 +244,12 @@
   "value_max": "Largest numeric value in the profile window.",
   "value_min": "Smallest numeric value in the profile window.",
   "value_p50": "Median: half of the values are below, half above.",
-  "variable": "Environment variable that sets the retention.",
   "when": "Time of the change.",
   "window": "Length of the analysed period in days.",
-  "with area": "Share of analysed entities that have an area in Home Assistant."
+  "with area": "Share of analysed entities that have an area in Home Assistant.",
+  "configured": "Days from the installation's configuration (the add-on's options or the environment); used when nothing is stored here.",
+  "current days": "Days kept now.",
+  "new days": "Days kept after the change."
  },
  "nl": {
   "Entities in HA": "Aantal entiteiten dat Home Assistant nu meldt.",
@@ -295,7 +298,6 @@
   "new_value": "Waarde na de wijziging.",
   "numeric_share": "Aandeel toestanden dat een getal is.",
   "old_value": "Waarde vóór de wijziging.",
-  "option": "Naam van de optie op het tabblad Configuratie van de add-on.",
   "outcome": "Resultaat van de aanroep: ok of fout.",
   "period start": "Begin van de periode waarop de bevinding betrekking heeft.",
   "q": "False discovery rate (q-waarde): het verwachte aandeel valse bevindingen bij deze sterkte. Kleiner is zekerder.",
@@ -326,10 +328,12 @@
   "value_max": "Grootste numerieke waarde in het profielvenster.",
   "value_min": "Kleinste numerieke waarde in het profielvenster.",
   "value_p50": "Mediaan: de helft van de waarden ligt eronder, de helft erboven.",
-  "variable": "Omgevingsvariabele die de bewaartermijn instelt.",
   "when": "Tijdstip van de wijziging.",
   "window": "Lengte van de geanalyseerde periode in dagen.",
-  "with area": "Aandeel geanalyseerde entiteiten met een ruimte in Home Assistant."
+  "with area": "Aandeel geanalyseerde entiteiten met een ruimte in Home Assistant.",
+  "configured": "Dagen uit de configuratie van de installatie (opties van de add-on of de omgeving); geldt als hier niets is opgeslagen.",
+  "current days": "Zoveel dagen worden nu bewaard.",
+  "new days": "Zoveel dagen worden na de wijziging bewaard."
  },
  "pl": {
   "Entities in HA": "Liczba encji, które Home Assistant teraz zgłasza.",
@@ -378,7 +382,6 @@
   "new_value": "Wartość po zmianie.",
   "numeric_share": "Udział stanów będących liczbami.",
   "old_value": "Wartość przed zmianą.",
-  "option": "Nazwa opcji na karcie Konfiguracja dodatku.",
   "outcome": "Wynik wywołania: ok lub błąd.",
   "period start": "Początek okresu, którego dotyczy wynik.",
   "q": "Odsetek fałszywych odkryć (wartość q): oczekiwany udział fałszywych wyników przy tej sile. Mniejsza jest pewniejsza.",
@@ -409,9 +412,11 @@
   "value_max": "Największa wartość liczbowa w oknie profilu.",
   "value_min": "Najmniejsza wartość liczbowa w oknie profilu.",
   "value_p50": "Mediana: połowa wartości jest niższa, połowa wyższa.",
-  "variable": "Zmienna środowiskowa ustawiająca czas przechowywania.",
   "when": "Czas zmiany.",
   "window": "Długość analizowanego okresu w dniach.",
-  "with area": "Udział analizowanych encji, które mają obszar w Home Assistant."
+  "with area": "Udział analizowanych encji, które mają obszar w Home Assistant.",
+  "configured": "Liczba dni z konfiguracji instalacji (opcje dodatku lub środowisko); obowiązuje, gdy nic tu nie zapisano.",
+  "current days": "Liczba dni przechowywanych teraz.",
+  "new days": "Liczba dni przechowywanych po zmianie."
  }
 }

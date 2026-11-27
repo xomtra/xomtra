@@ -4,13 +4,13 @@ configuration:
     description: Poziom logowania usług xomtra.
   states_retention_days:
     name: Historia stanów (dni)
-    description: Ile dni historii stanów jest przechowywanych w lake.
+    description: Ile dni historii stanów jest przechowywanych w lake. Wartość domyślna; strona Retencja w panelu xomtry może ją nadpisać.
   statistics_5min_retention_days:
     name: Statystyki 5-minutowe (dni)
-    description: Ile dni statystyk 5-minutowych jest przechowywanych w lake.
+    description: Ile dni statystyk 5-minutowych jest przechowywanych w lake. Wartość domyślna; strona Retencja w panelu xomtry może ją nadpisać.
   statistics_hour_retention_days:
     name: Statystyki godzinowe (dni)
-    description: Ile dni statystyk godzinowych jest przechowywanych w lake.
+    description: Ile dni statystyk godzinowych jest przechowywanych w lake. Wartość domyślna; strona Retencja w panelu xomtry może ją nadpisać.
   mcp_url:
     name: Adres MCP
     description: >-

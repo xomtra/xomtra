@@ -234,6 +234,36 @@ SPECS: tuple[Spec, ...] = (
 )
 BY_KEY: dict[str, Spec] = {s.key: s for s in SPECS}
 
+# Retention periods (ADR 034, ADR 094): stored by the admin GUI's page Retention in the
+# same history as the analysis settings, applied by the next retention run. Their
+# default comes from the edition (hacore.edition) or the installation's configuration
+# (environment, the add-on's options); ``default`` here is the full edition's.
+RETENTION = "Retention"
+RETENTION_SPECS: tuple[Spec, ...] = (
+    Spec("states_retention_days", "int", 365, RETENTION, "States", lo=1, hi=3650),
+    Spec(
+        "statistics_5min_retention_days",
+        "int",
+        365,
+        RETENTION,
+        "5-minute statistics",
+        lo=1,
+        hi=3650,
+    ),
+    Spec(
+        "statistics_hour_retention_days",
+        "int",
+        5 * 365,
+        RETENTION,
+        "Hourly statistics",
+        lo=1,
+        hi=3650,
+    ),
+)
+RETENTION_BY_KEY: dict[str, Spec] = {s.key: s for s in RETENTION_SPECS}
+# Every key the admin GUI may store.
+STORED_BY_KEY: dict[str, Spec] = BY_KEY | RETENTION_BY_KEY
+
 
 def parse_stored(rows: list[tuple[str, Any]]) -> tuple[dict[str, Value], list[str]]:
     """Stored overrides (key, decoded JSON value) that are known and valid, and the
@@ -241,7 +271,7 @@ def parse_stored(rows: list[tuple[str, Any]]) -> tuple[dict[str, Value], list[st
     out: dict[str, Value] = {}
     problems: list[str] = []
     for key, raw in rows:
-        spec = BY_KEY.get(key)
+        spec = STORED_BY_KEY.get(key)
         if spec is None:
             problems.append(f"{key}: unknown setting, ignored")
             continue

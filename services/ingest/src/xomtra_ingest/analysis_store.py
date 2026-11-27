@@ -1,6 +1,7 @@
 """Analysis settings stored by the admin GUI (ADR 060), applied over the environment.
 
-The admin GUI appends changes to ``analysis.setting_change`` in the audit database; the
+The admin GUI appends changes to ``analysis.setting_change`` in the audit database (the
+analysis thresholds and, ADR 094, the retention periods); the
 ingest's ops role may only call ``analysis.current_settings()``. Every analysis run
 reads them again, so a change needs no restart. If the database cannot be reached the
 run goes on with the environment and the defaults, and says so in the log.
@@ -11,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from hacore.analysis_settings import BY_KEY, Value, parse_stored
+from hacore.analysis_settings import STORED_BY_KEY, Value, parse_stored
 from hacore.findings import Dismissal
 from xomtra_ingest.settings import IngestSettings
 
@@ -61,12 +62,13 @@ def load_dismissals(s: IngestSettings) -> list[Dismissal]:
 
 
 def with_overrides(s: IngestSettings, overrides: dict[str, Value] | None = None) -> IngestSettings:
-    """``s`` with the stored analysis settings applied (stored > environment > default)."""
+    """``s`` with the stored analysis and retention settings applied (stored >
+    environment > default)."""
     values = load_overrides(s) if overrides is None else overrides
-    values = {k: v for k, v in values.items() if k in BY_KEY}
+    values = {k: v for k, v in values.items() if k in STORED_BY_KEY}
     if not values:
         return s
-    logger.info("Stored analysis settings: %s", values)
+    logger.info("Stored settings: %s", values)
     data = s.model_dump()
     data.update(values)
     return type(s)(**data)

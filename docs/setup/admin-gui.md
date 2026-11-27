@@ -12,15 +12,25 @@ sign-ins of the Claude connector, each with **Disconnect**.
 | Overview | Home Assistant connection (version, latency, entities), last state and statistic in the lake, catalog by kind with stale entities, drift of the last 7 days |
 | Catalog | searchable entity profile (kind, change rate, value range, stale, range shift) |
 | Drift | changes between daily profiles, last 30 days |
-| Retention | configured retention periods with their cut-off dates, size of every lake table |
+| Retention | retention periods of states, 5-minute and hourly statistics, each with its cut-off date, a form to change it and the history of changes; size of every lake table |
 | Findings | confidence of the last correlation runs (low power, area coverage, analysed entities without an area, ADR 067), current findings with *Dismiss* (for good or for 30/90/365 days, with a reason) and the list of dismissed findings with *Undo* |
 | Analysis settings | thresholds of correlations, anomalies and change points (target q, minimum \|r\|, z cap, windows, method, display of indirect and common-factor relations), with a preview of their effect on the current findings and the history of changes |
 | Audit | last 200 calls of MCP tools and of this GUI, with the identity provider (`entra`, `ha`, `token`) |
 | Tokens | local access only: issue and revoke personal tokens, connect instructions and the Claude Desktop extension ([local access](local-access.md)) |
 | Dagster | the Dagster UI (`/admin/dagster/`): runs, schedules, launching jobs |
 
-Retention values are set in `.env` (`XOMTRA_*_RETENTION_DAYS`) and applied by the
-ingest; the GUI shows them read-only.
+### Retention (ADR 094)
+
+The three retention periods (states, 5-minute statistics, hourly statistics; 1 to 3650
+days) are set on the page **Retention**. A value saved there wins over the
+installation's configuration (`XOMTRA_*_RETENTION_DAYS` in compose, the add-on's options
+`*_retention_days`), which stays the default; *Reset* hands the period back to it. The
+next retention run (daily at 03:30, or earlier when the disk runs full) uses the value,
+without a restart. A shorter period than the current one asks for a confirmation,
+because the next run deletes the older data for good (xomtra can load again only what
+Home Assistant still keeps). Changes are stored like the analysis settings (schema
+`analysis` of the audit database, with who, when, value and reason) and every change is
+in the audit (`admin:retention_setting`, with the previous value).
 
 ### Analysis settings (ADR 060)
 

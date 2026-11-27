@@ -105,7 +105,9 @@ def restate(start: datetime, end: datetime) -> None:
 
 
 def retention(settings: IngestSettings | None = None) -> dict[str, Any]:
-    s = settings or IngestSettings()
+    """Delete rows older than the retention periods; a period stored in the admin GUI
+    wins over the environment (ADR 094) and is read again on every run."""
+    s = analysis_store.with_overrides(settings or IngestSettings())
     with open_lake() as con:
         result = maintenance.apply_retention(con, s.retention)
     return {

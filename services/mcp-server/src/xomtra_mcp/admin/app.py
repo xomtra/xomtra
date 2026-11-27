@@ -40,7 +40,7 @@ from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Re
 from starlette.routing import Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from hacore.analysis_settings import BY_KEY, SPECS, Spec, Value
+from hacore.analysis_settings import BY_KEY, RETENTION_BY_KEY, RETENTION_SPECS, SPECS, Spec, Value
 from hacore.ha_connection import HAConnection, StoreError, normalize_url
 from hacore.ha_connection import save as save_connection
 from xomtra_mcp.access import AccessStore, AccessStoreError, PostgresAccessStore
@@ -662,43 +662,110 @@ class AdminApp:
         body = "<p class=muted>Last 30 days</p>" + table(cols, [[r[c] for c in cols] for r in rows])
         return HTMLResponse(page("Entity changes", body, user.get("username")))
 
-    async def retention(self, request: Request, user: dict[str, Any]) -> Response:
-        s = self.settings
-        now = datetime.now(UTC)
-        periods = [
-            ("States", "STATES_RETENTION_DAYS", s.states_retention_days),
-            (
-                "5-minute statistics",
-                "STATISTICS_5MIN_RETENTION_DAYS",
-                s.statistics_5min_retention_days,
-            ),
-            (
-                "Hourly statistics",
-                "STATISTICS_HOUR_RETENTION_DAYS",
-                s.statistics_hour_retention_days,
-            ),
-        ]
-        if self.ingress:
-            # The add-on's options carry the same names in lower case (xomtra-env).
-            periods = [(n, v.lower(), d) for n, v, d in periods]
-            body = (
-                "<p class=muted>Applied daily at 03:30; the data files disappear 7 days "
-                "later. Change the days in the add-on's Configuration tab; the add-on "
-                "restarts with them.</p>"
-            )
-        else:
-            periods = [(n, f"XOMTRA_{v}", d) for n, v, d in periods]
-            body = (
-                "<p class=muted>Applied daily at 03:30 (job retention_daily); the data files "
-                "disappear 7 days later. Change the values in <code>.env</code> and restart "
-                "the ingest containers.</p>"
-            )
-        body += table(
-            ["data", "option" if self.ingress else "variable", "days", "deleted before"],
-            [(n, v, d, (now - timedelta(days=d)).date().isoformat()) for n, v, d in periods],
-            {2},
+    def _configured_retention(self) -> dict[str, int]:
+        """Retention days of the installation (environment, the add-on's options)."""
+        return {spec.key: int(getattr(self.settings, spec.key)) for spec in RETENTION_SPECS}
+
+    async def _stored_retention(self) -> tuple[dict[str, Change], list[Change]] | None:
+        """Retention periods stored in the admin GUI and their history (ADR 094);
+        None without a settings store."""
+        if self.analysis is None:
+            return None
+        current = await asyncio.to_thread(self.analysis.current)
+        history = await asyncio.to_thread(self.analysis.history, 500)
+        return (
+            {k: c for k, c in current.items() if k in RETENTION_BY_KEY},
+            [c for c in history if c.key in RETENTION_BY_KEY][:50],
         )
-        body += f"<p class=muted>Catalog profile window: {e(s.catalog_window_days)} days.</p>"
+
+    def _retention_row(
+        self, spec: Spec, configured: int, stored: Change | None, effective: int, now: datetime
+    ) -> list[Any]:
+        buttons = "<button name=action value=save>Save</button>"
+        if stored is not None:
+            buttons += " <button name=action value=reset>Reset</button>"
+        form = (
+            f"<form class=filters method=post action='{prefix()}/retention'>"
+            f"<input type=hidden name=key value='{e(spec.key)}'>"
+            f"<input name=value type=number inputmode=numeric min={spec.lo:g} max={spec.hi:g} "
+            f"step=1 required value='{effective}' aria-label='days'>"
+            "<input name=reason size=18 maxlength=200 placeholder='reason (optional)'>"
+            f"{buttons}</form>"
+        )
+        who = f"{e(stored.changed_by)}, {fmt(stored.changed_at)}" if stored else ""
+        return [
+            spec.label,
+            configured,
+            stored.value if stored else None,
+            effective,
+            (now - timedelta(days=effective)).date(),
+            who,
+            form,
+        ]
+
+    async def retention(
+        self, request: Request, user: dict[str, Any], *, note: str = "", status_code: int = 200
+    ) -> Response:
+        title = "Retention"
+        now = datetime.now(UTC)
+        configured = self._configured_retention()
+        try:
+            stored_all = await self._stored_retention()
+        except SettingsStoreError:
+            stored_all = None
+            note += "<p class=bad>The settings store is unavailable.</p>"
+            status_code = max(status_code, 503)
+        stored, history = stored_all or ({}, [])
+        body = note + (
+            "<p class=muted>Applied daily at 03:30; the data files disappear 7 days later. "
+            "A value saved here wins over the installation's configuration and is used by "
+            "the next run, without a restart. Reset hands the period back to the "
+            "installation's configuration.</p>"
+        )
+        if self.analysis is None:
+            body += (
+                "<p class=warn>The settings store is not configured for the admin GUI; the "
+                "periods cannot be changed here.</p>"
+            )
+            rows = [
+                [
+                    spec.label,
+                    configured[spec.key],
+                    configured[spec.key],
+                    (now - timedelta(days=configured[spec.key])).date(),
+                ]
+                for spec in RETENTION_SPECS
+            ]
+            body += table(["data", "configured", "days", "deleted before"], rows, {1, 2})
+        else:
+            rows = []
+            for spec in RETENTION_SPECS:
+                change = stored.get(spec.key)
+                effective = int(change.value) if change else configured[spec.key]  # type: ignore[arg-type]
+                rows.append(self._retention_row(spec, configured[spec.key], change, effective, now))
+            body += table(
+                ["data", "configured", "stored", "days", "deleted before", "changed", ""],
+                rows,
+                {1, 2, 3},
+                trusted_html={5, 6},
+            )
+            body += "<p class=muted>Allowed: 1 to 3650 days.</p>"
+        window = e(self.settings.catalog_window_days)
+        body += f"<p class=muted>Catalog profile window: {window} days.</p>"
+        if history:
+            body += "<h2>History</h2>" + table(
+                ["when", "data", "value", "by", "reason"],
+                [
+                    [
+                        c.changed_at,
+                        RETENTION_BY_KEY[c.key].label,
+                        "back to configuration" if c.value is None else c.value,
+                        c.changed_by,
+                        c.reason,
+                    ]
+                    for c in history
+                ],
+            )
         if self.data is not None:
             sizes = await asyncio.to_thread(status.table_sizes, self.data)
             body += "<h2>Tables in the lake</h2>" + table(
@@ -706,7 +773,85 @@ class AdminApp:
                 [list(r.values()) for r in sizes],
                 {2, 3, 4, 5},
             )
-        return HTMLResponse(page("Retention", body, user.get("username")))
+        return HTMLResponse(page(title, body, user.get("username")), status_code)
+
+    async def retention_post(self, request: Request, user: dict[str, Any]) -> Response:
+        """Store a retention period (ADR 094); shortening needs a confirmation."""
+        form = await self._form(request)
+        spec = RETENTION_BY_KEY.get(form.get("key", ""))
+        action = form.get("action", "save")
+        reason = form.get("reason", "")[:200] or None
+        if spec is None or action not in ("save", "reset") or self.analysis is None:
+            return await self.retention(
+                request, user, note="<p class=bad>Unknown setting.</p>", status_code=400
+            )
+        configured = self._configured_retention()[spec.key]
+        value: int | None = None
+        try:
+            current = await asyncio.to_thread(self.analysis.current)
+            change = current.get(spec.key)
+            effective = int(change.value) if change else configured  # type: ignore[arg-type]
+            if action == "save":
+                try:
+                    value = int(spec.parse(form.get("value", "")))
+                except ValueError:
+                    return await self.retention(
+                        request,
+                        user,
+                        note=(
+                            f"<p class=bad><b>{e(spec.label)}</b> "
+                            "Enter a whole number of days from 1 to 3650.</p>"
+                        ),
+                        status_code=400,
+                    )
+            new = configured if value is None else value
+            if new < effective and form.get("confirm") != "1":
+                cutoff = (datetime.now(UTC) - timedelta(days=new)).date()
+                keep = (
+                    f"<input type=hidden name=key value='{e(spec.key)}'>"
+                    f"<input type=hidden name=action value='{e(action)}'>"
+                    f"<input type=hidden name=value value='{e(new)}'>"
+                    f"<input type=hidden name=reason value='{e(reason or '')}'>"
+                )
+                note = (
+                    f"<h2>{e(spec.label)}</h2>"
+                    + cards(
+                        [
+                            ("current days", effective, ""),
+                            ("new days", new, "warn"),
+                            ("deleted before", cutoff, "bad"),
+                        ]
+                    )
+                    + "<p class=warn>Shortening the period deletes the older data at the next "
+                    "run. It cannot be undone; xomtra can only load again what Home Assistant "
+                    "still keeps in its own history.</p>"
+                    f"<form class=filters method=post action='{prefix()}/retention'>{keep}"
+                    "<label><input type=checkbox name=confirm value=1 required> "
+                    "delete the older data</label>"
+                    "<button class=danger>Shorten</button></form>"
+                )
+                return await self.retention(request, user, note=note, status_code=409)
+            await asyncio.to_thread(
+                self.analysis.set, spec.key, value, by=user.get("username"), reason=reason
+            )
+            await self._audit(
+                "retention_setting",
+                user,
+                arguments={
+                    "key": spec.key,
+                    "value": value,
+                    "previous": effective,
+                    "reason": reason,
+                },
+            )
+        except (SettingsStoreError, AuditError):
+            return await self.retention(
+                request,
+                user,
+                note="<p class=bad>Not saved: the settings store or audit is unavailable.</p>",
+                status_code=503,
+            )
+        return RedirectResponse(f"{prefix()}/retention", status_code=303)
 
     async def audit_page(self, request: Request, user: dict[str, Any]) -> Response:
         rows = await self.recent_audit()
@@ -805,10 +950,11 @@ class AdminApp:
             return HTMLResponse(page(title, body, user.get("username")))
         try:
             current = await asyncio.to_thread(self.analysis.current)
-            history = await asyncio.to_thread(self.analysis.history, 50)
+            history = await asyncio.to_thread(self.analysis.history, 500)
         except SettingsStoreError:
             body = "<p class=bad>The settings store is unavailable.</p>"
             return HTMLResponse(page(title, body, user.get("username")), 503)
+        history = [c for c in history if c.key not in RETENTION_BY_KEY][:50]
         body = note + (
             "<p class=warn>If the findings work for you, leave these settings as they are."
             "</p>"
@@ -1775,6 +1921,11 @@ class AdminApp:
             Route(f"{PREFIX}/catalog", p("catalog", self.catalog)),
             Route(f"{PREFIX}/drift", p("drift", self.drift)),
             Route(f"{PREFIX}/retention", p("retention", self.retention)),
+            Route(
+                f"{PREFIX}/retention",
+                p("retention_setting", self.retention_post, audit=False),
+                methods=["POST"],
+            ),
             Route(f"{PREFIX}/audit", p("audit", self.audit_page)),
             Route(f"{PREFIX}/analysis", p("analysis", self.analysis_page)),
             Route(
