@@ -305,7 +305,7 @@ async def test_gui_follows_the_language_cookie_and_accept_language() -> None:
         en = await client.get("/", headers={**HA, "accept-language": "fr-FR"})
     assert "<html lang=cs>" in cs.text
     assert "<h1>Přehled</h1>" in cs.text
-    assert "Zálohy Home Assistantu neobsahují analytiku xomtra" in cs.text
+    assert "Zálohy Home Assistantu neobsahují analytiku xomtry" in cs.text
     assert "Home Assistant backups do not include" not in cs.text
     assert ">Vydat token</button>" in tokens.text
     assert "placeholder='pro koho'" in tokens.text
