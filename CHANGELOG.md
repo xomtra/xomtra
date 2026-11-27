@@ -11,6 +11,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-27
+
 ### Added
 
 - Admin page **Answers** (ADR 090): named sets of answer guidelines kept in the local
@@ -517,7 +519,8 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/xomtra/xomtra/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/xomtra/xomtra/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/xomtra/xomtra/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/xomtra/xomtra/compare/v0.6.2...v0.7.0

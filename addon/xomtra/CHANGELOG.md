@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.9.0 - 2026-11-27
+
+### Added
+
+- Admin page **Answers** (ADR 090): named sets of answer guidelines kept in the local
+  database. Factory sets **Default** (relevant data first, the answer first, then a chart
+  or a table, friendly tone, with topics: energy with solar, battery, feed-in and costs;
+  security with alarms, cameras and motion, counted per area and never per person;
+  vehicles; heating and indoor climate; water; device health; the weekly overview, each
+  with what to look at, which charts and optional external sources such as spot prices,
+  weather or fuel prices), **Concise** (as short as possible, no jokes) and **Core
+  only** (no guidelines); custom sets (up to 20, 8,000 characters each) are duplicated from any set and edited in
+  the browser, with a preview of exactly what the assistant gets, a history with restore,
+  and export and import as JSON. One set is active; a change applies within 30 seconds,
+  without a restart.
+
+### Changed
+
+- The default answer guidelines aim at relevant results and readable answers: search
+  before answering, compare periods, rank findings, answer first, charts or compact
+  tables, "what to check" at the end.
+- The core rules also cover conclusions about persons, invented values and read only
+  access; they come before every set and cannot be changed or turned off.
+- Tool descriptions carry only the short core rules; `answer_guidelines` in the results
+  of `server_info`, `get_findings` and `get_weekly_summary` carry the core rules and the
+  active set; other data results name the active set (`answer_guidelines_set`).
+
+### Removed
+
+- Add-on options `answer_style` and `default_guidelines` and the variables
+  `XOMTRA_ANSWER_STYLE` and `XOMTRA_DEFAULT_GUIDELINES`, including the pub style.
+  **Upgrade note:** every installation starts with the set Default (also those that had
+  the pub style). If you had turned the guidelines off, activate **Core only** on the
+  page Answers; a pub-like tone can be written as a custom set (within the core rules).
+- The place for a central theme from xomtra.com (ADR 075): no text for the assistant ever
+  comes from a central service.
+
 ## 0.8.0 - 2026-11-27
 
 ### Added
@@ -116,41 +153,5 @@
   local MCP server: a short version is part of every data tool description, and the
   full text comes with `server_info`, `get_findings` and `get_weekly_summary`
   (`answer_guidelines`).
-
-## 0.6.1 - 2026-11-26
-
-### Added
-
-- Admin GUI, Tokens and Connect clients: a note on which AI assistants can connect to
-  the local access mode (assistants on a computer in the LAN, not cloud connectors
-  such as claude.ai or ChatGPT).
-- Admin GUI footer with the version (links to its release notes), xomtra.com, the
-  documentation and bug reports. The links open in a new tab and send no Referer.
-
-### Changed
-
-- Claude Desktop extension: the xomtra icon and xomtra.com as its homepage.
-- Admin GUI overview: smaller card values that fit on one line, clearer catalog column
-  names (entity kind, entities, stale entities), the profiling time in the local
-  format, and the backup note in one box.
-
-### Fixed
-
-- Claude Desktop extension did not start in Claude Desktop's built-in Node.js
-  ("Unable to connect to extension server"): the bridge only started when run as the
-  main script. It now always starts.
-- Claude Desktop extension: a server it cannot connect to (wrong address, or on macOS
-  Claude not allowed in Local Network) now gives an error with a hint within 10 s
-  instead of Claude Desktop's "Unable to connect to extension server" after a minute.
-- Admin GUI: Safari saved the Claude Desktop extension as `xomtra.zip`. It is now
-  sent as `application/octet-stream` with a plain file name and saves as
-  `xomtra.mcpb`.
-- Admin GUI after an upgrade: the browser kept the previous version's stylesheet and
-  script (cached for an hour or a day) and showed the new pages half unstyled. Their
-  URLs now carry a version (also the tips and the icon), so an upgrade loads the new
-  ones, and the token diagram stays readable without its stylesheet.
-- Home Assistant add-on: the update dialog said "No changelog found". The add-on now
-  ships its own `CHANGELOG.md` with the last five released versions;
-  `scripts/release.py prepare` writes it and `check` refuses a tag without it.
 
 Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md
