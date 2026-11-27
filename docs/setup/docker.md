@@ -8,6 +8,27 @@ Requirements: Docker Engine with the Compose plugin (`docker compose version`), 
 cores and 4 GB RAM for the full edition (2 GB for the lite edition), a few GB of disk,
 and Home Assistant reachable from this machine.
 
+## 0. Address (optional, before the first start)
+
+Nothing is needed: without settings xomtra uses this machine's LAN address
+(`https://192.168.1.20/`). Reserve that address in your router so that DHCP does not
+change it.
+
+If you want a name instead (`https://xomtra.lan/`), set it in step 1 after the download
+and before the first `docker compose up`:
+
+```bash
+echo 'XOMTRA_LOCAL_HOST=xomtra.lan' >> .env   # in xomtra/deploy/compose
+```
+
+The name only has to resolve to this machine on the clients (browser, Claude Desktop,
+Claude Code), e.g. a DNS record in your router or Pi-hole; the server itself does not
+look it up, and no public DNS or internet access is needed. xomtra then answers only
+under that name, not under the IP address.
+
+You can change it later (see [Optional settings](#optional-settings-env)), so a final
+name is not a precondition; it only saves you from updating the clients afterwards.
+
 ## 1. Start
 
 Download the release (or clone the repository), start the stack and print the setup
@@ -85,11 +106,16 @@ what you need, for example:
 | `XOMTRA_ACCESS_MODE=public` | `local` | Claude connector on a public host, see [claude-connector.md](claude-connector.md) |
 
 `./init-env.sh` asks these questions and writes `.env` for you. After changing `.env`,
-run `docker compose up -d` again.
+run `docker compose up -d --force-recreate`: the address is part of the links of the
+admin GUI and of the Home Assistant sign-in, and services that did not change otherwise
+would keep the old one. The data, tokens and the Home Assistant connection stay (they
+are in the volumes).
 
-The address is found at every `docker compose up`. If the machine gets a new address
-from DHCP, run `docker compose up -d` again (or reserve the address in your router, or
-set `XOMTRA_LOCAL_HOST`).
+The address is found at every start. If the machine gets a new address from DHCP, or
+you change `XOMTRA_LOCAL_HOST` later, run `docker compose up -d --force-recreate`. Caddy
+issues the certificate for the new address from the same local CA, so clients that
+trust the CA keep trusting the server; only the URL in the clients (MCP endpoint,
+bookmarks) has to be updated.
 
 ## Backups
 

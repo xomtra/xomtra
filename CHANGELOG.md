@@ -27,6 +27,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   searching for it in `docker compose logs admin` (where it stays as well). The new
   command `xomtra-admin setup-link` prints the link while Home Assistant is not
   connected, and where to sign in once it is.
+- Docs (Docker compose): new step "0. Address" (the LAN address works without settings;
+  a name goes into `.env` before the first start and only has to resolve on the
+  clients). Changing the address later needs `docker compose up -d --force-recreate`,
+  not just `up -d`, so that every service takes the new address.
 
 ### Fixed
 
