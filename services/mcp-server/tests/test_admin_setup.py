@@ -14,7 +14,7 @@ from hacore.testing import VALID_TOKEN, FakeHA, running_fake_ha
 from xomtra_mcp.admin import app as app_module
 from xomtra_mcp.admin import setup
 from xomtra_mcp.admin.__main__ import _announce_setup, main
-from xomtra_mcp.admin.app import AdminApp
+from xomtra_mcp.admin.app import AdminApp, _default_ha_port
 from xomtra_mcp.admin.config import AdminSettings
 from xomtra_mcp.audit import MemoryAuditSink
 
@@ -231,3 +231,48 @@ def test_unknown_argument_is_refused() -> None:
     with pytest.raises(SystemExit) as exit_info:
         main(["nonsense"])
     assert "usage" in str(exit_info.value.code)
+
+
+def test_default_ha_port() -> None:
+    assert _default_ha_port("http://192.0.2.5") == "http://192.0.2.5:8123"
+    assert _default_ha_port("https://ha.example/") == "https://ha.example:8123/"
+    assert _default_ha_port("http://[2001:db8::1]") == "http://[2001:db8::1]:8123"
+    assert _default_ha_port("http://192.0.2.5:8123") is None
+    assert _default_ha_port("https://ha.example:443") is None
+
+
+async def test_setup_without_port_tries_8123_then_hints(
+    fake_ha: tuple[FakeHA, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, ha_url = fake_ha
+    app, _, _, saved = make_app(monkeypatch)
+    code = setup.setup_code(SESSION_KEY)
+    tried: list[str] = []
+    real = app_module.status.ha_status
+
+    async def ha_status(url: str | None, token: str | None) -> dict[str, Any]:
+        tried.append(str(url))
+        # The address without a port reaches something else; :8123 is Home Assistant.
+        return await real(ha_url if str(url).endswith(":8123") else "http://127.0.0.1:9", token)
+
+    monkeypatch.setattr(app_module.status, "ha_status", ha_status)
+    async with client_for(app) as client:
+        done = await client.post(
+            "/admin/setup", data={"code": code, "url": "http://192.0.2.5", "token": VALID_TOKEN}
+        )
+        assert done.status_code == 200, done.text
+        assert tried == ["http://192.0.2.5", "http://192.0.2.5:8123"]
+        assert saved[0]["url"] == "http://192.0.2.5:8123"
+
+    async def unreachable(url: str | None, token: str | None) -> dict[str, Any]:
+        return await real("http://127.0.0.1:9", token)
+
+    monkeypatch.setattr(app_module.status, "ha_status", unreachable)
+    app, _, _, saved = make_app(monkeypatch)
+    async with client_for(app) as client:
+        failed = await client.post(
+            "/admin/setup", data={"code": code, "url": "http://192.0.2.5", "token": VALID_TOKEN}
+        )
+    assert failed.status_code == 400
+    assert "The address has no port." in failed.text
+    assert saved == []

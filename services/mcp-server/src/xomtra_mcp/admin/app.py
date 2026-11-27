@@ -116,10 +116,19 @@ def _same_address(peer: str, expected: str) -> bool:
 
 def connection_error(ha: dict[str, Any]) -> str:
     """Why Home Assistant cannot be reached: a sentence, then the technical detail."""
-    detail = ha.get("detail")
-    return f"<p class=bad>{e(ha['error'])}</p>" + (
+    detail, hint = ha.get("detail"), ha.get("hint")
+    return (f"<p class=bad>{e(ha['error'])}</p>" + (f"<p>{e(hint)}</p>" if hint else "")) + (
         f"<p class=muted>Details: <code>{e(detail)}</code></p>" if detail else ""
     )
+
+
+def _default_ha_port(url: str) -> str | None:
+    """The URL with Home Assistant's port 8123 if it names no port, else None."""
+    parts = urlparse(url)
+    if parts.port is not None or not parts.hostname:
+        return None
+    host = f"[{parts.hostname}]" if ":" in parts.hostname else parts.hostname
+    return parts._replace(netloc=f"{host}:8123").geturl()
 
 
 def _url_host(hostname: str) -> str:
@@ -1551,7 +1560,7 @@ class AdminApp:
             f"<form class=filters method=post action='{prefix()}{setup.PATH}'>"
             + (f"<input type=hidden name=code value='{e(code)}'>" if code else "")
             + "<label>Home Assistant URL <input name=url required maxlength=300 size=40 "
-            f"placeholder='http://homeassistant.local:8123' value='{e(url)}'></label>"
+            f"placeholder='http://192.168.1.10:8123' value='{e(url)}'></label>"
             "<label>Long-lived access token <input name=token type=password maxlength=1000 "
             f"size=40 autocomplete=new-password spellcheck=false{'' if current else ' required'}>"
             "</label>"
@@ -1629,6 +1638,17 @@ class AdminApp:
             body = self._setup_form(code, current, "Enter the access token.")
             return HTMLResponse(page(title, body, who), 400, headers=self.headers)
         ha = await status.ha_status(url, token)
+        if not ha.get("ok") and (with_port := _default_ha_port(url)):
+            # Without a port the address means 80/443, where often something else answers
+            # (and may even refuse the token); Home Assistant itself listens on 8123.
+            retry = await status.ha_status(with_port, token)
+            if retry.get("ok"):
+                url, ha = with_port, retry
+            else:
+                ha["hint"] = (
+                    "The address has no port. Home Assistant normally listens on the port "
+                    "8123, for example http://192.168.1.10:8123."
+                )
         if not ha.get("ok"):
             body = connection_error(ha) + self._setup_form(code, current, None)
             return HTMLResponse(page(title, body, who), 400, headers=self.headers)

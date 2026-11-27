@@ -27,6 +27,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   terminal line, a trailing newline) is dropped instead of making Home Assistant reject
   the token, and the token field asks password managers not to fill in a saved password
   (`autocomplete=new-password`).
+- Setup page: an address without a port (`http://192.168.1.10`) means port 80 or 443,
+  where often another server answers. The setup now tries Home Assistant's port 8123 as
+  well and stores that address if it works; otherwise the error says that the port is
+  missing. The example in the URL field shows the port.
 
 ## [0.9.1] - 2026-11-27
 

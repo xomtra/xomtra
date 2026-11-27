@@ -315,7 +315,8 @@
    "Something other than Home Assistant answered at this address. Check the address and the port; if Home Assistant uses HTTPS, use https://, and a reverse proxy must pass WebSockets.": "Na této adrese odpověděl někdo jiný než Home Assistant. Zkontrolujte adresu a port; pokud Home Assistant používá HTTPS, použijte https://, a reverzní proxy musí propouštět WebSockety.",
    "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant neodpověděl včas. Zkontrolujte, že se k němu tento server dostane: adresu, port a firewall mezi nimi.",
    "Home Assistant cannot be reached at this address.": "Home Assistant na této adrese není dostupný.",
-   "Details:": "Podrobnosti:"
+   "Details:": "Podrobnosti:",
+   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Adresa nemá port. Home Assistant obvykle poslouchá na portu 8123, například http://192.168.1.10:8123."
   },
   "de": {
    "(address": "(Adresse",
@@ -594,7 +595,8 @@
    "Something other than Home Assistant answered at this address. Check the address and the port; if Home Assistant uses HTTPS, use https://, and a reverse proxy must pass WebSockets.": "Unter dieser Adresse hat etwas anderes als Home Assistant geantwortet. Prüfe Adresse und Port; verwendet Home Assistant HTTPS, nimm https://, und ein Reverse Proxy muss WebSockets durchlassen.",
    "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant hat nicht rechtzeitig geantwortet. Prüfe, ob dieser Server ihn erreicht: Adresse, Port und eine Firewall dazwischen.",
    "Home Assistant cannot be reached at this address.": "Home Assistant ist unter dieser Adresse nicht erreichbar.",
-   "Details:": "Details:"
+   "Details:": "Details:",
+   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Die Adresse hat keinen Port. Home Assistant lauscht normalerweise auf dem Port 8123, zum Beispiel http://192.168.1.10:8123."
   },
   "nl": {
    "(address": "(adres",
@@ -872,7 +874,8 @@
    "Something other than Home Assistant answered at this address. Check the address and the port; if Home Assistant uses HTTPS, use https://, and a reverse proxy must pass WebSockets.": "Op dit adres antwoordde iets anders dan Home Assistant. Controleer het adres en de poort; gebruikt Home Assistant HTTPS, gebruik dan https://, en een reverse proxy moet WebSockets doorlaten.",
    "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant antwoordde niet op tijd. Controleer of deze server hem kan bereiken: het adres, de poort en een firewall daartussen.",
    "Home Assistant cannot be reached at this address.": "Home Assistant is op dit adres niet bereikbaar.",
-   "Details:": "Details:"
+   "Details:": "Details:",
+   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Het adres heeft geen poort. Home Assistant luistert normaal op poort 8123, bijvoorbeeld http://192.168.1.10:8123."
   },
   "pl": {
    "(address": "(adres",
@@ -1154,7 +1157,8 @@
    "Something other than Home Assistant answered at this address. Check the address and the port; if Home Assistant uses HTTPS, use https://, and a reverse proxy must pass WebSockets.": "Pod tym adresem odpowiedziało coś innego niż Home Assistant. Sprawdź adres i port; jeśli Home Assistant używa HTTPS, użyj https://, a reverse proxy musi przepuszczać WebSockety.",
    "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant nie odpowiedział na czas. Sprawdź, czy ten serwer może się z nim połączyć: adres, port i zaporę między nimi.",
    "Home Assistant cannot be reached at this address.": "Home Assistant jest niedostępny pod tym adresem.",
-   "Details:": "Szczegóły:"
+   "Details:": "Szczegóły:",
+   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Adres nie ma portu. Home Assistant zwykle nasłuchuje na porcie 8123, na przykład http://192.168.1.10:8123."
   }
  },
  "th": {
