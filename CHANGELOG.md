@@ -13,22 +13,45 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Added
 
+- Admin page **Access** (public access with Home Assistant sign-in, ADR 081): give HA
+  users who are not administrators the role `xomtra.Reader`, and see every sign-in of
+  the Claude connector with **Disconnect**.
+- Claude connector sign-ins end after `XOMTRA_SESSION_DAYS` (default 180); in the last
+  14 days `server_info` asks the assistant to tell the user to connect again.
+- Guide [which installation to choose](docs/setup/choose-edition.md): limits of the
+  add-on and of an own machine, supported AI assistants, what the external connector
+  needs (domain, A record, port 443, certificate, sign-in).
 - Answer style option (add-on option `answer_style`, `XOMTRA_ANSWER_STYLE`): `friendly`
   (default) or `pub`, the crude style of 0.7.x with personal humour (ADR 080).
 
 ### Changed
 
+- Home Assistant sign-in is the default (`XOMTRA_AUTH_MODE=ha`); Entra ID stays an
+  option (ADR 081). **Upgrade note:** installations with Entra ID that did not set
+  `XOMTRA_AUTH_MODE` must add `XOMTRA_AUTH_MODE=entra` to `.env` (the server refuses to
+  start with Entra values and no mode, with this hint).
+- Public access with Home Assistant sign-in: only HA administrators get in by default
+  (`XOMTRA_HA_ROLE_MAP` default `admin=xomtra.Admin,user=`); other users need a role on
+  the page Access. **Upgrade note:** users who were Readers through the old default
+  need that role on the page Access.
+- Claude connector with Home Assistant sign-in requires two-factor authentication in
+  HA (`XOMTRA_HA_REQUIRE_MFA`, default `true`).
 - Default answer style is friendly with light humour; the crude pub style is an option.
 - Core rules also forbid politically or religiously tinged jokes and innuendo, in every
   style and theme.
-- **Upgrade note:** with Home Assistant sign-in, only Home Assistant administrators get
-  in by default (`XOMTRA_HA_ROLE_MAP=admin=xomtra.Admin,user=`). To let other users
-  read, set `user=xomtra.Reader`.
 - Personal tokens expire after at most a year (30, 90 or 365 days, 90 by default); the
   option "never" is gone. Existing tokens keep their expiry.
 - Admin GUI: the note on AI assistants says plainly that claude.ai needs an installation
   on its own virtual machine with a public address and that ChatGPT and other cloud
   assistants are not supported yet.
+
+### Security
+
+- The Claude connector keeps no Home Assistant token of the user: it is revoked right
+  after the sign-in (as the admin GUI already did). Requests are checked against the
+  session, the access list and, with an administrator token in xomtra's HA connection,
+  HA's user directory. Audit records `connector:sign_in` (with `ha_token_revoked`) and
+  `connector:session_refused`.
 
 ## [0.7.1] - 2026-11-26
 

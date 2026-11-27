@@ -67,6 +67,7 @@ class FakeEntra:
 
 def settings(**kwargs: Any) -> AdminSettings:
     values: dict[str, Any] = {
+        "auth_mode": "entra",
         "base_url": BASE,
         "entra_tenant_id": TENANT,
         "entra_client_id": CLIENT,

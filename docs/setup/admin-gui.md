@@ -1,8 +1,11 @@
 # Admin GUI and Dagster UI (phase 1a.3)
 
 `https://<public-host>/admin/` (or `https://<local-host>/admin/` in [local access](local-access.md))
-shows the state of the installation. Sign-in with Entra ID or, with
-`XOMTRA_AUTH_MODE=ha`, with a [Home Assistant administrator account](ha-login.md).
+shows the state of the installation. Sign-in with a
+[Home Assistant administrator account](ha-login.md) (default) or, with
+`XOMTRA_AUTH_MODE=entra`, with Entra ID. The page **Access** (public access with Home
+Assistant sign-in, ADR 081) gives other HA users the role `xomtra.Reader` and lists the
+sign-ins of the Claude connector, each with **Disconnect**.
 
 | Page | Content |
 | --- | --- |

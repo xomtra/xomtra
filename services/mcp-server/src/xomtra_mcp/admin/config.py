@@ -18,7 +18,8 @@ class AdminSettings(BaseSettings):
 
     # ingress: behind Home Assistant Ingress (add-on, ADR 070); HA signs the user in and
     # the Supervisor's proxy passes them in X-Remote-User-* headers.
-    auth_mode: Literal["entra", "ha", "ingress", "none"] = "entra"
+    # Default: a Home Assistant account (ADR 081); Entra ID is optional.
+    auth_mode: Literal["ha", "entra", "ingress", "none"] = "ha"
     access_mode: Literal["public", "local"] = "public"
     host: str = "0.0.0.0"  # noqa: S104 - container port, only reachable through Caddy
     admin_port: int = Field(default=8100, ge=1, le=65535)
@@ -47,6 +48,9 @@ class AdminSettings(BaseSettings):
     ha_auth_url: str | None = None
     ha_allowed_users: Annotated[list[str], NoDecode] = []
     ha_role_map: str = DEFAULT_ROLE_MAP
+    # Shown on the page Access (the MCP server applies them, ADR 081).
+    ha_require_mfa: bool = True
+    session_days: int = Field(default=180, ge=7, le=365)
     # MCP endpoint for clients in the LAN (local access), shown with new tokens and put
     # into the Claude Desktop extension; default <base_url>/mcp.
     mcp_url: AnyHttpUrl | None = None

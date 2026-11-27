@@ -219,6 +219,10 @@ services:
       XOMTRA_HA_AUTH_URL: ${XOMTRA_HA_AUTH_URL:-}
       XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
       XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=}
+      # Claude connector with HA sign-in (ADR 081): two-factor authentication required,
+      # a sign-in ends after this many days.
+      XOMTRA_HA_REQUIRE_MFA: ${XOMTRA_HA_REQUIRE_MFA:-true}
+      XOMTRA_SESSION_DAYS: ${XOMTRA_SESSION_DAYS:-180}
       XOMTRA_ENTRA_REQUIRED_SCOPES: ${XOMTRA_ENTRA_REQUIRED_SCOPES:-mcp.access}
       # Optional: Home Assistant is normally entered in the admin GUI (ADR 077).
       XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
@@ -348,6 +352,10 @@ services:
       XOMTRA_HA_AUTH_URL: ${XOMTRA_HA_AUTH_URL:-}
       XOMTRA_HA_ALLOWED_USERS: ${XOMTRA_HA_ALLOWED_USERS:-}
       XOMTRA_HA_ROLE_MAP: ${XOMTRA_HA_ROLE_MAP:-admin=xomtra.Admin,user=}
+      # Claude connector with HA sign-in (ADR 081): two-factor authentication required,
+      # a sign-in ends after this many days.
+      XOMTRA_HA_REQUIRE_MFA: ${XOMTRA_HA_REQUIRE_MFA:-true}
+      XOMTRA_SESSION_DAYS: ${XOMTRA_SESSION_DAYS:-180}
       # MCP endpoint shown with new personal tokens (local access); default <base_url>/mcp.
       XOMTRA_MCP_URL: ${XOMTRA_MCP_URL:-}
       XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}

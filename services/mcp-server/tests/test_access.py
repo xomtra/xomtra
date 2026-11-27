@@ -23,7 +23,8 @@ from mcp.server.auth.provider import TokenError
 from pydantic import SecretStr, ValidationError
 
 from hacore.testing import VALID_TOKEN, FakeHA, running_fake_ha
-from xomtra_mcp import desktop
+from xomtra_mcp import desktop, ha_auth
+from xomtra_mcp.access import MemoryAccessStore, expiry_warning
 from xomtra_mcp.audit import MemoryAuditSink
 from xomtra_mcp.config import Settings
 from xomtra_mcp.ha_auth import (
@@ -33,6 +34,7 @@ from xomtra_mcp.ha_auth import (
     HomeAssistantTokenVerifier,
     RoleMap,
     roles_for,
+    session_id,
 )
 from xomtra_mcp.identity import identity_from_claims
 from xomtra_mcp.server import build_auth, create_server
@@ -171,6 +173,7 @@ async def test_provider_refuses_not_allowed_user_at_token_exchange(
         jwt_signing_key="k" * 40,
         role_map=RoleMap(),
         allowed_users=["u1"],
+        require_mfa=False,
     )
     with pytest.raises(TokenError):
         await provider._extract_upstream_claims({"access_token": VALID_TOKEN})
@@ -465,3 +468,234 @@ def test_desktop_bridge_refuses_plain_http_to_lan() -> None:
     )
     assert proc.returncode == 1
     assert "unencrypted" in proc.stderr
+
+
+# ---- access list, two-factor authentication and sessions (ADR 081) ---------------------
+
+MFA = {"mfa_modules": [{"id": "totp", "name": "Authenticator app", "enabled": True}]}
+
+
+def test_ha_user_mfa_and_listed_role() -> None:
+    plain = HAUser.from_reply(PLAIN_USER)
+    assert plain.mfa is False
+    assert HAUser.from_reply({**PLAIN_USER, **MFA}).mfa is True
+    off = {"mfa_modules": [{"id": "totp", "enabled": False}]}
+    assert HAUser.from_reply({**PLAIN_USER, **off}).mfa is False
+    # Default role map (ADR 081): other HA users need a role from the access list.
+    default = RoleMap.parse(ha_auth.DEFAULT_ROLE_MAP)
+    assert roles_for(plain, default) == []
+    assert roles_for(plain, default, listed="xomtra.Reader") == ["xomtra.Reader"]
+    assert roles_for(HAUser.from_reply(ADMIN_USER), default) == ["xomtra.Admin"]
+
+
+def test_session_id_reads_the_issuer() -> None:
+    import base64
+
+    def part(data: dict[str, Any]) -> str:
+        return base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip("=")
+
+    token = f"{part({'alg': 'HS256'})}.{part({'iss': 'rt-1', 'exp': 1})}.sig"
+    assert session_id(token) == "rt-1"
+    assert session_id("not-a-jwt") is None
+    assert session_id("a.!!!.c") is None
+    assert session_id(f"{part({})}.{part({'iss': 5})}.sig") is None
+
+
+async def test_verifier_access_list_and_mfa(fake_ha: tuple[FakeHA, str]) -> None:
+    fake, url = fake_ha
+    store = MemoryAccessStore()
+    verifier = HomeAssistantTokenVerifier(
+        ha_url=url,
+        role_map=RoleMap.parse(ha_auth.DEFAULT_ROLE_MAP),
+        store=store,
+        require_mfa=True,
+        cache_seconds=0,
+    )
+    fake.results["auth/current_user"] = {**PLAIN_USER, **MFA}
+    with pytest.raises(ha_auth.RefusedError, match="no access to xomtra yet"):
+        await verifier.checked_claims(VALID_TOKEN)
+    # The attempt is recorded so the admin sees who is waiting.
+    assert [u.ha_user_id for u in store.ha_users()] == ["u2"]
+    assert store.set_ha_user_role("u2", "xomtra.Reader", "admin")
+    claims = await verifier.checked_claims(VALID_TOKEN)
+    assert claims["roles"] == ["xomtra.Reader"]
+    # Without two-factor authentication: refused, also for administrators.
+    fake.results["auth/current_user"] = ADMIN_USER
+    with pytest.raises(ha_auth.RefusedError, match="two-factor"):
+        await verifier.checked_claims(VALID_TOKEN)
+    assert await verifier.verify_token(VALID_TOKEN) is None
+
+
+async def test_verifier_sessions_end_and_disconnect(
+    fake_ha: tuple[FakeHA, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake, url = fake_ha
+    fake.results["auth/current_user"] = {**ADMIN_USER, **MFA}
+    fake.results["auth/delete_refresh_token"] = None
+    monkeypatch.setattr(ha_auth, "session_id", lambda _token: "rt-1")
+    store = MemoryAccessStore()
+    verifier = HomeAssistantTokenVerifier(
+        ha_url=url,
+        role_map=RoleMap(),
+        store=store,
+        require_mfa=True,
+        session_days=180,
+        cache_seconds=0,
+    )
+    claims = await verifier.checked_claims(VALID_TOKEN)
+    assert claims["sid"] == "rt-1"
+    ends = datetime.fromisoformat(claims["session_expires_at"])
+    assert timedelta(days=179) < ends - datetime.now(UTC) <= timedelta(days=180)
+    assert identity_from_claims(claims, []).session_expires_at == claims["session_expires_at"]
+    (row,) = store.sessions()
+    assert (row.idp, row.subject, row.name) == ("ha", "u1", "Jana")
+    # Disconnected in the admin GUI: refused, and the HA session is deleted.
+    assert store.revoke_session("rt-1", "admin")
+    with pytest.raises(ha_auth.RefusedError, match="has ended"):
+        await verifier.checked_claims(VALID_TOKEN)
+    deleted = [m for m in fake.received if m.get("type") == "auth/delete_refresh_token"]
+    assert deleted
+    assert deleted[-1]["refresh_token_id"] == "rt-1"
+    # Expired: refused too.
+    store.rows["rt-1"].revoked_at = None
+    store.rows["rt-1"].expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    with pytest.raises(ha_auth.RefusedError, match="has ended"):
+        await verifier.checked_claims(VALID_TOKEN)
+
+
+def test_provider_session_lifetime_and_settings() -> None:
+    s = Settings(
+        auth_mode="ha",
+        base_url=BASE,  # type: ignore[arg-type]
+        ha_url="http://ha.lan:8123",
+        jwt_signing_key=SecretStr("k" * 40),
+        **AUDIT,
+    )
+    assert (s.session_days, s.ha_require_mfa) == (180, True)
+    assert s.role_map == RoleMap(user=None)
+    auth = build_auth(s, access=MemoryAccessStore())
+    assert isinstance(auth, HomeAssistantProvider)
+    assert auth._fallback_refresh_token_expiry_seconds == 180 * 86400
+    assert auth._verifier.require_mfa is True
+    with pytest.raises(ValidationError):
+        Settings(auth_mode="ha", session_days=400, **AUDIT)  # type: ignore[arg-type]
+    # Entra values without the mode: a clear hint instead of a silent switch.
+    with pytest.raises(ValidationError, match="XOMTRA_AUTH_MODE=entra"):
+        Settings(base_url=BASE, entra_client_id="c", jwt_signing_key=SecretStr("k" * 40), **AUDIT)  # type: ignore[arg-type]
+
+
+def test_expiry_warning() -> None:
+    now = datetime(2026, 11, 27, tzinfo=UTC)
+    assert expiry_warning(now + timedelta(days=20), now) is None
+    text = expiry_warning(now + timedelta(days=10), now)
+    assert text is not None
+    assert "2026-12-07" in text
+
+
+async def test_session_needs_no_ha_token_after_sign_in(
+    fake_ha: tuple[FakeHA, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake, url = fake_ha
+    fake.results["auth/current_user"] = {**PLAIN_USER, **MFA}
+    monkeypatch.setattr(ha_auth, "session_id", lambda _token: "rt-9")
+    revoked: list[str] = []
+
+    async def revoke(_url: str, token: str) -> bool:
+        revoked.append(token)
+        return True
+
+    monkeypatch.setattr(ha_auth, "revoke_ha_refresh_token", revoke)
+    store = MemoryAccessStore()
+    store.ha_user_seen("u2", "Petr", False)
+    store.set_ha_user_role("u2", "xomtra.Reader", "admin")
+    users: dict[str, ha_auth.DirectoryUser] | None = None
+
+    async def connection() -> tuple[str, str] | None:
+        return None
+
+    directory = ha_auth.HAUserDirectory(connection, cache_seconds=0)
+
+    async def listed() -> dict[str, ha_auth.DirectoryUser] | None:
+        return users
+
+    monkeypatch.setattr(directory, "users", listed)
+    provider = HomeAssistantProvider(
+        base_url=BASE,
+        ha_url=url,
+        ha_auth_url=url,
+        jwt_signing_key="k" * 40,
+        role_map=RoleMap.parse(ha_auth.DEFAULT_ROLE_MAP),
+        store=store,
+        directory=directory,
+        audit=(audit := MemoryAuditSink()),
+    )
+    assert provider._fastmcp_access_token_expiry_seconds == 180 * 86400
+    claims = await provider._extract_upstream_claims(
+        {"access_token": VALID_TOKEN, "refresh_token": "ha-refresh"}
+    )
+    assert claims["roles"] == ["xomtra.Reader"]
+    # The user's HA token is revoked right after the sign-in.
+    assert revoked == ["ha-refresh"]
+    verifier = provider._verifier
+    verifier.cache_seconds = 0
+    # Later requests: HA no longer accepts the token, the session carries on.
+    fake.results["auth/current_user"] = None
+    token = await verifier.verify_token("revoked-ha-token")
+    assert token is not None
+    assert token.claims["sid"] == "rt-9"
+    # Removed from the access list: refused at once.
+    store.set_ha_user_role("u2", None, "admin")
+    assert await verifier.verify_token("revoked-ha-token") is None
+    store.set_ha_user_role("u2", "xomtra.Reader", "admin")
+    # Deactivated in HA (seen through xomtra's own HA connection): refused.
+    users = {"u2": ha_auth.DirectoryUser("u2", "Petr", is_active=False, is_admin=False)}
+    assert await verifier.verify_token("revoked-ha-token") is None
+    users = {"u2": ha_auth.DirectoryUser("u2", "Petr", is_active=True, is_admin=True)}
+    admin = await verifier.verify_token("revoked-ha-token")
+    assert admin is not None
+    assert admin.claims["roles"] == ["xomtra.Admin"]
+    # Refused sign-in: the HA token is revoked too.
+    fake.results["auth/current_user"] = PLAIN_USER  # no two-factor authentication
+    with pytest.raises(TokenError):
+        await provider._extract_upstream_claims(
+            {"access_token": VALID_TOKEN, "refresh_token": "ha-refresh-2"}
+        )
+    assert revoked == ["ha-refresh", "ha-refresh-2"]
+    # Audit: sign-ins with the revocation of the HA token, refused sessions once per reason.
+    signs = [r for r in audit.records if r.tool == "connector:sign_in"]
+    assert [(r.decision, r.arguments["ha_token_revoked"]) for r in signs] == [
+        ("allowed", True),
+        ("denied", True),
+    ]
+    assert signs[0].arguments["session"] == "rt-9"
+    assert signs[0].subject == "u2"
+    store.revoke_session("rt-9", "admin")
+    assert await verifier.verify_token("revoked-ha-token") is None
+    assert await verifier.verify_token("revoked-ha-token") is None
+    refused = [r.error for r in audit.records if r.tool == "connector:session_refused"]
+    # Removed from the access list, deactivated in HA, disconnected: each once.
+    assert len(refused) == 3
+    assert "has ended" in str(refused[-1])
+
+
+async def test_ha_user_directory(fake_ha: tuple[FakeHA, str]) -> None:
+    fake, url = fake_ha
+    fake.results["config/auth/list"] = [
+        {"id": "u1", "name": "Jana", "is_owner": True, "is_active": True, "group_ids": []},
+        {"id": "u2", "name": "Petr", "is_active": False, "group_ids": ["system-users"]},
+        {"id": "u3", "name": "Eva", "is_active": True, "group_ids": ["system-admin"]},
+    ]
+
+    async def connection() -> tuple[str, str] | None:
+        return url, VALID_TOKEN
+
+    users = await ha_auth.HAUserDirectory(connection).users()
+    assert users is not None
+    assert users["u1"].is_admin
+    assert not users["u2"].is_active
+    assert users["u3"].is_admin
+
+    async def nothing() -> tuple[str, str] | None:
+        return None
+
+    assert await ha_auth.HAUserDirectory(nothing).users() is None
