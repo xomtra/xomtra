@@ -136,3 +136,8 @@ into the volume `secrets`, so the Postgres roles and S3 keys keep matching
 values in the volume always win. `XOMTRA_HA_URL` and `XOMTRA_HA_TOKEN` in `.env` keep
 working; to move them to the admin GUI, delete them from `.env`, run
 `docker compose up -d` and use the setup link.
+
+## Uninstall
+
+To remove xomtra with its data, images, the clients' extension and certificate and the
+token in Home Assistant, see [uninstall.md](uninstall.md).

@@ -11,6 +11,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Docs: complete uninstall of the Docker Compose installation
+  ([docs/setup/uninstall.md](docs/setup/uninstall.md)): optional backup of the volumes,
+  `docker compose down -v --rmi all`, the Claude clients and the CA certificate, the
+  token and user in Home Assistant, and the public setup.
+
 ## [0.9.2] - 2026-11-27
 
 ### Added
