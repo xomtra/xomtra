@@ -97,7 +97,7 @@ async def test_mcp_tokens_refresh_and_revoke(ha_url: str, tokens: OnboardedToken
     assert issued["expires_in"] > 0
     assert issued["refresh_token"]
 
-    verifier = HomeAssistantTokenVerifier(ha_url=ha_url, role_map=RoleMap())
+    verifier = HomeAssistantTokenVerifier(ha_url=ha_url, role_map=RoleMap(user="xomtra.Reader"))
     access = await verifier.verify_token(issued["access_token"])
     assert access is not None
     assert access.claims["roles"] == ["xomtra.Reader"]

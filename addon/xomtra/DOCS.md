@@ -24,17 +24,17 @@ Home Assistant permission.
 
 ## Style of the answers
 
-By default xomtra asks your assistant for very funny, crude and vulgar answers, like a
-mate in the pub, fitted to your language, country, culture and locality. It teases you
-only with tact and keeps the facts exact. If this form of the answers does not suit
-you, turn off the option **Default answer style** on the add-on's **Configuration** tab
-and restart the add-on.
+By default xomtra asks your assistant for friendly answers with light humour. If you
+prefer very funny, crude and vulgar answers, like a mate in the pub, fitted to your
+language, country and culture and personal from what the assistant already knows about
+you, choose **pub** in the option **Answer style**. To send no style or rules at all,
+turn off **Answer guidelines**. Both are on the add-on's **Configuration** tab and take
+effect after a restart.
 
 Core rules always apply, in every style and theme: no jokes about accidents, outages,
-risky situations or threats to life and health, and no sexist, racist, homophobic,
-xenophobic or political jokes. At holidays (Christmas, Easter, Halloween) xomtra.com may
-send a theme for the answers; it is not switched off by this option and is forgotten
-24 hours after it arrives.
+risky situations or threats to life and health, and nothing sexist, racist, homophobic,
+xenophobic, political or religious. At holidays (Christmas, Easter, Halloween) xomtra.com
+may send a theme for the answers; it is forgotten 24 hours after it arrives.
 
 ## Requirements
 

@@ -19,7 +19,7 @@ HA sign-in is then used for the admin GUI only.
 | `XOMTRA_HA_URL` | – | HA as the xomtra server reaches it (token exchange, identity) |
 | `XOMTRA_HA_AUTH_URL` | `XOMTRA_HA_URL` | HA as **your browser** reaches it (sign-in page) |
 | `XOMTRA_HA_ALLOWED_USERS` | empty = all | comma separated HA user ids or names allowed to sign in |
-| `XOMTRA_HA_ROLE_MAP` | `admin=xomtra.Admin,user=xomtra.Reader` | role of HA administrators (and the owner) and of other HA users; `user=` lets only administrators in |
+| `XOMTRA_HA_ROLE_MAP` | `admin=xomtra.Admin,user=` | role of HA administrators (and the owner) and of other HA users; the default lets only administrators in, `user=xomtra.Reader` also lets other HA users read |
 | `XOMTRA_BASE_URL` | – | xomtra's own URL; it is the `client_id` xomtra presents to HA |
 
 Nothing has to be registered in Home Assistant: HA identifies clients by their URL
