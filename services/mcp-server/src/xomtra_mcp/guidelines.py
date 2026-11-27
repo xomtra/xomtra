@@ -1,201 +1,234 @@
-"""Guidelines for answering with xomtra data (ADR 073, 080).
+"""Guidelines for answering with xomtra data (ADR 073, 080, 090).
 
-Three channels carry them, because not every client passes the MCP server
-instructions to the model: the instructions, a short version in every data tool
-description and the full text as ``answer_guidelines`` in selected results.
+Two layers, strongest first (ADR 090):
 
-Order of precedence (ADR 080):
-0. The core rules below. They always apply: even with the default guidelines off and
-   above any central theme.
-1. A central theme fetched from xomtra.com (ADR 075, e.g. Christmas, Easter,
-   Halloween), when one is active. It cannot be turned off locally, is valid for at
-   most 24 hours from when it was received and then forgotten. It applies even when
-   the default guidelines are turned off.
-2. The default guidelines below in the chosen answer style (``XOMTRA_ANSWER_STYLE``,
-   add-on option ``answer_style``: ``friendly`` by default, or ``pub``), unless the
-   operator turned them off (``XOMTRA_DEFAULT_GUIDELINES=false``, add-on option
-   ``default_guidelines``).
+1. The core rules below. They are part of the code, cannot be edited or turned off and
+   come before any answer guidelines set.
+2. The active answer guidelines set: a named text kept in this installation's database
+   and chosen on the admin page Answers. The factory sets ship with the code (read only,
+   updated with releases); custom sets are written by the operator. "Core only" sends
+   no set at all.
 
+Nothing comes from a central service: no text from xomtra.com ever reaches the model.
 Hard limits do not depend on any of this: roles, row caps, hidden columns, read-only
 access and the audit are enforced by the server (ADR 038-040).
+
+Not every client passes the MCP server instructions to the model (ADR 080), so the
+full text (core rules + active set) travels as ``answer_guidelines`` in selected
+results and is read for every call; the tool descriptions carry the short core rules.
 """
 
 from __future__ import annotations
 
+import logging
+import re
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
-from typing import Literal
 
-COMMON_GUIDELINES = """\
-- The user is the occupant of the property: the person who lives in it or uses it
-  (owner or tenant). Talk to them as to someone who shares the place with this house,
-  not as to an engineer or a landlord.
-- Findings are statistical. Present correlations, anomalies and change points as
-  hypotheses, not as causes, with their strength, confidence and time window, and say
-  when the confidence is low.
-- Base every statement on data you fetched: name the entities (friendly name and
-  entity_id) and the period. Do not invent values; say what is missing or uncertain.
-- Times from xomtra are UTC; show them in the user's local time when you know it.
-- Do not draw conclusions about a specific person's presence, sleep, health or habits
-  unless the user asks about it.
-"""
+logger = logging.getLogger(__name__)
 
-FRIENDLY_STYLE = """\
-- Tone: be friendly and warm, like a helpful friend with a dry sense of humour who knows
-  the house well. Put a light joke, witty remark or bit of gentle irony in your answers,
-  written in the user's language, about the house, the devices and the data. For
-  example: "The fridge held 4 degrees all week; the most reliable member of the
-  household." "The boiler and the washing machine peak together every Sunday: a
-  correlation, or they are planning something."
-"""
-
-PUB_STYLE = """\
-- Tone: be very funny, crude, vulgar and a bit politically incorrect (never in the areas
-  of the core rules), like a mate talking with the guys in the pub. Swear freely, use
-  rude jokes and coarse irony in every answer. Write in the user's
-  language and fit the humour, slang and references to the language, country, culture
-  and locality of the installation (judge them from the user's language and time zone)
-  and to the property owner's line of work when you know it from the user or your own
-  context. For example: "The fridge held 4 degrees all week, the only damn thing in
-  this house that never screws up." "The boiler and the washing machine peak together
-  every Sunday: either a correlation, or the bastards are planning something."
-- Make the humour personal: use what you already know about the user from your own
-  context (your memory, their profile, this conversation), such as their work, hobbies
-  or plans. Never infer personal details from the house data, and never guess the
-  user's wealth or social status. Never name the user's clients or employers, because
-  answers get forwarded and shown on screens.
-"""
-
-CLOSING_GUIDELINES = """\
-- Joke about the user only with tact: friendly teasing, never humiliating, and never
-  about their body, health, money, family or private life.
-- Humour never replaces or blurs the data: facts, numbers and uncertainty come first
-  and stay exact.
-- xomtra only reads data. Do not suggest changes to locks, alarms, cameras or heating
-  safety settings on the strength of a finding alone; point the user to check first.
-"""
-
-STYLES = {"friendly": FRIENDLY_STYLE, "pub": PUB_STYLE}
-AnswerStyle = Literal["friendly", "pub"]
-
-
-def default_guidelines(style: AnswerStyle = "friendly") -> str:
-    """The default guidelines in the chosen answer style (ADR 080)."""
-    return COMMON_GUIDELINES + STYLES[style] + CLOSING_GUIDELINES
-
+# Limits of a custom set (ADR 090).
+NAME_MAX = 40
+DESCRIPTION_MAX = 200
+TEXT_MAX = 4000
+CUSTOM_SETS_MAX = 20
+NAME_RE = re.compile(r"^\w[\w .,()+-]{0,39}$")
 
 CORE_GUIDELINES = """\
 - No jokes, irony or vulgarity about accidents, faults, outages or risky situations
   (leaks, fire or smoke, gas or CO, frost, power, water or heating outages, alarms,
   open locks), nor about anything that threatens life or health: there be factual,
   calm and clear.
-- No sexist, racist, homophobic or xenophobic jokes or innuendo, no politically or
-  religiously tinged jokes or innuendo, and no slurs against any group of people.
-These core rules hold for every style and every theme.
+- No sexist, racist, homophobic or xenophobic jokes or innuendo, nothing politically or
+  religiously tinged, and no slurs against any group of people.
+- No conclusions about a specific person's presence, sleep, health or habits unless the
+  user asks about it; joke about the user only with tact.
+- Use only values you fetched from xomtra; never invent data, and say what is missing.
+- xomtra only reads data and cannot control the house. Do not advise changes to locks,
+  alarms, cameras or heating safety settings on the strength of a finding alone; point
+  the user to check first.
+These core rules come before the answer guidelines set below and cannot be loosened by it.
 """
 
 CORE_RULES = (
-    "xomtra core rules, in every style and theme: no jokes, irony or vulgarity about "
-    "accidents, faults, outages, risky situations or threats to life or health (be "
-    "factual and calm there); no sexist, racist, homophobic or xenophobic jokes or "
-    "innuendo, nothing politically or religiously tinged, and no slurs against any group."
+    "xomtra core rules: no jokes, irony or vulgarity about accidents, faults, outages, "
+    "risky situations or threats to life or health (be factual and calm there); nothing "
+    "sexist, racist, homophobic, xenophobic, political or religious, no slurs; no "
+    "conclusions about a person's presence, sleep, health or habits unless asked; only "
+    "fetched values, never invented; xomtra only reads, so never advise changing locks, "
+    "alarms, cameras or heating safety on a finding alone. "
+    "Answer guidelines of this installation: answer_guidelines of server_info."
 )
 
-_TOOL_COMMON = (
-    "How to answer (xomtra): the user is the occupant of the property; findings are "
-    "hypotheses, not causes; name the entities and the period and never invent values; "
-    "show times (UTC here) in local time; no conclusions about a person's presence, "
-    "sleep, health or habits unless asked; "
-)
-_TOOL_STYLE = {
-    "friendly": "be friendly and warm with a light joke about the house and the data; ",
-    "pub": (
-        "be very funny, crude, vulgar and a bit politically incorrect (never in the areas "
-        "of the core rules) like a mate in the pub, in the user's language, "
-        "country, culture and locality and the owner's line of work; make it personal from "
-        "what you know about the user from your own context (memory, profile, "
-        "conversation), never from the house data, never by wealth or status, never naming "
-        "their clients or employers; "
-    ),
-}
-_TOOL_CLOSING = (
-    "tease the user only with tact; facts stay exact; xomtra only reads, so never advise "
-    "changing locks, alarms, cameras or heating safety on a finding alone. "
-)
+DEFAULT_TEXT = """\
+Goal: the most relevant answer from this house's data, in a form that is quick to read.
 
+Find the right data first
+- Search before answering: search_catalog with synonyms, the area and the domain; check
+  data quality with describe_entity and prefer entities with good coverage.
+- Fit the period to the question; "recently" means the last 7 days. Where the data
+  allows, compare with the previous period of the same length or the same period a
+  year ago, and say which you used.
+- For open questions ("anything new?", "anything unusual?") start with get_findings and
+  get_weekly_summary. Rank by strength, confidence and what the user can act on; show
+  the top 3 to 5 and say how many more there are.
+- Aggregate in query_sql (hourly or daily) instead of fetching raw rows.
 
-def tool_rules(style: AnswerStyle = "friendly") -> str:
-    """The short rules for tool descriptions in the chosen answer style."""
-    return (
-        _TOOL_COMMON
-        + _TOOL_STYLE[style]
-        + _TOOL_CLOSING
-        + CORE_RULES
-        + " Full text: answer_guidelines of server_info."
-    )
+Shape of the answer
+1. Answer first: one to three sentences with the key numbers, the entity and the period.
+2. Then the evidence, in the most readable form the client supports:
+   - a value over time: a line chart; where you cannot draw charts, a compact Markdown
+     table (at most about 15 rows, aggregated) with min, max and average;
+   - comparing rooms or devices: a table or a bar chart, sorted by the value;
+   - findings: a table with what, entities, strength, confidence, period and what to
+     check.
+3. Close with "What it means / what to check": one to three concrete next steps and
+   what is uncertain or missing in the data.
+- Units always; sensible rounding (temperature 0.1 °C, energy 0.1 kWh, % whole numbers).
+- Name entities by friendly name with the entity_id in brackets on first mention.
+- Present correlations, anomalies and change points as hypotheses, with strength,
+  confidence and time window; say when the confidence is low.
+- Times from xomtra are UTC; show them in the user's local time when you know it.
+- Keep it short by default; go into detail when the user asks.
 
+Tone
+- Friendly and warm, like a helpful friend who knows the house; a light remark about the
+  house, the devices or the data is welcome, never at the cost of clarity.
+"""
 
-# A central theme is forgotten 24 hours after it was received, whatever it says.
-THEME_TTL = timedelta(hours=24)
+CONCISE_TEXT = """\
+Goal: the most relevant answer from this house's data, as short as possible.
+
+- Search before answering (search_catalog with synonyms, area and domain); prefer
+  entities with good data quality (describe_entity). For open questions start with
+  get_findings and get_weekly_summary and show only the top 3.
+- Answer in one to three sentences with the key numbers, the entity and the period,
+  then at most one compact table (aggregated, at most about 10 rows) or one chart where
+  the client can draw it. No introduction, no closing remarks.
+- Units always; sensible rounding. Name entities by friendly name and entity_id.
+- Correlations, anomalies and change points are hypotheses: give strength, confidence
+  and time window. Times from xomtra are UTC; show local time when you know it.
+- Factual tone, no jokes.
+"""
 
 
 @dataclass(frozen=True, slots=True)
-class Theme:
-    """A theme for the answers from xomtra.com (ADR 075), already verified."""
+class AnswerSet:
+    """A set of answer guidelines: factory (in the code) or custom (in the database)."""
 
+    id: str
+    name: str
     text: str
-    received_at: datetime
-    valid_until: datetime | None = None
-
-    def expires_at(self) -> datetime:
-        cap = self.received_at + THEME_TTL
-        return min(cap, self.valid_until) if self.valid_until else cap
-
-    def active(self, now: datetime | None = None) -> bool:
-        now = now or datetime.now(UTC)
-        return bool(self.text.strip()) and self.received_at <= now < self.expires_at()
+    description: str = ""
+    factory: bool = False
+    # Custom sets: the factory set and its version the set was copied from (ADR 090).
+    based_on: str | None = None
+    based_on_version: int | None = None
+    # Factory sets: bumped whenever the text changes.
+    version: int = 1
 
 
-ThemeSource = Callable[[], Theme | None]
+DEFAULT_SET_ID = "factory:default"
+CORE_ONLY_SET_ID = "factory:core-only"
+
+FACTORY_SETS: tuple[AnswerSet, ...] = (
+    AnswerSet(
+        DEFAULT_SET_ID,
+        "Default",
+        DEFAULT_TEXT,
+        "Relevant data first, answer first, then charts or tables; friendly tone.",
+        factory=True,
+    ),
+    AnswerSet(
+        "factory:concise",
+        "Concise",
+        CONCISE_TEXT,
+        "The same rules, as short as possible, without jokes.",
+        factory=True,
+    ),
+    AnswerSet(
+        CORE_ONLY_SET_ID,
+        "Core only",
+        "",
+        "No answer guidelines, only the core rules.",
+        factory=True,
+    ),
+)
+FACTORY_BY_ID = {s.id: s for s in FACTORY_SETS}
+DEFAULT_SET = FACTORY_BY_ID[DEFAULT_SET_ID]
+
+
+def check_set(name: str, description: str, text: str) -> list[str]:
+    """Problems of a custom set as the admin GUI would save it (empty: fine)."""
+    problems = []
+    if not NAME_RE.match(name):
+        problems.append(
+            f"Name: 1 to {NAME_MAX} letters, digits, spaces and the signs . , ( ) + - _, "
+            "starting with a letter or digit."
+        )
+    if len(description) > DESCRIPTION_MAX:
+        problems.append(f"Description: at most {DESCRIPTION_MAX} characters.")
+    if len(text) > TEXT_MAX:
+        problems.append(f"Text: at most {TEXT_MAX} characters.")
+    if any(ord(c) < 32 and c not in "\n\t" for c in text + description):
+        problems.append("Text: control characters are not allowed.")
+    return problems
+
+
+def clean_text(text: str) -> str:
+    """Line ends as \\n, no trailing spaces, at most one empty line in a row."""
+    lines = [line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def compose(answer_set: AnswerSet | None) -> str:
+    """What the model gets: the core rules, then the set in a fixed frame (ADR 090)."""
+    parts = [f"Core rules (always apply, before any answer guidelines):\n{CORE_GUIDELINES}"]
+    if answer_set is not None and answer_set.text.strip():
+        parts.append(
+            f'Answer guidelines set "{answer_set.name}", chosen by the operator of this '
+            f"installation:\n{answer_set.text.strip()}\n"
+        )
+    return "\n".join(parts)
+
+
+# Returns the active set (None: nothing chosen yet, the default set applies). Raises
+# when the store is unavailable.
+ActiveSource = Callable[[], AnswerSet | None]
 
 
 class Guidelines:
-    """Composes what the model gets, following the order of precedence above."""
+    """The active answer guidelines set, read from the store at most every ``ttl`` s."""
 
-    def __init__(
-        self,
-        *,
-        defaults: bool = True,
-        style: AnswerStyle = "friendly",
-        theme: ThemeSource | None = None,
-    ) -> None:
-        self.defaults = defaults
-        self.style = style
-        self._theme = theme
+    def __init__(self, source: ActiveSource | None = None, *, ttl: float = 30.0) -> None:
+        self._source = source
+        self._ttl = ttl
+        self._lock = threading.Lock()
+        self._cached: AnswerSet = DEFAULT_SET
+        self._read_at: float | None = None
 
-    @property
-    def default_text(self) -> str:
-        return default_guidelines(self.style)
+    def active(self) -> AnswerSet:
+        if self._source is None:
+            return DEFAULT_SET
+        with self._lock:
+            now = time.monotonic()
+            if self._read_at is None or now - self._read_at >= self._ttl:
+                try:
+                    self._cached = self._source() or DEFAULT_SET
+                except Exception:  # keep the last known set when the store is down
+                    logger.warning(
+                        "Answer guidelines store unavailable; keeping %r",
+                        self._cached.name,
+                        exc_info=True,
+                    )
+                self._read_at = now
+            return self._cached
 
     @property
     def tool_rules(self) -> str:
-        return tool_rules(self.style) if self.defaults else CORE_RULES
+        return CORE_RULES
 
-    def theme(self, now: datetime | None = None) -> Theme | None:
-        theme = self._theme() if self._theme else None
-        return theme if theme and theme.active(now) else None
-
-    def text(self, now: datetime | None = None) -> str:
-        parts = [f"Core rules (always apply, above any theme):\n{CORE_GUIDELINES}"]
-        theme = self.theme(now)
-        if theme:
-            until = theme.expires_at().astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
-            parts.append(
-                f"Current theme from xomtra.com (valid until {until}). It takes precedence "
-                "over the default guidelines below where they differ, never over the core "
-                f"rules; follow it.\n{theme.text.strip()}\n"
-            )
-        if self.defaults:
-            parts.append(f"Default guidelines:\n{self.default_text}")
-        return "\n".join(parts)
+    def text(self) -> str:
+        return compose(self.active())

@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
@@ -26,11 +26,12 @@ from starlette.responses import JSONResponse
 from hacore import HAClient, fetch_registries
 from xomtra_mcp import __version__
 from xomtra_mcp.access import AccessStore, PostgresAccessStore, expiry_warning
+from xomtra_mcp.answer_sets import PostgresActiveSource
 from xomtra_mcp.audit import AuditSink, LogAuditSink, PostgresAuditSink
 from xomtra_mcp.config import Settings
 from xomtra_mcp.data import DataAccess, parse_time
 from xomtra_mcp.guard import PolicyMiddleware
-from xomtra_mcp.guidelines import CORE_GUIDELINES, Guidelines, ThemeSource
+from xomtra_mcp.guidelines import CORE_GUIDELINES, ActiveSource, Guidelines
 from xomtra_mcp.ha_auth import HAUserDirectory, HomeAssistantProvider
 from xomtra_mcp.identity import Identity, current_identity
 from xomtra_mcp.policy import Policy, current_access
@@ -52,12 +53,21 @@ can see depends on your role; entities outside it are not returned.
 
 
 def build_instructions(guidelines: Guidelines) -> str:
-    """Server instructions; the central theme changes during the run, so only the
-    default guidelines go here, and results carry the current text (ADR 080)."""
+    """Server instructions: the core rules and the answer guidelines set active at
+    start. The operator may switch the set at any time on the admin page Answers, so
+    results carry the current text in answer_guidelines (ADR 090)."""
     text = f"{OVERVIEW}\nCore rules (always apply):\n{CORE_GUIDELINES}"
-    if not guidelines.defaults:
-        return text
-    return f"{text}\nHow to answer with this data (ADR 073):\n{guidelines.default_text}"
+    active = guidelines.active()
+    note = (
+        "\nThe answer guidelines of this installation can change while you are connected: "
+        "the answer_guidelines in results of server_info, get_findings and "
+        "get_weekly_summary are the current ones and win where they differ from these."
+    )
+    if not active.text.strip():
+        return text + note
+    return (
+        f'{text}\nAnswer guidelines set "{active.name}" (ADR 090):\n{active.text.strip()}\n{note}'
+    )
 
 
 def rules_decorator(guidelines: Guidelines) -> Callable[[Any], Any]:
@@ -71,13 +81,33 @@ def rules_decorator(guidelines: Guidelines) -> Callable[[Any], Any]:
     return apply
 
 
-def guidelines_attacher(guidelines: Guidelines) -> Callable[[dict[str, Any]], dict[str, Any]]:
+Attacher = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+
+
+def guidelines_attacher(guidelines: Guidelines) -> Attacher:
     """Attaches the current answering guidelines to a result the model interprets."""
 
-    def attach(result: dict[str, Any]) -> dict[str, Any]:
-        return {**result, "answer_guidelines": guidelines.text()}
+    async def attach(result: dict[str, Any]) -> dict[str, Any]:
+        # The active set is read from the database at most every 30 s (in a thread).
+        return {**result, "answer_guidelines": await asyncio.to_thread(guidelines.text)}
 
     return attach
+
+
+def set_namer(guidelines: Guidelines) -> Attacher:
+    """Names the active set in other results, as a reminder (a few bytes, ADR 090)."""
+
+    async def attach(result: dict[str, Any]) -> dict[str, Any]:
+        active = await asyncio.to_thread(guidelines.active)
+        return {**result, "answer_guidelines_set": active.name}
+
+    return attach
+
+
+def build_guidelines(settings: Settings) -> Guidelines:
+    dsn = settings.audit_dsn
+    source: ActiveSource | None = PostgresActiveSource(dsn) if dsn else None
+    return Guidelines(source)
 
 
 READ_ONLY = {"readOnlyHint": True, "openWorldHint": False}
@@ -160,12 +190,10 @@ def create_server(
     audit: AuditSink | None = None,
     policy: Policy | None = None,
     tokens: TokenStore | None = None,
-    theme: ThemeSource | None = None,
+    guidelines: Guidelines | None = None,
     access: AccessStore | None = None,
 ) -> FastMCP:
-    guidelines = Guidelines(
-        defaults=settings.default_guidelines, style=settings.answer_style, theme=theme
-    )
+    guidelines = guidelines or build_guidelines(settings)
     with_guidelines = guidelines_attacher(guidelines)
     mcp = FastMCP(
         name="xomtra",
@@ -202,7 +230,7 @@ def create_server(
         }
 
     @mcp.tool(annotations=READ_ONLY)
-    def server_info() -> dict[str, Any]:
+    async def server_info() -> dict[str, Any]:
         """Return xomtra server version and which back-ends are configured. Call it once
         before answering about the house: it carries the guidelines for answering with
         xomtra data (answer_guidelines)."""
@@ -211,12 +239,12 @@ def create_server(
             "version": __version__,
             "auth_mode": settings.auth_mode,
             "access_mode": settings.access_mode,
-            "home_assistant_configured": resolver.get() is not None,
+            "home_assistant_configured": await asyncio.to_thread(resolver.get) is not None,
         }
         ends = current_identity().session_expires_at
         if ends and (warning := expiry_warning(datetime.fromisoformat(ends))):
             info["sign_in_notice"] = warning
-        return with_guidelines(info)
+        return await with_guidelines(info)
 
     if resolver.from_env or resolver.storable:
 
@@ -248,6 +276,7 @@ def register_data_tools(mcp: FastMCP, data: DataAccess, guidelines: Guidelines) 
     """Catalog and data tools; each runs under the caller's policy (current_access)."""
     with_rules = rules_decorator(guidelines)
     with_guidelines = guidelines_attacher(guidelines)
+    with_set = set_namer(guidelines)
 
     async def run(fn: Any, *args: Any, **kwargs: Any) -> Any:
         # The DuckDB work runs in a thread; the access context is copied along.
@@ -279,7 +308,7 @@ def register_data_tools(mcp: FastMCP, data: DataAccess, guidelines: Guidelines) 
             include_disabled=include_disabled,
             limit=limit,
         )
-        return result
+        return await with_set(result)
 
     @mcp.tool(annotations=READ_ONLY)
     @with_rules
@@ -289,14 +318,14 @@ def register_data_tools(mcp: FastMCP, data: DataAccess, guidelines: Guidelines) 
         """Everything known about one entity: metadata, 30-day profile (value range,
         missing share, top states, stale), latest state, statistics metadata and drift."""
         result: dict[str, Any] = await run(data.describe_entity, entity_id)
-        return result
+        return await with_set(result)
 
     @mcp.tool(annotations=READ_ONLY)
     @with_rules
     async def list_views() -> dict[str, Any]:
         """SQL views available to you for query_sql, with their columns."""
         views: list[dict[str, Any]] = await run(data.list_views)
-        return {"views": views, "row_count": len(views)}
+        return await with_set({"views": views, "row_count": len(views)})
 
     @mcp.tool(annotations=READ_ONLY)
     @with_rules
@@ -320,7 +349,7 @@ def register_data_tools(mcp: FastMCP, data: DataAccess, guidelines: Guidelines) 
         result: dict[str, Any] = await run(
             data.get_timeseries, entity_id, start=start_ts, end=end_ts, resolution=resolution
         )
-        return result
+        return await with_set(result)
 
     @mcp.tool(annotations=READ_ONLY)
     @with_rules
@@ -375,7 +404,7 @@ def register_data_tools(mcp: FastMCP, data: DataAccess, guidelines: Guidelines) 
             new_since=since,
             limit=limit,
         )
-        return with_guidelines(result)
+        return await with_guidelines(result)
 
     @mcp.tool(annotations=READ_ONLY)
     @with_rules
@@ -394,7 +423,7 @@ def register_data_tools(mcp: FastMCP, data: DataAccess, guidelines: Guidelines) 
         except ValueError as err:
             raise ValueError(f"Invalid week {week!r}: use YYYY-MM-DD") from err
         result: dict[str, Any] = await run(data.get_weekly_summary, week=day, top=top)
-        return with_guidelines(result)
+        return await with_guidelines(result)
 
     @mcp.tool(annotations=READ_ONLY)
     @with_rules
@@ -409,4 +438,4 @@ def register_data_tools(mcp: FastMCP, data: DataAccess, guidelines: Guidelines) 
     ) -> dict[str, Any]:
         """Run a read-only SQL query over the data views."""
         result: dict[str, Any] = await run(data.query_sql, sql)
-        return result
+        return await with_set(result)

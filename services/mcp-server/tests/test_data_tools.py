@@ -280,13 +280,17 @@ async def test_rules_travel_with_data_tools(data: DataAccess) -> None:
         "get_weekly_summary",
         "query_sql",
     ):
-        assert "findings are hypotheses, not causes" in tools[name], name
         assert "presence, sleep, health" in tools[name], name
-        assert "friendly and warm with a light joke" in tools[name], name
-        assert "nothing politically or religiously tinged" in tools[name], name
+        assert "never invented" in tools[name], name
+        assert "political or religious" in tools[name], name
         assert "threats to life or health" in tools[name], name
-    assert "\n\nHow to answer (xomtra)" in tools["get_findings"]
+        assert "answer_guidelines of server_info" in tools[name], name
+    assert "\n\nxomtra core rules" in tools["get_findings"]
     findings = await call(srv, "get_findings")
     summary = await call(srv, "get_weekly_summary")
     for result in (findings, summary):
-        assert "hypotheses, not as causes" in result["answer_guidelines"]
+        assert "Answer first" in result["answer_guidelines"]
+        assert "never invent data" in result["answer_guidelines"]
+    # Other results name the active set (ADR 090).
+    catalog = await call(srv, "search_catalog")
+    assert catalog["answer_guidelines_set"] == "Default"

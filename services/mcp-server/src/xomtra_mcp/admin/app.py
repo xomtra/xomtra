@@ -55,11 +55,13 @@ from xomtra_mcp.admin.analysis import (
     preview,
     run_confidence,
 )
+from xomtra_mcp.admin.answers import AnswersPage
 from xomtra_mcp.admin.config import PREFIX, AdminSettings
 from xomtra_mcp.admin.html import CSS, cards, e, fmt, page, table, token_flow
 from xomtra_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
 from xomtra_mcp.admin.session import Signer
 from xomtra_mcp.admin.view import View, prefix
+from xomtra_mcp.answer_sets import AnswerSetStore, PostgresAnswerSetStore
 from xomtra_mcp.audit import AuditError, AuditRecord, AuditSink, LogAuditSink
 from xomtra_mcp.data import DataAccess
 from xomtra_mcp.desktop import FILENAME as MCPB_FILENAME
@@ -149,19 +151,15 @@ CLIENTS_NOTE = (
     "</span></p>"
 )
 
-# Shown with CLIENTS_NOTE: the answer style can be changed or turned off (ADR 080).
+# Shown with CLIENTS_NOTE: the answers follow the active set of the page Answers (ADR 090).
 ANSWERS_NOTE = (
     "<p class=warn><strong>Style of the answers</strong>"
     "<span class=more>"
-    "By default xomtra asks the assistant for friendly answers with light humour. "
-    "If you prefer very funny, crude and vulgar answers like from a mate in the "
-    "pub, choose the pub answer style; if you do not want any style, turn the "
-    "answer guidelines off. In Home Assistant use the add-on options Answer style "
-    "and Answer guidelines (Configuration tab), in other installations "
-    "XOMTRA_ANSWER_STYLE=pub or XOMTRA_DEFAULT_GUIDELINES=false in .env. Then "
-    "restart xomtra. Core rules always apply: no jokes about accidents or threats "
-    "to life and health, nothing sexist, racist, homophobic, xenophobic, political "
-    "or religious."
+    "By default xomtra asks the assistant for relevant answers with charts or tables "
+    "and a friendly tone. Choose another set or write your own on the page Answers; it "
+    "applies within 30 seconds. Core rules always apply: no jokes about accidents or "
+    "threats to life and health, nothing sexist, racist, homophobic, xenophobic, "
+    "political or religious."
     "</span></p>"
 )
 
@@ -182,6 +180,7 @@ class AdminApp:
         tokens: TokenStore | None = None,
         analysis: SettingsStore | None = None,
         access: AccessStore | None = None,
+        answer_sets: AnswerSetStore | None = None,
     ) -> None:
         self.settings = settings
         self.data = data
@@ -216,6 +215,9 @@ class AdminApp:
         if access is None and dsn and settings.auth_mode == "ha":
             access = PostgresAccessStore(dsn)
         self.access = access
+        if answer_sets is None and dsn:
+            answer_sets = PostgresAnswerSetStore(dsn)
+        self.answers = AnswersPage(answer_sets, self._audit, self._form)
         self.ingress = settings.auth_mode == "ingress"
         self.headers = dict(HEADERS)
         if self.ingress:
@@ -1222,8 +1224,8 @@ class AdminApp:
         )
         return HTMLResponse(page("Tokens", body, user.get("username")))
 
-    async def _form(self, request: Request) -> dict[str, str]:
-        raw = (await request.body())[:10_000].decode(errors="replace")
+    async def _form(self, request: Request, limit: int = 10_000) -> dict[str, str]:
+        raw = (await request.body())[:limit].decode(errors="replace")
         return {k: v[0].strip() for k, v in parse_qs(raw).items() if v}
 
     async def token_issue(self, request: Request, user: dict[str, Any]) -> Response:
@@ -1701,6 +1703,13 @@ class AdminApp:
                 p("analysis_setting", self.analysis_post, audit=False),
                 methods=["POST"],
             ),
+            Route(f"{PREFIX}/answers", p("answers", self.answers.show)),
+            Route(
+                f"{PREFIX}/answers",
+                p("answers_change", self.answers.post, audit=False),
+                methods=["POST"],
+            ),
+            Route(f"{PREFIX}/answers/export", p("answers_export", self.answers.export)),
             Route(f"{PREFIX}/findings", p("findings", self.findings_page)),
             Route(
                 f"{PREFIX}/findings/dismiss",

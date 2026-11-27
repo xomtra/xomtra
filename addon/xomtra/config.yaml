@@ -37,8 +37,6 @@ options:
   states_retention_days: 90
   statistics_5min_retention_days: 90
   statistics_hour_retention_days: 1825
-  default_guidelines: true
-  answer_style: friendly
 # Optional options (schema "?") stay out of the defaults: the Supervisor validates an
 # empty string against the type and refuses to start (url? does not accept "").
 schema:
@@ -46,6 +44,4 @@ schema:
   states_retention_days: int(1,3650)
   statistics_5min_retention_days: int(1,3650)
   statistics_hour_retention_days: int(1,3650)
-  default_guidelines: bool
-  answer_style: list(friendly|pub)
   mcp_url: url?

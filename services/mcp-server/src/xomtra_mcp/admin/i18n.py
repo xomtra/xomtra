@@ -4,9 +4,10 @@ The pages are written in English. :func:`translate` translates the finished page
 ``static/i18n.json``: a text node that equals a catalog entry, a long entry (three or
 more words) anywhere in a text node, a short one at its start or end (the pieces of a
 sentence around a value), and column names only in table headers. Code, preformatted
-text and scripts stay as they are, and so does everything that is not in the catalog
-(entity names, values). The language comes from the ``xomtra_lang`` cookie, which
-ui.js sets from Home Assistant's language, or else from the browser's Accept-Language.
+text, scripts, text areas and user text in <bdi> stay as they are, and so does
+everything that is not in the catalog (entity names, values). The language comes from
+the ``xomtra_lang`` cookie, which ui.js sets from Home Assistant's language, or else
+from the browser's Accept-Language.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ COOKIE = "xomtra_lang"
 CATALOG = Path(__file__).parent / "static" / "i18n.json"
 
 _TAG = re.compile(r"(<[^>]*>)")
-_SKIP = re.compile(r"<(/?)(code|pre|script|style)\b", re.IGNORECASE)
+_SKIP = re.compile(r"<(/?)(code|pre|script|style|textarea|bdi)\b", re.IGNORECASE)
 _ATTR = re.compile(r"""(placeholder=)(['"])(.*?)\2""")
 
 

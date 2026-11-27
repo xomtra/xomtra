@@ -147,9 +147,14 @@ How to verify a released image: [releasing.md](releasing.md); a build of `main`:
 - What the AI client fetches through MCP goes to that client's provider under the user's
   own account and its terms. Roles (section 3) and the labels (section 1) decide what it
   can fetch.
-- The tool descriptions and results carry answering guidelines (ADR 073, 080): findings
-  are hypotheses, no conclusions about a person's presence, sleep or health unless asked.
-  These guide the model; they are not a security boundary.
+- The tool descriptions and results carry answering guidelines (ADR 073, 080, 090):
+  fixed core rules (no conclusions about a person's presence, sleep or health unless
+  asked, only fetched values, xomtra only reads, no jokes about accidents or threats to
+  life and health, nothing discriminating, political or religious) and the answer
+  guidelines set chosen on the admin page Answers. The sets are kept in the local audit
+  database; no text for the model comes from xomtra.com or any other central service.
+  Only administrators can change them. They guide the model; they are not a security
+  boundary.
 
 ## Not released yet
 
@@ -167,4 +172,5 @@ Accepted and in review (ADR 081, ADR 084, pull request #77), not in 0.7.1:
   authentication in Home Assistant is required.
 
 Proposed, not decided: optional TLS for the add-on's MCP port (ADR 076); signed notices
-from xomtra.com verified with a pinned Ed25519 key (ADR 075).
+from xomtra.com verified with a pinned Ed25519 key, shown only in the admin GUI and never
+passed to the model (ADR 075 as changed by ADR 090).

@@ -17,20 +17,5 @@ configuration:
       MCP-endpoint zoals clients in je netwerk het bereiken, bijvoorbeeld
       http://homeassistant.local:8000/mcp. Leeg: het beheer leidt het af uit het adres
       waarop je Home Assistant hebt geopend.
-  default_guidelines:
-    name: Antwoordregels
-    description: >-
-      Stuur de assistent de standaardregels voor antwoorden (rol, omgang met data, tact)
-      in de gekozen stijl. Uit: alleen de basisregels blijven (geen grappen over
-      ongelukken, storingen of gevaar voor leven en gezondheid; geen seksistische,
-      racistische, homofobe, xenofobe, politieke of religieuze grappen); een actueel
-      thema van xomtra.com blijft gelden. Werkt na een herstart.
-  answer_style:
-    name: Antwoordstijl
-    description: >-
-      friendly: vriendelijke antwoorden met lichte humor (standaard). pub: heel
-      grappige, grove en vulgaire antwoorden als van een maat in de kroeg, afgestemd op
-      je taal, land en cultuur en persoonlijk op basis van wat de assistent over je
-      weet; de basisregels blijven gelden. Werkt na een herstart.
 network:
   8000/tcp: MCP-endpoint in het LAN (persoonlijke toegangstokens)

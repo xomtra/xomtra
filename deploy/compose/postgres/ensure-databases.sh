@@ -289,5 +289,56 @@ REVOKE ALL ON FUNCTION setup.ha_connection() FROM PUBLIC;
 SELECT format('GRANT USAGE ON SCHEMA setup TO %I, %I, %I', :'adm', :'usr', :'ops') \gexec
 SELECT format('GRANT SELECT, INSERT ON setup.ha_connection_change TO %I', :'adm') \gexec
 SELECT format('GRANT EXECUTE ON FUNCTION setup.ha_connection() TO %I, %I, %I', :'adm', :'usr', :'ops') \gexec
+
+-- Answer guidelines sets of the admin page Answers (ADR 090). Factory sets live in the
+-- code; custom sets here. answer_set: one row per custom set (no DELETE, deleted_at
+-- hides it); answer_set_version: append-only history of name, description and text,
+-- the latest row is the set; active_change: append-only, the latest row is the active
+-- set (factory or custom id). The admin GUI reads and appends; the MCP server may only
+-- call guidance.active_set().
+CREATE SCHEMA IF NOT EXISTS guidance AUTHORIZATION postgres;
+CREATE TABLE IF NOT EXISTS guidance.answer_set (
+  id               text PRIMARY KEY,
+  based_on         text,
+  based_on_version integer,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  created_by       text,
+  deleted_at       timestamptz,
+  deleted_by       text
+);
+CREATE TABLE IF NOT EXISTS guidance.answer_set_version (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  set_id      text NOT NULL REFERENCES guidance.answer_set (id),
+  name        text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 40),
+  description text NOT NULL DEFAULT '' CHECK (char_length(description) <= 200),
+  body        text NOT NULL CHECK (char_length(body) <= 4000),
+  changed_at  timestamptz NOT NULL DEFAULT now(),
+  changed_by  text
+);
+CREATE INDEX IF NOT EXISTS answer_set_version_set ON guidance.answer_set_version (set_id, id);
+CREATE TABLE IF NOT EXISTS guidance.active_change (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  set_id     text NOT NULL,
+  changed_at timestamptz NOT NULL DEFAULT now(),
+  changed_by text
+);
+-- The active set: its id, and for a custom set its latest name and text. No row: nothing
+-- chosen yet or the custom set was deleted (the MCP server then uses the default set).
+CREATE OR REPLACE FUNCTION guidance.active_set()
+RETURNS TABLE (set_id text, name text, body text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $f$
+  WITH a AS (SELECT c.set_id FROM guidance.active_change c ORDER BY c.id DESC LIMIT 1)
+  SELECT a.set_id, NULL::text, NULL::text FROM a WHERE a.set_id LIKE 'factory:%'
+  UNION ALL
+  SELECT a.set_id, v.name, v.body FROM a
+  JOIN guidance.answer_set s ON s.id = a.set_id AND s.deleted_at IS NULL
+  JOIN LATERAL (SELECT x.name, x.body FROM guidance.answer_set_version x
+                WHERE x.set_id = s.id ORDER BY x.id DESC LIMIT 1) v ON true
+$f$;
+REVOKE ALL ON FUNCTION guidance.active_set() FROM PUBLIC;
+SELECT format('GRANT USAGE ON SCHEMA guidance TO %I, %I', :'adm', :'usr') \gexec
+SELECT format('GRANT SELECT, INSERT ON guidance.answer_set, guidance.answer_set_version, guidance.active_change TO %I', :'adm') \gexec
+SELECT format('GRANT UPDATE (deleted_at, deleted_by) ON guidance.answer_set TO %I', :'adm') \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION guidance.active_set() TO %I, %I', :'adm', :'usr') \gexec
 SQL
 echo "Postgres roles and databases are in place."

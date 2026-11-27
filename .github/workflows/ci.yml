@@ -357,6 +357,35 @@ jobs:
             "SELECT last_used_at IS NOT NULL FROM access.token WHERE id = 'ci'" | grep -qx t
           docker compose exec -T postgres psql -U postgres -d audit -tAc \
             "SELECT count(*) FROM audit.tool_call WHERE tool = 'ci-old'" | grep -qx 0
+      - name: Smoke test answer guidelines sets (ADR 090 grants)
+        working-directory: deploy/compose
+        run: |
+          # A custom set made active by the superuser; the MCP role may only read it.
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d audit -c \
+            "INSERT INTO guidance.answer_set (id) VALUES ('custom:ci'); INSERT INTO guidance.answer_set_version (set_id, name, body) VALUES ('custom:ci', 'CI', 'Answer briefly.'); INSERT INTO guidance.active_change (set_id) VALUES ('custom:ci')"
+          docker compose exec -T mcp python - <<'PY'
+          import psycopg2
+          from xomtra_mcp.answer_sets import PostgresActiveSource
+          from xomtra_mcp.config import Settings
+
+          dsn = Settings().audit_dsn
+          active = PostgresActiveSource(dsn)()
+          assert active is not None and active.name == "CI" and active.text == "Answer briefly.", active
+          con = psycopg2.connect(dsn)
+          con.autocommit = True
+          for sql in (
+              "SELECT * FROM guidance.answer_set_version",
+              "INSERT INTO guidance.active_change (set_id) VALUES ('factory:core-only')",
+          ):
+              try:
+                  con.cursor().execute(sql)
+                  raise SystemExit(f"MCP role may run: {sql}")
+              except psycopg2.Error:
+                  pass
+          print("answer set grants ok")
+          PY
+          docker compose exec -T postgres psql -U postgres -d audit -c \
+            "INSERT INTO guidance.active_change (set_id) VALUES ('factory:default')"
       - name: Smoke test admin GUI (sign-in required, Dagster UI under /admin/dagster)
         working-directory: deploy/compose
         run: |
