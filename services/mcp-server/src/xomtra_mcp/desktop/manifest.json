@@ -46,7 +46,7 @@
     "ca_file": {
       "type": "file",
       "title": "Certificate of the server (optional)",
-      "description": "xomtra-ca.crt from https://<server>/xomtra-ca.crt when the server uses its own local certificate",
+      "description": "Needed with xomtra's own certificate (the default in your LAN) unless it is trusted by the system: xomtra-ca.crt from https://<server>/xomtra-ca.crt",
       "required": false,
       "default": ""
     },

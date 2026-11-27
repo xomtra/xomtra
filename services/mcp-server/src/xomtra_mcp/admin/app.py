@@ -1498,7 +1498,8 @@ class AdminApp:
             "shows the extension and asks for the token.</li>"
             + (
                 "<li>Paste the token. If your browser warned about the certificate of this "
-                f"server, also download <a href='{e(ca)}'>xomtra-ca.crt</a> and select it "
+                "server (xomtra's own certificate), this is required for Claude Desktop: "
+                f"also download <a href='{e(ca)}'>xomtra-ca.crt</a> and select it "
                 "as <em>Certificate of the server</em>.</li></ol>"
                 if tls
                 else "<li>Paste the token. The address uses plain http://, so "

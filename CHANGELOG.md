@@ -31,6 +31,14 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   where often another server answers. The setup now tries Home Assistant's port 8123 as
   well and stores that address if it works; otherwise the error says that the port is
   missing. The example in the URL field shows the port.
+- Claude Desktop extension: a certificate the computer does not trust
+  (`unable to get local issuer certificate`) is no longer reported with the network
+  hint (Local Network permission). The message says to choose `xomtra-ca.crt` as
+  *Certificate of the server*, that a chosen file is not the CA of this server, or that
+  the certificate is for another name.
+- Docs (local access) and the Connect page: trusting xomtra's CA is required for Claude
+  Desktop and Claude Code, with the commands for macOS, Windows and Linux and how to
+  compare the fingerprint on both sides.
 
 ## [0.9.1] - 2026-11-27
 

@@ -29,6 +29,42 @@ const UNREACHABLE_HINT =
   "Check the address and that this computer reaches the server. On macOS allow Claude " +
   "in System Settings > Privacy & Security > Local Network, then restart Claude.";
 
+// Node's codes for a certificate chain this computer does not trust.
+const UNTRUSTED_CODES = new Set([
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "CERT_SIGNATURE_FAILURE",
+]);
+
+// What to do about a failed connection: the certificate, or reaching the server.
+function hintFor(err, url, ca) {
+  const code = err && err.code;
+  if (UNTRUSTED_CODES.has(code)) {
+    if (ca) {
+      return (
+        "The certificate file chosen in the extension settings is not the one of this " +
+        `server. Download it again from ${url.origin}/xomtra-ca.crt and choose that file.`
+      );
+    }
+    return (
+      "This computer does not trust the certificate of the server (xomtra's own local " +
+      `certificate authority). Download ${url.origin}/xomtra-ca.crt and choose it in ` +
+      "the extension settings under Certificate of the server, or trust it in the " +
+      "system (docs/setup/local-access.md, also how to check its fingerprint)."
+    );
+  }
+  if (code === "ERR_TLS_CERT_ALTNAME_INVALID") {
+    return (
+      "The certificate of the server is for another name. Use the address the server " +
+      "was set up with (XOMTRA_LOCAL_HOST), as shown on Connect in the xomtra admin GUI."
+    );
+  }
+  return UNREACHABLE_HINT;
+}
+
 function log(message) {
   process.stderr.write(`[xomtra-bridge] ${message}\n`);
 }
@@ -184,7 +220,8 @@ class Bridge {
     } catch (err) {
       this.errorFor(
         message,
-        `Cannot reach xomtra at ${this.url.origin}: ${err.message}. ${UNREACHABLE_HINT}`,
+        `Cannot reach xomtra at ${this.url.origin}: ${err.message}. ` +
+          hintFor(err, this.url, this.ca),
       );
       return;
     }

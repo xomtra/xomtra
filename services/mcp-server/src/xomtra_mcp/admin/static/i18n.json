@@ -143,7 +143,6 @@
    "Other MCP clients": "Další MCP klienti",
    "Overview": "Přehled",
    "Paste the token.": "Vložte token.",
-   "Paste the token. If your browser warned about the certificate of this server, also download": "Vložte token. Pokud prohlížeč varoval před certifikátem tohoto serveru, stáhněte také",
    "Paste the token. The address uses plain http://, so": "Vložte token. Adresa používá prosté http://, proto je",
    "Personal tokens are used only in the local access mode (": "Osobní tokeny se používají jen v lokálním režimu přístupu (",
    "Preview": "Náhled",
@@ -316,7 +315,8 @@
    "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant neodpověděl včas. Zkontrolujte, že se k němu tento server dostane: adresu, port a firewall mezi nimi.",
    "Home Assistant cannot be reached at this address.": "Home Assistant na této adrese není dostupný.",
    "Details:": "Podrobnosti:",
-   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Adresa nemá port. Home Assistant obvykle poslouchá na portu 8123, například http://192.168.1.10:8123."
+   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Adresa nemá port. Home Assistant obvykle poslouchá na portu 8123, například http://192.168.1.10:8123.",
+   "Paste the token. If your browser warned about the certificate of this server (xomtra's own certificate), this is required for Claude Desktop: also download": "Vložte token. Pokud prohlížeč varoval před certifikátem tohoto serveru (vlastní certifikát xomtry), je to pro Claude Desktop nutné: stáhněte také"
   },
   "de": {
    "(address": "(Adresse",
@@ -423,7 +423,6 @@
    "Other MCP clients": "Andere MCP-Clients",
    "Overview": "Übersicht",
    "Paste the token.": "Fügen Sie den Token ein.",
-   "Paste the token. If your browser warned about the certificate of this server, also download": "Fügen Sie den Token ein. Wenn Ihr Browser vor dem Zertifikat dieses Servers gewarnt hat, laden Sie auch",
    "Paste the token. The address uses plain http://, so": "Fügen Sie den Token ein. Die Adresse verwendet einfaches http://, daher ist",
    "Personal tokens are used only in the local access mode (": "Persönliche Tokens werden nur im lokalen Zugriffsmodus verwendet (",
    "Preview": "Vorschau",
@@ -596,7 +595,8 @@
    "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant hat nicht rechtzeitig geantwortet. Prüfe, ob dieser Server ihn erreicht: Adresse, Port und eine Firewall dazwischen.",
    "Home Assistant cannot be reached at this address.": "Home Assistant ist unter dieser Adresse nicht erreichbar.",
    "Details:": "Details:",
-   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Die Adresse hat keinen Port. Home Assistant lauscht normalerweise auf dem Port 8123, zum Beispiel http://192.168.1.10:8123."
+   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Die Adresse hat keinen Port. Home Assistant lauscht normalerweise auf dem Port 8123, zum Beispiel http://192.168.1.10:8123.",
+   "Paste the token. If your browser warned about the certificate of this server (xomtra's own certificate), this is required for Claude Desktop: also download": "Fügen Sie den Token ein. Wenn Ihr Browser vor dem Zertifikat dieses Servers gewarnt hat (xomtras eigenes Zertifikat), ist das für Claude Desktop nötig: Laden Sie auch"
   },
   "nl": {
    "(address": "(adres",
@@ -703,7 +703,6 @@
    "Other MCP clients": "Andere MCP-clients",
    "Overview": "Overzicht",
    "Paste the token.": "Plak het token.",
-   "Paste the token. If your browser warned about the certificate of this server, also download": "Plak het token. Als je browser waarschuwde voor het certificaat van deze server, download dan ook",
    "Paste the token. The address uses plain http://, so": "Plak het token. Het adres gebruikt gewoon http://, dus",
    "Personal tokens are used only in the local access mode (": "Persoonlijke tokens worden alleen in de lokale toegangsmodus gebruikt (",
    "Preview": "Voorbeeld",
@@ -875,7 +874,8 @@
    "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant antwoordde niet op tijd. Controleer of deze server hem kan bereiken: het adres, de poort en een firewall daartussen.",
    "Home Assistant cannot be reached at this address.": "Home Assistant is op dit adres niet bereikbaar.",
    "Details:": "Details:",
-   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Het adres heeft geen poort. Home Assistant luistert normaal op poort 8123, bijvoorbeeld http://192.168.1.10:8123."
+   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Het adres heeft geen poort. Home Assistant luistert normaal op poort 8123, bijvoorbeeld http://192.168.1.10:8123.",
+   "Paste the token. If your browser warned about the certificate of this server (xomtra's own certificate), this is required for Claude Desktop: also download": "Plak het token. Als je browser waarschuwde voor het certificaat van deze server (het eigen certificaat van xomtra), is dit nodig voor Claude Desktop: download ook"
   },
   "pl": {
    "(address": "(adres",
@@ -984,7 +984,6 @@
    "Other MCP clients": "Inni klienci MCP",
    "Overview": "Przegląd",
    "Paste the token.": "Wklej token.",
-   "Paste the token. If your browser warned about the certificate of this server, also download": "Wklej token. Jeśli przeglądarka ostrzegła przed certyfikatem tego serwera, pobierz też",
    "Paste the token. The address uses plain http://, so": "Wklej token. Adres używa zwykłego http://, więc opcja",
    "Personal tokens are used only in the local access mode (": "Osobiste tokeny są używane tylko w lokalnym trybie dostępu (",
    "Preview": "Podgląd",
@@ -1158,7 +1157,8 @@
    "Home Assistant did not answer in time. Check that this server can reach it: the address, the port and a firewall between them.": "Home Assistant nie odpowiedział na czas. Sprawdź, czy ten serwer może się z nim połączyć: adres, port i zaporę między nimi.",
    "Home Assistant cannot be reached at this address.": "Home Assistant jest niedostępny pod tym adresem.",
    "Details:": "Szczegóły:",
-   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Adres nie ma portu. Home Assistant zwykle nasłuchuje na porcie 8123, na przykład http://192.168.1.10:8123."
+   "The address has no port. Home Assistant normally listens on the port 8123, for example http://192.168.1.10:8123.": "Adres nie ma portu. Home Assistant zwykle nasłuchuje na porcie 8123, na przykład http://192.168.1.10:8123.",
+   "Paste the token. If your browser warned about the certificate of this server (xomtra's own certificate), this is required for Claude Desktop: also download": "Wklej token. Jeśli przeglądarka ostrzegła przed certyfikatem tego serwera (własny certyfikat xomtra), jest to wymagane dla Claude Desktop: pobierz też"
   }
  },
  "th": {

@@ -35,8 +35,36 @@ docker compose exec caddy cat /data/caddy/pki/authorities/local/root.crt \
   | openssl x509 -noout -fingerprint -sha256
 ```
 
-Then either import it into the system's trust store (browser and every client trust the
-server) or give it only to the clients that need it (below).
+and on the computer where you downloaded it:
+
+```bash
+openssl x509 -noout -fingerprint -sha256 -in ~/Downloads/xomtra-ca.crt   # macOS, Linux
+certutil -dump $env:USERPROFILE\Downloads\xomtra-ca.crt | findstr /i "sha256"   # Windows
+```
+
+**This step is required for Claude Desktop and Claude Code.** They run on Node, which
+trusts neither the browser's exception nor a CA it has not been given; without it they
+fail with `unable to get local issuer certificate`. Do one of the two:
+
+- **Only for Claude** (recommended, works in any case, no change to the system): choose
+  `xomtra-ca.crt` as *Certificate of the server* in the Claude Desktop extension
+  (step 4), and start Claude Code with `NODE_EXTRA_CA_CERTS=/path/to/xomtra-ca.crt`.
+- **For the whole computer** (browsers and other clients):
+
+  ```bash
+  # macOS
+  sudo security add-trusted-cert -d -r trustRoot \
+    -k /Library/Keychains/System.keychain ~/Downloads/xomtra-ca.crt
+  # Windows (PowerShell as administrator)
+  certutil -addstore -f Root $env:USERPROFILE\Downloads\xomtra-ca.crt
+  # Debian/Ubuntu
+  sudo cp xomtra-ca.crt /usr/local/share/ca-certificates/xomtra-ca.crt
+  sudo update-ca-certificates
+  ```
+
+  Restart Claude Desktop afterwards. Whether the extension uses the system store depends
+  on the Node built into Claude Desktop; if it still reports the error, also use the
+  first option.
 
 ## 3. Issue a token
 
