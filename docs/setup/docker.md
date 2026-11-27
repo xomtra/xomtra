@@ -4,7 +4,8 @@ xomtra on any Linux machine with Docker (a virtual machine, a mini PC, a NAS). N
 fill in before the start (ADR 077): the internal passwords and keys are generated on the
 first start, and Home Assistant is connected in the browser afterwards.
 
-Requirements: Docker Engine with the Compose plugin (`docker compose version`), 2 CPU
+Requirements: Docker Engine with the Compose plugin v2 ([official install](https://docs.docker.com/engine/install/),
+check with `docker compose version`), 2 CPU
 cores and 4 GB RAM for the full edition (2 GB for the lite edition), a few GB of disk,
 and Home Assistant reachable from this machine, usually on port 8123
 (`http://<ha-address>:8123`).
