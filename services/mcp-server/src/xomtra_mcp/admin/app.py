@@ -1157,6 +1157,15 @@ class AdminApp:
 
     # ---- personal tokens and client setup (local access, ADR 056/059) ---------------
 
+    def _entra_note(self) -> str:
+        """Who may use xomtra with Entra ID (there is no page Access then)."""
+        if self.settings.auth_mode != "entra":
+            return ""
+        return (
+            "<p class=muted>With Entra ID, who may use xomtra and with which role is set in "
+            "Entra (app roles of the enterprise application). Sign-ins end in Entra too.</p>"
+        )
+
     def _local_only(self, user: dict[str, Any], title: str) -> Response | None:
         if self.settings.access_mode == "local" and self.tokens is not None:
             return None
@@ -1164,7 +1173,7 @@ class AdminApp:
             "<p class=warn>Personal tokens are used only in the local access mode "
             "(<code>XOMTRA_ACCESS_MODE=local</code>, see docs/setup/local-access.md). "
             "In the public mode, Claude connects with OAuth (docs/setup/claude-connector.md)."
-            "</p>"
+            "</p>" + self._entra_note()
         )
         return HTMLResponse(page(title, body, user.get("username")))
 
@@ -1216,6 +1225,7 @@ class AdminApp:
         body = (
             "<p class=muted>Each person or device gets its own token. A token is shown once; "
             "only its hash is stored. Revoked tokens stop working within 30 seconds.</p>"
+            + self._entra_note()
             + CLIENTS_NOTE
             + token_flow()
             + form
@@ -1313,24 +1323,23 @@ class AdminApp:
 
     # ---- access of the Claude connector (ADR 081) ------------------------------------
 
+    def has_access_page(self) -> bool:
+        """The page Access exists for the Claude connector with Home Assistant sign-in
+        (public mode, ADR 081); otherwise its few words are on the page Tokens."""
+        return (
+            self.settings.auth_mode != "entra"
+            and self.settings.access_mode == "public"
+            and not self.ingress
+        )
+
     def _access_refused(self, user: dict[str, Any]) -> Response | None:
-        if self.settings.auth_mode == "entra":
-            text = (
-                "With Entra ID, who may use xomtra and with which role is set in Entra "
-                "(app roles of the enterprise application). Sign-ins end in Entra too."
-            )
-        elif self.settings.access_mode == "local" or self.ingress:
-            text = (
-                "In the local access mode, Claude and other MCP clients connect with "
-                "personal tokens; issue and revoke them on the page Tokens."
-            )
-        elif self.access is None:
+        if not self.has_access_page():
+            return RedirectResponse(f"{prefix()}/tokens", status_code=303)
+        if self.access is None:
             return HTMLResponse(
                 page("Access", "<p class=bad>The access store is unavailable.</p>", None), 503
             )
-        else:
-            return None
-        return HTMLResponse(page("Access", f"<p class=muted>{e(text)}</p>", user.get("username")))
+        return None
 
     async def access_page(self, request: Request, user: dict[str, Any]) -> Response:
         refused = self._access_refused(user)
@@ -1814,7 +1823,7 @@ class AdminApp:
             Route(f"{PREFIX}/auth/check", self.check),
             Route(f"{PREFIX}/logout", self.logout, methods=["POST"]),
         ]
-        return RequestView(Starlette(routes=routes), self.settings)
+        return RequestView(Starlette(routes=routes), self.settings, self.has_access_page())
 
 
 def _lang(scope: Scope) -> str:
@@ -1836,11 +1845,11 @@ class RequestView:
     ``/admin`` prefix, which is put back here so that the routes stay the same.
     """
 
-    def __init__(self, app: ASGIApp, settings: AdminSettings) -> None:
+    def __init__(self, app: ASGIApp, settings: AdminSettings, access_page: bool) -> None:
         self.app = app
         self.ingress = settings.auth_mode == "ingress"
         self.proxy = settings.ingress_proxy
-        self.base = View(dagster=settings.dagster_ui and not self.ingress)
+        self.base = View(access=access_page)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         lang = _lang(scope)
@@ -1869,7 +1878,7 @@ class RequestView:
         token = view.current.set(
             View(
                 prefix=ingress_path,
-                dagster=False,
+                access=False,
                 sign_out=False,
                 endpoint=endpoint,
                 lang=lang,

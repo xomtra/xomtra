@@ -261,7 +261,7 @@ FOOTER = (
 
 def page(title: str, body: str, user: str | None) -> str:
     v = view.current.get()
-    nav = NAV
+    nav = (item for item in NAV if v.access or item[0] != "/access")
     links = "".join(
         f'<a href="{v.prefix}{path}"{" aria-current=page" if label == title else ""}>'
         f"{escape(label)}</a>"

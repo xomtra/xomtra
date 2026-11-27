@@ -26,6 +26,10 @@
   of the answers moved from Tokens and Connect clients to the page Answers.
 - Admin GUI (Docker compose): the menu no longer links to the Dagster UI; it stays
   reachable for administrators at `/admin/dagster/`.
+- Admin GUI: the page Access is in the menu only where it has something to manage (the
+  Claude connector with Home Assistant sign-in, public mode). With personal tokens, the
+  add-on or Entra ID it had only a sentence; `/admin/access` leads to Tokens, which
+  carries the Entra note.
 - Admin GUI: when Home Assistant cannot be reached (setup page and Overview), a sentence
   says why and what to try, in every language of the admin GUI: `https://` on a plain
   HTTP port ("try http://"), an untrusted certificate, a name this server cannot
