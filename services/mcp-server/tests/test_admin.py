@@ -119,7 +119,7 @@ async def test_admin_sign_in_pages_and_audit(data: DataAccess) -> None:
         for path, text in [
             ("/admin/", "Catalog"),
             ("/admin/catalog?q=teplota", "sensor.temp"),
-            ("/admin/drift", "Drift"),
+            ("/admin/drift", "Entity changes"),
             ("/admin/retention", "XOMTRA_STATES_RETENTION_DAYS"),
             ("/admin/audit", "not configured"),
         ]:

@@ -215,17 +215,19 @@ MARK = (
     'stroke="var(--surface)" stroke-width="2"/></svg>'
 )
 
+# Most used first: what xomtra found, how it answers and who may ask; then the data
+# behind it and the settings.
 NAV = (
     ("/", "Overview"),
-    ("/catalog", "Catalog"),
-    ("/drift", "Drift"),
-    ("/retention", "Retention"),
     ("/findings", "Findings"),
-    ("/analysis", "Analysis settings"),
     ("/answers", "Answers"),
-    ("/audit", "Audit"),
     ("/tokens", "Tokens"),
     ("/access", "Access"),
+    ("/catalog", "Catalog"),
+    ("/drift", "Entity changes"),
+    ("/retention", "Retention"),
+    ("/analysis", "Analysis settings"),
+    ("/audit", "Audit"),
 )
 
 

@@ -153,7 +153,7 @@ BACKUP_NOTE = (
 )
 
 
-# Shown on the token pages: the local access mode only serves clients in the LAN.
+# Shown on the page Connect clients: the local access mode only serves clients in the LAN.
 CLIENTS_NOTE = (
     "<p class=warn><strong>Which AI assistants can connect</strong>"
     "<span class=more>"
@@ -585,9 +585,9 @@ class AdminApp:
                 {1, 2},
             )
         else:
-            body += "<p class=muted>No profile yet (job catalog_daily).</p>"
+            body += "<p class=muted>No profile yet; the catalog is profiled once a day.</p>"
         drift = lake.get("drift_7d") or []
-        body += "<h2>Drift, last 7 days</h2>" + (
+        body += "<h2>Entity changes, last 7 days</h2>" + (
             table(["type", "count"], [(d["drift_type"], d["n"]) for d in drift], {1})
             if drift
             else "<p class=muted>None.</p>"
@@ -656,35 +656,45 @@ class AdminApp:
     async def drift(self, request: Request, user: dict[str, Any]) -> Response:
         data = self.data
         if data is None:
-            return self._no_data(user, "Drift")
+            return self._no_data(user, "Entity changes")
         rows = await asyncio.to_thread(status.drift_rows, data)
         cols = ["detected_at", "entity_id", "drift_type", "field", "old_value", "new_value"]
         body = "<p class=muted>Last 30 days</p>" + table(cols, [[r[c] for c in cols] for r in rows])
-        return HTMLResponse(page("Drift", body, user.get("username")))
+        return HTMLResponse(page("Entity changes", body, user.get("username")))
 
     async def retention(self, request: Request, user: dict[str, Any]) -> Response:
         s = self.settings
         now = datetime.now(UTC)
         periods = [
-            ("States", "XOMTRA_STATES_RETENTION_DAYS", s.states_retention_days),
+            ("States", "STATES_RETENTION_DAYS", s.states_retention_days),
             (
                 "5-minute statistics",
-                "XOMTRA_STATISTICS_5MIN_RETENTION_DAYS",
+                "STATISTICS_5MIN_RETENTION_DAYS",
                 s.statistics_5min_retention_days,
             ),
             (
                 "Hourly statistics",
-                "XOMTRA_STATISTICS_HOUR_RETENTION_DAYS",
+                "STATISTICS_HOUR_RETENTION_DAYS",
                 s.statistics_hour_retention_days,
             ),
         ]
-        body = (
-            "<p class=muted>Applied daily at 03:30 by the Dagster job retention_daily; data "
-            "files disappear after the snapshot retention (7 days). Change the values in "
-            "<code>.env</code> and restart the ingest containers.</p>"
-        )
+        if self.ingress:
+            # The add-on's options carry the same names in lower case (xomtra-env).
+            periods = [(n, v.lower(), d) for n, v, d in periods]
+            body = (
+                "<p class=muted>Applied daily at 03:30; the data files disappear 7 days "
+                "later. Change the days in the add-on's Configuration tab; the add-on "
+                "restarts with them.</p>"
+            )
+        else:
+            periods = [(n, f"XOMTRA_{v}", d) for n, v, d in periods]
+            body = (
+                "<p class=muted>Applied daily at 03:30 (job retention_daily); the data files "
+                "disappear 7 days later. Change the values in <code>.env</code> and restart "
+                "the ingest containers.</p>"
+            )
         body += table(
-            ["data", "variable", "days", "deleted before"],
+            ["data", "option" if self.ingress else "variable", "days", "deleted before"],
             [(n, v, d, (now - timedelta(days=d)).date().isoformat()) for n, v, d in periods],
             {2},
         )
@@ -712,7 +722,7 @@ class AdminApp:
             "arguments",
             "error",
         ]
-        body = "<p class=muted>Last 200 calls (MCP tools and this GUI)</p>"
+        body = "<p class=muted>Last 200 calls (MCP tools and this admin)</p>"
         if rows is None:
             body += "<p class=warn>The audit database is not configured for the admin GUI.</p>"
         else:
@@ -800,11 +810,12 @@ class AdminApp:
             body = "<p class=bad>The settings store is unavailable.</p>"
             return HTMLResponse(page(title, body, user.get("username")), 503)
         body = note + (
+            "<p class=warn>If the findings work for you, leave these settings as they are."
+            "</p>"
             "<p class=muted>A stored value wins over the ingest's environment variable, which "
-            "wins over the default. The next analysis run (daily) uses it; no restart. "
-            "The thresholds set the rate of false findings, not their number (ADR 060, "
-            "062): a larger home rightly finds more.</p>"
-            "<p class=muted><small>Don't change it, if it works.</small></p>"
+            "wins over the default. The next analysis run (daily) uses it, without a "
+            "restart. The thresholds set the share of false findings, not their number: a "
+            "larger home rightly finds more.</p>"
         )
         if any(k in BY_KEY for k in current):
             body += (
@@ -951,15 +962,14 @@ class AdminApp:
             for t in ("", *FINDING_TYPES)
         )
         body = note + (
-            "<p class=muted>A dismissed finding is flagged <code>dismissed</code> from the "
-            "next analysis run on and hidden like the other flags (Claude sees it only with "
-            "<code>include_flagged</code>). It applies to the pair of entities (correlation) "
-            "or the entity (anomaly, change point) in every window, until undone or the "
-            "chosen date.</p>"
+            "<p class=muted>A dismissed finding is hidden from the next analysis run on, in "
+            "every window, until you undo it or until the chosen date: for a correlation the "
+            "pair of entities, for an anomaly or a change point the entity. Claude sees it "
+            "only when it asks for flagged findings too.</p>"
             "<form class=filters method=get>"
             f"<select name=type>{options}</select>"
             f"<label><input type=checkbox name=flagged value=1{' checked' if flagged else ''}>"
-            " include flagged</label><button>Filter</button></form>"
+            " including flagged</label><button>Filter</button></form>"
         )
         until = "".join(
             f"<option value={d}>{f'{d} days' if d else 'for good'}</option>" for d in DISMISS_DAYS
@@ -1064,7 +1074,7 @@ class AdminApp:
             out += (
                 "<p class=warn>Low power: with few series or few entities in an area the "
                 "false correlations are strong ones with a shared cause the analysis cannot "
-                "see, so a stricter threshold does not help (ADR 067). Assign the entities "
+                "see, so a stricter threshold does not help. Assign the entities "
                 "below to areas in Home Assistant; that measurably lowers the false "
                 "findings.</p>"
             )
@@ -1226,7 +1236,10 @@ class AdminApp:
             "<p class=muted>Each person or device gets its own token. A token is shown once; "
             "only its hash is stored. Revoked tokens stop working within 30 seconds.</p>"
             + self._entra_note()
-            + CLIENTS_NOTE
+            + "<p class=muted>Only assistants on a computer in your local network can "
+            "connect, such as Claude Desktop and Claude Code; claude.ai on the web and ChatGPT "
+            f"cannot. <a href='{prefix()}/connect'>How to connect Claude and other MCP "
+            "clients</a></p>"
             + token_flow()
             + form
             + table(
@@ -1234,7 +1247,6 @@ class AdminApp:
                 rows,
                 trusted_html={7},
             )
-            + f"<p><a href='{prefix()}/connect'>How to connect Claude and other MCP clients</a></p>"
         )
         return HTMLResponse(page("Tokens", body, user.get("username")))
 
@@ -1292,6 +1304,8 @@ class AdminApp:
             "<strong>Copy it now, it is not shown again.</strong></p>"
             f"<p><input class=token readonly size=80 value='{e(token)}'></p>"
             + self._connect_help(token)
+            + "<p class=muted>claude.ai on the web and on phones connects through Anthropic's "
+            "servers and needs the public access mode (docs/setup/claude-connector.md).</p>"
             + f"<p><a href='{prefix()}/tokens'>Back to tokens</a></p>"
         )
         return HTMLResponse(page("New token", body, user.get("username")))
@@ -1553,8 +1567,6 @@ class AdminApp:
             + "<h2>Other MCP clients</h2>"
             "<p>Streamable HTTP endpoint with a bearer token, e.g.:</p>"
             f"<pre>{e(server)}</pre>"
-            "<p class=muted>claude.ai on the web and on phones connects through Anthropic's "
-            "servers and needs the public access mode (docs/setup/claude-connector.md).</p>"
         )
 
     async def connect_page(self, request: Request, user: dict[str, Any]) -> Response:
