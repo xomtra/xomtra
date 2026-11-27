@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.8.0 - 2026-11-27
+
+### Added
+
+- Admin page **Access** (public access with Home Assistant sign-in, ADR 081): give HA
+  users who are not administrators the role `xomtra.Reader`, and see every sign-in of
+  the Claude connector with **Disconnect**.
+- Claude connector sign-ins end after `XOMTRA_SESSION_DAYS` (default 180); in the last
+  14 days `server_info` asks the assistant to tell the user to connect again.
+- Guide [which installation to choose](docs/setup/choose-edition.md): limits of the
+  add-on and of an own machine, supported AI assistants, what the external connector
+  needs (domain, A record, port 443, certificate, sign-in).
+- Answer style option (add-on option `answer_style`, `XOMTRA_ANSWER_STYLE`): `friendly`
+  (default) or `pub`, the crude style of 0.7.x with personal humour (ADR 080).
+
+### Changed
+
+- Home Assistant sign-in is the default (`XOMTRA_AUTH_MODE=ha`); Entra ID stays an
+  option (ADR 081). **Upgrade note:** installations with Entra ID that did not set
+  `XOMTRA_AUTH_MODE` must add `XOMTRA_AUTH_MODE=entra` to `.env` (the server refuses to
+  start with Entra values and no mode, with this hint).
+- Public access with Home Assistant sign-in: only HA administrators get in by default
+  (`XOMTRA_HA_ROLE_MAP` default `admin=xomtra.Admin,user=`); other users need a role on
+  the page Access. **Upgrade note:** users who were Readers through the old default
+  need that role on the page Access.
+- Claude connector with Home Assistant sign-in requires two-factor authentication in
+  HA (`XOMTRA_HA_REQUIRE_MFA`, default `true`).
+- Default answer style is friendly with light humour; the crude pub style is an option.
+- Core rules also forbid politically or religiously tinged jokes and innuendo, in every
+  style and theme.
+- Personal tokens expire after at most a year (30, 90 or 365 days, 90 by default); the
+  option "never" is gone. Existing tokens keep their expiry.
+- Admin GUI: the note on AI assistants says plainly that claude.ai needs an installation
+  on its own virtual machine with a public address and that ChatGPT and other cloud
+  assistants are not supported yet.
+
+### Security
+
+- The Claude connector keeps no Home Assistant token of the user: it is revoked right
+  after the sign-in (as the admin GUI already did). Requests are checked against the
+  session, the access list and, with an administrator token in xomtra's HA connection,
+  HA's user directory. Audit records `connector:sign_in` (with `ha_token_revoked`) and
+  `connector:session_refused`.
+
 ## 0.7.1 - 2026-11-26
 
 ### Added
@@ -108,63 +152,5 @@
 - Home Assistant add-on: the update dialog said "No changelog found". The add-on now
   ships its own `CHANGELOG.md` with the last five released versions;
   `scripts/release.py prepare` writes it and `check` refuses a tag without it.
-
-## 0.6.0 - 2026-11-26
-
-### Added
-
-- Admin GUI and add-on options in Czech, German, Polish and Dutch: the GUI follows Home
-  Assistant's language (outside Home Assistant the browser's), English stays the
-  default. Entity names, values and code stay as they are.
-- Analysis settings: "Reset all to defaults" sets every changed setting back to its
-  default in one step (confirmed with a tick box, recorded in the history and audit).
-- Admin GUI: explanations of the columns and cards on hover or focus, in the language of
-  Home Assistant (English, Czech, German, Polish, Dutch); numbers with digit grouping,
-  shares as percentages, dates and times in Home Assistant's number, date and time
-  format and time zone (outside Home Assistant the browser's).
-- Free disk space of the lake on the admin overview. Below
-  `XOMTRA_WORKER_STOP_FREE_RATIO` (default 3 %) the worker pauses the stream and the
-  writing jobs until there is space again, then catches up from Home Assistant's
-  history; the retention still runs (ADR 072).
-- Home Assistant add-on: the overview and the documentation say that Home Assistant
-  backups do not include the lake (history and findings) and recommend xomtra on its
-  own virtual machine for backups of the whole history.
-- Default guidance for the LLM in the MCP server's instructions (ADR 073): findings as
-  hypotheses with their strength and window, statements based on fetched data, local
-  time, no conclusions about a person unless asked, a friendly tone with the odd joke or irony,
-  and no advice on locks or alarms from a finding alone. Advisory for the model; the
-  server's access rules are unchanged.
-- Tokens page: a picture of how a token connects an LLM agent with xomtra and that
-  xomtra only reads Home Assistant, with the page's actions on it.
-
-### Changed
-
-- The admin GUI has the look of xomtra.com: the xomtra mark and wordmark, Geist and
-  Geist Mono (bundled, no external requests), graphite and indigo colours. It is dark
-  by default; behind Home Assistant Ingress it turns light when Home Assistant is in
-  light mode. The add-on has an icon and a logo for the add-on store.
-- The add-on's website link in Home Assistant points to https://xomtra.com instead of
-  the GitHub repository.
-
-### Fixed
-
-- Home Assistant add-on: after a restore from a backup (which leaves the lake out) it
-  failed on Parquet files the catalog still named. It now detects the missing lake,
-  starts a new one and loads the history from Home Assistant again; tokens, audit and
-  analysis settings stay.
-- Worker on a new lake (first start, or after a restore without it): the live stream
-  and the missed jobs both created the `bronze` schema, one failed on the DuckLake
-  transaction conflict and the stream reconnected. The worker now creates the lake's
-  schemas and tables once before the stream and the jobs start.
-- Admin GUI behind Home Assistant Ingress: forms (issuing a token, settings) were still
-  refused with "Cross-site request refused" when Home Assistant is opened over plain
-  `http://` in the LAN. Browsers send `Sec-Fetch-Site` only to https origins, and the
-  Origin does not match the forwarded host that reaches the add-on. Behind Ingress the
-  forms now carry a token bound to the Home Assistant user and the Ingress session;
-  `Sec-Fetch-Site: cross-site` or `same-site` is still refused.
-- Postgres no longer logs DuckLake's commit retries ("duplicate key value violates
-  unique constraint ducklake_snapshot_pkey") as errors: the stream and the jobs write
-  at the same time and DuckLake retries such a commit by design. Errors of the catalog
-  database are left to the services, which log them.
 
 Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md
