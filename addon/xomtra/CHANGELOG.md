@@ -20,6 +20,14 @@
 
 ### Changed
 
+- Admin GUI, clearer structure and texts: the menu starts with Findings, Answers and
+  Tokens; Drift is called Entity changes; the page Answers has one introduction and folds
+  the text of a factory set; Tokens says in one line which assistants can connect (the
+  details stay on Connect clients); Analysis settings opens with the advice to leave
+  working settings alone and no longer cites ADR numbers; Retention in the add-on names
+  the add-on's options instead of Dagster and `.env`; Findings explains a dismissal
+  without internal names and translates its columns and types. Czech and German texts
+  reviewed (German now uses "du", as Home Assistant does).
 - Admin GUI, Tokens: the picture of the flow no longer has the Claude Desktop button
   (the page of a new token has the download), and the arrow labels sit above and below
   the boxes, so that longer translations no longer run into them. The note on the style
