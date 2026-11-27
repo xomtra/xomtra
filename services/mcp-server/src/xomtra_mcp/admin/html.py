@@ -127,6 +127,9 @@ input[type=checkbox] { accent-color:var(--accent); padding:0; }
 button { cursor:pointer; font-weight:500; background:var(--ink); color:var(--bg);
   border-color:var(--ink); }
 button:hover { opacity:.88; }
+a.button { display:inline-block; padding:7px 14px; border-radius:8px; font-weight:500;
+  background:var(--ink); color:var(--bg); text-decoration:none; }
+a.button:hover { opacity:.88; }
 button.danger { background:var(--bad); border-color:var(--bad); color:var(--bg); }
 button[value=reset], button[value=preview] { background:var(--surface);
   color:var(--ink); border-color:var(--line); }

@@ -317,6 +317,29 @@ def test_mcpb_contents() -> None:
     assert manifest["user_config"]["allow_http"]["default"] is False
 
 
+PEM = b"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
+
+
+def test_mcpb_carries_the_local_ca() -> None:
+    data = desktop.build_mcpb("https://xomtra.lan/mcp", version="1.2.3", ca_pem=PEM)
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        assert archive.read(desktop.CA_NAME) == PEM
+        manifest = json.loads(archive.read("manifest.json"))
+    assert manifest["user_config"]["ca_file"]["description"] == desktop.BUNDLED_CA_NOTE
+    # Never the token: only the address and the (public) certificate are personalized.
+    assert "xmt_" not in data.decode("latin-1")
+
+
+@pytest.mark.parametrize(
+    "data",
+    [b"", b"hello", PEM + PEM, b"-----BEGIN PRIVATE KEY-----\nx\n-----END CERTIFICATE-----"],
+)
+def test_mcpb_refuses_anything_but_one_certificate(data: bytes) -> None:
+    assert not desktop.is_ca_pem(data)
+    with pytest.raises(ValueError, match="PEM"):
+        desktop.build_mcpb("https://xomtra.lan/mcp", ca_pem=data)
+
+
 def test_mcpb_for_an_http_endpoint_allows_http() -> None:
     """The add-on serves MCP on plain http in the LAN; its download must work as is."""
     plain = desktop.manifest("http://homeassistant.local:8000/mcp")
@@ -359,11 +382,12 @@ def run_bridge(
     env: dict[str, str] | None = None,
     *,
     required: bool = False,
+    script: Path | None = None,
 ) -> list[Any]:
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is not installed")
-    script = Path(desktop.__file__).parent / "server" / "index.js"
+    script = script or Path(desktop.__file__).parent / "server" / "index.js"
     # required: loaded by another module, as Claude Desktop's built-in Node does.
     args = [node, "-e", f"require({json.dumps(str(script))})"] if required else [node, str(script)]
     proc = subprocess.Popen(  # noqa: S603 - test runs our own script
@@ -699,3 +723,130 @@ async def test_ha_user_directory(fake_ha: tuple[FakeHA, str]) -> None:
         return None
 
     assert await ha_auth.HAUserDirectory(nothing).users() is None
+
+
+@pytest.fixture
+def tls_server(tmp_path: Path) -> Iterator[tuple[str, Path, Path]]:
+    """HTTPS on 127.0.0.1 with a certificate of an own CA, like Caddy's local CA."""
+    import ipaddress
+    import ssl
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    def name(text: str) -> x509.Name:
+        return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, text)])
+
+    now = datetime.now(UTC)
+    ca_key, leaf_key, other_key = (ec.generate_private_key(ec.SECP256R1()) for _ in range(3))
+    ca = (
+        x509.CertificateBuilder()
+        .subject_name(name("test local CA"))
+        .issuer_name(name("test local CA"))
+        .public_key(ca_key.public_key())
+        .serial_number(1)
+        .not_valid_before(now - timedelta(minutes=1))
+        .not_valid_after(now + timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(ca_key, hashes.SHA256())
+    )
+    leaf = (
+        x509.CertificateBuilder()
+        .subject_name(name("127.0.0.1"))
+        .issuer_name(ca.subject)
+        .public_key(leaf_key.public_key())
+        .serial_number(2)
+        .not_valid_before(now - timedelta(minutes=1))
+        .not_valid_after(now + timedelta(days=1))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]),
+            critical=False,
+        )
+        .sign(ca_key, hashes.SHA256())
+    )
+    other = (
+        x509.CertificateBuilder()
+        .subject_name(name("other CA"))
+        .issuer_name(name("other CA"))
+        .public_key(other_key.public_key())
+        .serial_number(3)
+        .not_valid_before(now - timedelta(minutes=1))
+        .not_valid_after(now + timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(other_key, hashes.SHA256())
+    )
+    pem = serialization.Encoding.PEM
+    ca_file, other_file = tmp_path / "xomtra-ca.crt", tmp_path / "other-ca.crt"
+    ca_file.write_bytes(ca.public_bytes(pem))
+    other_file.write_bytes(other.public_bytes(pem))
+    chain, key = tmp_path / "leaf.pem", tmp_path / "leaf.key"
+    chain.write_bytes(leaf.public_bytes(pem))
+    key.write_bytes(
+        leaf_key.private_bytes(pem, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    )
+
+    class Refuse(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # the bridge only needs to get through TLS
+            self.send_response(401)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Refuse)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.load_cert_chain(chain, key)
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"https://127.0.0.1:{server.server_address[1]}/mcp", ca_file, other_file
+    finally:
+        server.shutdown()
+
+
+def test_desktop_bridge_explains_an_untrusted_certificate(
+    tls_server: tuple[str, Path, Path],
+) -> None:
+    url, ca_file, other_file = tls_server
+    untrusted = run_bridge(url, "xmt_x", [INIT], wait_for=1)[0]["error"]["message"]
+    assert "does not trust the certificate" in untrusted
+    assert "/xomtra-ca.crt" in untrusted
+    assert "Local Network" not in untrusted
+    wrong = run_bridge(url, "xmt_x", [INIT], wait_for=1, env={"XOMTRA_CA_FILE": str(other_file)})
+    assert "is not the one of this server" in wrong[0]["error"]["message"]
+    # With the CA chosen in the extension settings, TLS succeeds (here: token refused).
+    trusted = run_bridge(url, "xmt_x", [INIT], wait_for=1, env={"XOMTRA_CA_FILE": str(ca_file)})
+    assert "refused the token" in trusted[0]["error"]["message"]
+
+
+def _unpacked(tmp_path: Path, url: str, ca: Path) -> Path:
+    data = desktop.build_mcpb(url, ca_pem=ca.read_bytes())
+    target = tmp_path / "extension"
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        archive.extractall(target)
+    return target / "server" / "index.js"
+
+
+def test_desktop_bridge_trusts_the_bundled_ca(
+    tls_server: tuple[str, Path, Path], tmp_path: Path
+) -> None:
+    """The extension from the admin GUI trusts the server's CA without any setting."""
+    url, ca_file, other_file = tls_server
+    script = _unpacked(tmp_path / "good", url, ca_file)
+    trusted = run_bridge(url, "xmt_x", [INIT], wait_for=1, script=script)
+    assert "refused the token" in trusted[0]["error"]["message"]
+    # A server with a new CA: download the extension again.
+    stale = _unpacked(tmp_path / "stale", url, other_file)
+    message = run_bridge(url, "xmt_x", [INIT], wait_for=1, script=stale)[0]["error"]["message"]
+    assert "Download the extension again" in message
+    # A CA chosen in the settings wins over the bundled one.
+    chosen = run_bridge(
+        url, "xmt_x", [INIT], wait_for=1, script=stale, env={"XOMTRA_CA_FILE": str(ca_file)}
+    )
+    assert "refused the token" in chosen[0]["error"]["message"]

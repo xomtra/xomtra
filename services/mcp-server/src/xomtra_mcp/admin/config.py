@@ -54,6 +54,9 @@ class AdminSettings(BaseSettings):
     # MCP endpoint for clients in the LAN (local access), shown with new tokens and put
     # into the Claude Desktop extension; default <base_url>/mcp.
     mcp_url: AnyHttpUrl | None = None
+    # Root certificate of the server's own CA (Caddy, local access), put into the
+    # Claude Desktop extension so that it trusts only this CA; unset: no certificate.
+    local_ca_url: AnyHttpUrl | None = None
     timezone: str = "UTC"
 
     # Read access to the audit table (role with SELECT + INSERT, ADR 040/041).
@@ -76,7 +79,14 @@ class AdminSettings(BaseSettings):
     catalog_window_days: int = 30
 
     @field_validator(
-        "mcp_url", "ha_auth_url", "base_url", "ha_url", "ha_token", "settings_key", mode="before"
+        "mcp_url",
+        "local_ca_url",
+        "ha_auth_url",
+        "base_url",
+        "ha_url",
+        "ha_token",
+        "settings_key",
+        mode="before",
     )
     @classmethod
     def _empty_is_unset(cls, value: object) -> object:

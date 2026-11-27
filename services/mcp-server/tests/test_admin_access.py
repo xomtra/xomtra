@@ -332,3 +332,69 @@ async def test_access_page_explains_other_modes(fake_ha: tuple[FakeHA, str]) -> 
         page = await client.get("/admin/access")
         assert page.status_code == 200
         assert "personal tokens" in page.text
+
+
+PEM = b"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
+
+
+@pytest.fixture
+async def ca_server() -> AsyncIterator[tuple[str, dict[str, bytes]]]:
+    """Caddy's internal listener with the local CA's root certificate."""
+    import asyncio
+
+    served = {"body": PEM}
+
+    async def answer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.readuntil(b"\r\n\r\n")
+        body = served["body"]
+        writer.write(
+            b"HTTP/1.1 200 OK\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % len(body) + body
+        )
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_server(answer, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    async with server:
+        yield f"http://127.0.0.1:{port}/xomtra-ca.crt", served
+
+
+async def test_desktop_extension_carries_the_local_ca(
+    fake_ha: tuple[FakeHA, str], ca_server: tuple[str, dict[str, bytes]]
+) -> None:
+    fake, url = fake_ha
+    fake.results["auth/current_user"] = {"id": "u1", "name": "Jana", "is_admin": True}
+    ca_url, served = ca_server
+    app, _, _ = make_app(url, FakeHAHttp(), local_ca_url=ca_url)
+    async with client_for(app) as client:
+        await sign_in(client)
+        connect = await client.get("/admin/connect")
+        assert "Download for Claude Desktop" in connect.text
+        assert "trusts only this certificate" in connect.text
+        mcpb = await client.get("/admin/connect/xomtra.mcpb")
+        with zipfile.ZipFile(io.BytesIO(mcpb.content)) as archive:
+            assert archive.read("server/xomtra-ca.crt") == PEM
+        # Anything else than a certificate is left out, the download still works.
+        served["body"] = b"<html>not a certificate</html>"
+        mcpb = await client.get("/admin/connect/xomtra.mcpb")
+        assert mcpb.status_code == 200
+        with zipfile.ZipFile(io.BytesIO(mcpb.content)) as archive:
+            assert "server/xomtra-ca.crt" not in archive.namelist()
+
+
+async def test_desktop_extension_without_a_reachable_ca(fake_ha: tuple[FakeHA, str]) -> None:
+    fake, url = fake_ha
+    fake.results["auth/current_user"] = {"id": "u1", "name": "Jana", "is_admin": True}
+    app, _, _ = make_app(url, FakeHAHttp(), local_ca_url="http://127.0.0.1:9/xomtra-ca.crt")
+    async with client_for(app) as client:
+        await sign_in(client)
+        mcpb = await client.get("/admin/connect/xomtra.mcpb")
+        assert mcpb.status_code == 200
+        with zipfile.ZipFile(io.BytesIO(mcpb.content)) as archive:
+            assert "server/xomtra-ca.crt" not in archive.namelist()
+    # Without the setting (public mode, add-on) the page keeps the manual step.
+    app, _, _ = make_app(url, FakeHAHttp())
+    async with client_for(app) as client:
+        await sign_in(client)
+        connect = await client.get("/admin/connect")
+        assert "Certificate of the server" in connect.text

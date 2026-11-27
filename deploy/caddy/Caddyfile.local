@@ -14,6 +14,9 @@
 #     sign-in with the admin role (Home Assistant or Entra, ADR 041/053).
 #   - /xomtra-ca.crt: the root certificate of the local CA (public by nature), from
 #     LAN_CIDR, so that clients can trust the server.
+#   - http://caddy:8081/xomtra-ca.crt: the same certificate for the admin app inside the
+#     compose network (the port is not published); the admin app puts it into the
+#     Claude Desktop extension it builds, which then trusts only this CA.
 {
 	admin off
 	http_port 8080
@@ -103,5 +106,18 @@ https://{$XOMTRA_LOCAL_HOST} {
 
 	handle {
 		import refuse 404 "Not found"
+	}
+}
+
+http://:8081 {
+	@ca path /xomtra-ca.crt
+	handle @ca {
+		header Content-Type "application/x-pem-file"
+		rewrite * /root.crt
+		root * /data/caddy/pki/authorities/local
+		file_server
+	}
+	handle {
+		respond 404
 	}
 }

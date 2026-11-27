@@ -362,6 +362,8 @@ services:
       XOMTRA_SESSION_DAYS: ${XOMTRA_SESSION_DAYS:-180}
       # MCP endpoint shown with new personal tokens (local access); default <base_url>/mcp.
       XOMTRA_MCP_URL: ${XOMTRA_MCP_URL:-}
+      # The local CA's certificate for the Claude Desktop extension (Caddyfile.local).
+      XOMTRA_LOCAL_CA_URL: http://caddy:8081/xomtra-ca.crt
       XOMTRA_HA_URL: ${XOMTRA_HA_URL:-}
       XOMTRA_HA_TOKEN: ${XOMTRA_HA_TOKEN:-}
       XOMTRA_TIMEZONE: ${XOMTRA_TIMEZONE:-UTC}

@@ -21,7 +21,7 @@ from types import TracebackType
 from typing import Any, Self
 
 from websockets.asyncio.client import ClientConnection, connect
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from hacore.errors import (
     HAAuthError,
@@ -118,7 +118,9 @@ class HAClient:
                 max_size=self._max_message_size,
                 open_timeout=self._timeout,
             )
-        except (OSError, TimeoutError) as err:
+        except (OSError, TimeoutError, WebSocketException) as err:
+            # WebSocketException: an answer that is not a WebSocket upgrade (wrong address,
+            # a proxy without WebSocket support, plain HTTP on an HTTPS port).
             raise HAConnectionError(f"Cannot connect to Home Assistant: {err}") from err
 
         try:

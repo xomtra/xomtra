@@ -11,6 +11,47 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Claude Desktop without trusting a certificate: in the local access mode the extension
+  downloaded from the admin GUI (**Download for Claude Desktop** after issuing a token,
+  also on Connect clients) carries the root certificate of the server's own CA and
+  trusts only it (pinned), so nothing has to be imported into the computer. The admin
+  GUI reads the certificate from Caddy inside the compose network
+  (`XOMTRA_LOCAL_CA_URL`, an internal listener on port 8081 that is not published). The
+  token is still entered at install and never part of the file. An extension from
+  before a new installation of the server says to download it again. Claude Code and
+  other clients still need the CA trusted as described in docs/setup/local-access.md.
+
+### Changed
+
+- Admin GUI: when Home Assistant cannot be reached (setup page and Overview), a sentence
+  says why and what to try, in every language of the admin GUI: `https://` on a plain
+  HTTP port ("try http://"), an untrusted certificate, a name this server cannot
+  resolve, nothing listening on the port, another server or a proxy without WebSockets
+  answering, a timeout, or a rejected token. The technical message follows as a detail.
+
+### Fixed
+
+- An address that answers HTTP but not with a WebSocket upgrade no longer ends in an
+  internal error on the setup page; it is reported like any other connection error.
+- Setup page: whitespace copied with the access token (a line break from a wrapped
+  terminal line, a trailing newline) is dropped instead of making Home Assistant reject
+  the token, and the token field asks password managers not to fill in a saved password
+  (`autocomplete=new-password`).
+- Setup page: an address without a port (`http://192.168.1.10`) means port 80 or 443,
+  where often another server answers. The setup now tries Home Assistant's port 8123 as
+  well and stores that address if it works; otherwise the error says that the port is
+  missing. The example in the URL field shows the port.
+- Claude Desktop extension: a certificate the computer does not trust
+  (`unable to get local issuer certificate`) is no longer reported with the network
+  hint (Local Network permission). The message says to choose `xomtra-ca.crt` as
+  *Certificate of the server*, that a chosen file is not the CA of this server, or that
+  the certificate is for another name.
+- Docs (local access) and the Connect page: trusting xomtra's CA is required for Claude
+  Desktop and Claude Code, with the commands for macOS, Windows and Linux and how to
+  compare the fingerprint on both sides.
+
 ## [0.9.1] - 2026-11-27
 
 ### Added

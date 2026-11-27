@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
+import httpx2
 from starlette.applications import Starlette
 from starlette.datastructures import Headers
 from starlette.requests import Request
@@ -65,7 +66,7 @@ from xomtra_mcp.answer_sets import AnswerSetStore, PostgresAnswerSetStore
 from xomtra_mcp.audit import AuditError, AuditRecord, AuditSink, LogAuditSink
 from xomtra_mcp.data import DataAccess
 from xomtra_mcp.desktop import FILENAME as MCPB_FILENAME
-from xomtra_mcp.desktop import build_mcpb
+from xomtra_mcp.desktop import build_mcpb, is_ca_pem
 from xomtra_mcp.ha_auth import HomeAssistantLogin, RoleMap, roles_for
 from xomtra_mcp.ha_auth import LoginError as HALoginError
 from xomtra_mcp.tokens import PostgresTokenStore, TokenStore, TokenStoreError, expiry
@@ -112,6 +113,23 @@ def _same_address(peer: str, expected: str) -> bool:
         return address == ipaddress.ip_address(expected)
     except ValueError:
         return False
+
+
+def connection_error(ha: dict[str, Any]) -> str:
+    """Why Home Assistant cannot be reached: a sentence, then the technical detail."""
+    detail, hint = ha.get("detail"), ha.get("hint")
+    return (f"<p class=bad>{e(ha['error'])}</p>" + (f"<p>{e(hint)}</p>" if hint else "")) + (
+        f"<p class=muted>Details: <code>{e(detail)}</code></p>" if detail else ""
+    )
+
+
+def _default_ha_port(url: str) -> str | None:
+    """The URL with Home Assistant's port 8123 if it names no port, else None."""
+    parts = urlparse(url)
+    if parts.port is not None or not parts.hostname:
+        return None
+    host = f"[{parts.hostname}]" if ":" in parts.hostname else parts.hostname
+    return parts._replace(netloc=f"{host}:8123").geturl()
 
 
 def _url_host(hostname: str) -> str:
@@ -563,7 +581,7 @@ class AdminApp:
             ]
         )
         if ha.get("error"):
-            body += f"<p class=bad>{e(ha['error'])}</p>"
+            body += connection_error(ha)
         if self.ha.storable:
             body += (
                 f"<p class=muted><a href='{prefix()}{setup.PATH}'>Change the Home Assistant "
@@ -1455,12 +1473,34 @@ class AdminApp:
             return guess
         return self.settings.endpoint
 
+    def _bundles_ca(self) -> bool:
+        """The extension carries the server's own CA (local access with Caddy's CA)."""
+        return self.settings.access_mode == "local" and self.settings.local_ca_url is not None
+
+    async def _local_ca(self) -> bytes | None:
+        """Root certificate of the server's own CA, None when it cannot be read."""
+        url = self.settings.local_ca_url
+        if not self._bundles_ca() or url is None:
+            return None
+        try:
+            async with httpx2.AsyncClient(timeout=5, trust_env=False) as client:
+                response = await client.get(str(url))
+            response.raise_for_status()
+        except httpx2.HTTPError as err:
+            logger.warning("Cannot read the local CA certificate from %s: %s", url, err)
+            return None
+        if not is_ca_pem(response.content):
+            logger.warning("The local CA certificate from %s is not a PEM certificate", url)
+            return None
+        return response.content
+
     def _connect_help(self, token: str | None = None) -> str:
         url = self._endpoint()
         tok = token or "xmt_..."
         origin = urlparse(url)
         ca = f"{origin.scheme}://{origin.netloc}/xomtra-ca.crt"
         tls = origin.scheme == "https"
+        pinned = tls and self._bundles_ca()
         server = json.dumps(
             {
                 "mcpServers": {
@@ -1473,15 +1513,32 @@ class AdminApp:
             },
             indent=2,
         )
+        download = (
+            f"<p><a class=button href='{prefix()}/connect/{MCPB_FILENAME}' "
+            f"download='{MCPB_FILENAME}'>Download for Claude Desktop</a></p>"
+        )
         return (
-            "<h2>Claude Desktop</h2><ol>"
-            f"<li>Download <a href='{prefix()}/connect/{MCPB_FILENAME}' "
-            f"download='{MCPB_FILENAME}'>{MCPB_FILENAME}</a> "
-            f"(address <code>{e(url)}</code> is filled in) and open it: Claude Desktop "
-            "shows the extension and asks for the token.</li>"
+            "<h2>Claude Desktop</h2>"
+            + download
+            + "<ol>"
             + (
-                "<li>Paste the token. If your browser warned about the certificate of this "
-                f"server, also download <a href='{e(ca)}'>xomtra-ca.crt</a> and select it "
+                f"<li>Open the downloaded {MCPB_FILENAME}: Claude Desktop shows the extension. "
+                f"The address <code>{e(url)}</code> and the certificate of this server are "
+                "filled in; the extension trusts only this certificate, so nothing has to "
+                "be imported into the computer.</li>"
+                "<li>Paste the token and install. The token is not part of the file, "
+                "Claude Desktop keeps it as a secret.</li></ol>"
+                if pinned
+                else f"<li>Open the downloaded {MCPB_FILENAME}: Claude Desktop shows the "
+                f"extension and asks for the token. The address <code>{e(url)}</code> is "
+                "filled in.</li>"
+            )
+            + (
+                ""
+                if pinned
+                else "<li>Paste the token. If your browser warned about the certificate of this "
+                "server (xomtra's own certificate), this is required for Claude Desktop: "
+                f"also download <a href='{e(ca)}'>xomtra-ca.crt</a> and select it "
                 "as <em>Certificate of the server</em>.</li></ol>"
                 if tls
                 else "<li>Paste the token. The address uses plain http://, so "
@@ -1516,7 +1573,9 @@ class AdminApp:
         return HTMLResponse(page("Connect clients", body, user.get("username")))
 
     async def mcpb(self, request: Request, user: dict[str, Any]) -> Response:
-        data = build_mcpb(self._endpoint())
+        endpoint = self._endpoint()
+        ca = await self._local_ca() if urlparse(endpoint).scheme == "https" else None
+        data = build_mcpb(endpoint, ca_pem=ca)
         return Response(
             data,
             # Not application/zip: Safari then saves it as .zip.
@@ -1543,9 +1602,10 @@ class AdminApp:
             f"<form class=filters method=post action='{prefix()}{setup.PATH}'>"
             + (f"<input type=hidden name=code value='{e(code)}'>" if code else "")
             + "<label>Home Assistant URL <input name=url required maxlength=300 size=40 "
-            f"placeholder='http://homeassistant.local:8123' value='{e(url)}'></label>"
+            f"placeholder='http://192.168.1.10:8123' value='{e(url)}'></label>"
             "<label>Long-lived access token <input name=token type=password maxlength=1000 "
-            f"size=40 autocomplete=off{'' if current else ' required'}></label>"
+            f"size=40 autocomplete=new-password spellcheck=false{'' if current else ' required'}>"
+            "</label>"
             "<button>Connect</button></form>"
             + keep
             + "<p class=muted>The address must be reachable from this server (not only from"
@@ -1608,7 +1668,9 @@ class AdminApp:
     ) -> Response:
         title = "Connect Home Assistant"
         who = user.get("username") if user else None
-        token = form.get("token", "") or (current.token if current else "")
+        # A token has no whitespace: a line break or space copied with it (a wrapped
+        # terminal line, a trailing newline) would make Home Assistant reject it.
+        token = "".join(form.get("token", "").split()) or (current.token if current else "")
         try:
             url = normalize_url(form.get("url", ""))
         except ValueError as err:
@@ -1618,9 +1680,19 @@ class AdminApp:
             body = self._setup_form(code, current, "Enter the access token.")
             return HTMLResponse(page(title, body, who), 400, headers=self.headers)
         ha = await status.ha_status(url, token)
+        if not ha.get("ok") and (with_port := _default_ha_port(url)):
+            # Without a port the address means 80/443, where often something else answers
+            # (and may even refuse the token); Home Assistant itself listens on 8123.
+            retry = await status.ha_status(with_port, token)
+            if retry.get("ok"):
+                url, ha = with_port, retry
+            else:
+                ha["hint"] = (
+                    "The address has no port. Home Assistant normally listens on the port "
+                    "8123, for example http://192.168.1.10:8123."
+                )
         if not ha.get("ok"):
-            error = f"Home Assistant did not accept the connection: {ha.get('error')}"
-            body = self._setup_form(code, current, error)
+            body = connection_error(ha) + self._setup_form(code, current, None)
             return HTMLResponse(page(title, body, who), 400, headers=self.headers)
         actor = self._setup_actor(user)
         dsn, key = self.settings.audit_dsn, self._settings_key()
