@@ -10,6 +10,10 @@
 //   XOMTRA_URL      MCP endpoint, e.g. https://xomtra.lan/mcp
 //   XOMTRA_TOKEN    personal token from the admin GUI (xmt_...)
 //   XOMTRA_CA_FILE  optional PEM file of the server's local CA (self-signed setups)
+//
+// An extension downloaded from the admin GUI of a server with its own CA carries that
+// CA as server/xomtra-ca.crt; without XOMTRA_CA_FILE the bridge then trusts only it
+// (pinned) instead of the computer's trust store.
 //   XOMTRA_ALLOW_HTTP  "true" to allow plain http:// to a host other than loopback
 
 "use strict";
@@ -17,7 +21,10 @@
 const fs = require("node:fs");
 const http = require("node:http");
 const https = require("node:https");
+const path = require("node:path");
 const readline = require("node:readline");
+
+const BUNDLED_CA = path.join(__dirname, "xomtra-ca.crt");
 
 const PROTOCOL_HEADER = "mcp-protocol-version";
 const SESSION_HEADER = "mcp-session-id";
@@ -40,10 +47,17 @@ const UNTRUSTED_CODES = new Set([
 ]);
 
 // What to do about a failed connection: the certificate, or reaching the server.
-function hintFor(err, url, ca) {
+function hintFor(err, url, caSource) {
   const code = err && err.code;
   if (UNTRUSTED_CODES.has(code)) {
-    if (ca) {
+    if (caSource === "bundled") {
+      return (
+        "The server has a new certificate authority since this extension was downloaded " +
+        "(for example after a new installation). Download the extension again from the " +
+        "xomtra admin GUI (Tokens) and install it."
+      );
+    }
+    if (caSource === "chosen") {
       return (
         "The certificate file chosen in the extension settings is not the one of this " +
         `server. Download it again from ${url.origin}/xomtra-ca.crt and choose that file.`
@@ -91,15 +105,20 @@ function config(env) {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") fail("XOMTRA_URL must be http(s)");
   let ca;
+  let caSource = null;
   const caFile = (env.XOMTRA_CA_FILE || "").trim();
   if (caFile) {
     try {
       ca = fs.readFileSync(caFile);
+      caSource = "chosen";
     } catch (err) {
       fail(`Cannot read XOMTRA_CA_FILE ${caFile}: ${err.message}`);
     }
+  } else if (url.protocol === "https:" && fs.existsSync(BUNDLED_CA)) {
+    ca = fs.readFileSync(BUNDLED_CA);
+    caSource = "bundled";
   }
-  return { url, token, ca };
+  return { url, token, ca, caSource };
 }
 
 // Minimal Server-Sent Events parser: yields the data of each event.
@@ -116,10 +135,11 @@ function* sseEvents(buffer) {
 }
 
 class Bridge {
-  constructor({ url, token, ca }, write) {
+  constructor({ url, token, ca, caSource }, write) {
     this.url = url;
     this.token = token;
     this.ca = ca;
+    this.caSource = caSource || null;
     this.write = write;
     this.session = null;
     this.protocol = null;
@@ -221,7 +241,7 @@ class Bridge {
       this.errorFor(
         message,
         `Cannot reach xomtra at ${this.url.origin}: ${err.message}. ` +
-          hintFor(err, this.url, this.ca),
+          hintFor(err, this.url, this.caSource),
       );
       return;
     }

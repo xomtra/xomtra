@@ -26,7 +26,13 @@ backups: [Docker Compose install](docker.md).
 
 ## 2. Trust the server's certificate
 
-Caddy issues the certificate for `XOMTRA_LOCAL_HOST` from its own local CA. Download the
+Caddy issues the certificate for `XOMTRA_LOCAL_HOST` from its own local CA.
+
+**Claude Desktop needs nothing from this step:** the extension downloaded from the admin
+GUI (step 4) carries the CA certificate and trusts only it. Do this step for Claude
+Code, browsers and other clients.
+
+Download the
 CA certificate once from `https://<local-host>/xomtra-ca.crt` (your browser warns the
 first time, which is expected) and compare its fingerprint with the server:
 
@@ -42,13 +48,14 @@ openssl x509 -noout -fingerprint -sha256 -in ~/Downloads/xomtra-ca.crt   # macOS
 certutil -dump $env:USERPROFILE\Downloads\xomtra-ca.crt | findstr /i "sha256"   # Windows
 ```
 
-**This step is required for Claude Desktop and Claude Code.** They run on Node, which
-trusts neither the browser's exception nor a CA it has not been given; without it they
-fail with `unable to get local issuer certificate`. Do one of the two:
+**This step is required for Claude Code** (and for Claude Desktop with an extension
+from elsewhere than the admin GUI). It runs on Node, which trusts neither the browser's
+exception nor a CA it has not been given; without it, it fails with
+`unable to get local issuer certificate`. Do one of the two:
 
-- **Only for Claude** (recommended, works in any case, no change to the system): choose
-  `xomtra-ca.crt` as *Certificate of the server* in the Claude Desktop extension
-  (step 4), and start Claude Code with `NODE_EXTRA_CA_CERTS=/path/to/xomtra-ca.crt`.
+- **Only for Claude** (recommended, no change to the system): start Claude Code with
+  `NODE_EXTRA_CA_CERTS=/path/to/xomtra-ca.crt`; in the Claude Desktop extension choose
+  `xomtra-ca.crt` as *Certificate of the server*.
 - **For the whole computer** (browsers and other clients):
 
   ```bash
@@ -79,11 +86,23 @@ without the others and the audit shows who asked what.
 
 ### Claude Desktop
 
-1. Admin GUI → **Tokens → How to connect** → download `xomtra.mcpb`. The server's
-   address is already filled in.
+1. Admin GUI → **Tokens** → issue a token → **Download for Claude Desktop**
+   (`xomtra.mcpb`, also on **Connect clients**). The file is made for this server: the
+   address and the certificate of its local CA are filled in, and the extension trusts
+   only this certificate (pinned) instead of the computer's trust store. Nothing has
+   to be imported into the system.
 2. Open the file; Claude Desktop shows the extension and asks for the **personal
-   token** (stored as a secret by Claude Desktop) and, if the CA is not in your system
-   trust store, for the **certificate of the server** (`xomtra-ca.crt`).
+   token**. Paste it and install.
+
+The token is deliberately not part of the file: it would be a password lying in the
+Downloads folder, in backups and in anything the file is sent with, and anyone with
+the file could use it. Claude Desktop stores the token you paste as a secret. The
+address and the certificate in the file are public.
+
+After a new installation of the server (a new local CA) the extension reports that
+the server has a new certificate authority: download it again from the admin GUI.
+*Certificate of the server* in the extension settings stays available and wins over
+the bundled certificate.
 
 The extension is a small bridge without dependencies (`server/index.js`) that forwards
 MCP from Claude Desktop to the xomtra endpoint. It refuses plain `http://` to anything
@@ -117,7 +136,8 @@ Any client that speaks MCP over Streamable HTTP and can send a header:
 
 Clients that only speak stdio can use the same bridge as Claude Desktop:
 `XOMTRA_URL=https://<local-host>/mcp XOMTRA_TOKEN=xmt_... node server/index.js` (from
-the unpacked `xomtra.mcpb`; `XOMTRA_CA_FILE` for the CA certificate).
+the unpacked `xomtra.mcpb`, which trusts the certificate it carries; `XOMTRA_CA_FILE`
+for another CA certificate).
 
 ## What Caddy lets through (local mode)
 
@@ -125,6 +145,7 @@ the unpacked `xomtra.mcpb`; `XOMTRA_CA_FILE` for the CA certificate).
 | --- | --- | --- |
 | `/mcp` | `LAN_CIDR`, then a valid personal token | MCP clients |
 | `/xomtra-ca.crt` | `LAN_CIDR` | root certificate of the local CA |
+| `http://caddy:8081/xomtra-ca.crt` | compose network only (port not published) | the same certificate for the admin GUI, which puts it into the Claude Desktop extension |
 | `/admin`, `/admin/*` | `ADMIN_CIDR`, then sign-in with the admin role | admin GUI, Dagster UI |
 | everything else | nobody (404) | |
 

@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
+import httpx2
 from starlette.applications import Starlette
 from starlette.datastructures import Headers
 from starlette.requests import Request
@@ -65,7 +66,7 @@ from xomtra_mcp.answer_sets import AnswerSetStore, PostgresAnswerSetStore
 from xomtra_mcp.audit import AuditError, AuditRecord, AuditSink, LogAuditSink
 from xomtra_mcp.data import DataAccess
 from xomtra_mcp.desktop import FILENAME as MCPB_FILENAME
-from xomtra_mcp.desktop import build_mcpb
+from xomtra_mcp.desktop import build_mcpb, is_ca_pem
 from xomtra_mcp.ha_auth import HomeAssistantLogin, RoleMap, roles_for
 from xomtra_mcp.ha_auth import LoginError as HALoginError
 from xomtra_mcp.tokens import PostgresTokenStore, TokenStore, TokenStoreError, expiry
@@ -1472,12 +1473,34 @@ class AdminApp:
             return guess
         return self.settings.endpoint
 
+    def _bundles_ca(self) -> bool:
+        """The extension carries the server's own CA (local access with Caddy's CA)."""
+        return self.settings.access_mode == "local" and self.settings.local_ca_url is not None
+
+    async def _local_ca(self) -> bytes | None:
+        """Root certificate of the server's own CA, None when it cannot be read."""
+        url = self.settings.local_ca_url
+        if not self._bundles_ca() or url is None:
+            return None
+        try:
+            async with httpx2.AsyncClient(timeout=5, trust_env=False) as client:
+                response = await client.get(str(url))
+            response.raise_for_status()
+        except httpx2.HTTPError as err:
+            logger.warning("Cannot read the local CA certificate from %s: %s", url, err)
+            return None
+        if not is_ca_pem(response.content):
+            logger.warning("The local CA certificate from %s is not a PEM certificate", url)
+            return None
+        return response.content
+
     def _connect_help(self, token: str | None = None) -> str:
         url = self._endpoint()
         tok = token or "xmt_..."
         origin = urlparse(url)
         ca = f"{origin.scheme}://{origin.netloc}/xomtra-ca.crt"
         tls = origin.scheme == "https"
+        pinned = tls and self._bundles_ca()
         server = json.dumps(
             {
                 "mcpServers": {
@@ -1490,14 +1513,30 @@ class AdminApp:
             },
             indent=2,
         )
+        download = (
+            f"<p><a class=button href='{prefix()}/connect/{MCPB_FILENAME}' "
+            f"download='{MCPB_FILENAME}'>Download for Claude Desktop</a></p>"
+        )
         return (
-            "<h2>Claude Desktop</h2><ol>"
-            f"<li>Download <a href='{prefix()}/connect/{MCPB_FILENAME}' "
-            f"download='{MCPB_FILENAME}'>{MCPB_FILENAME}</a> "
-            f"(address <code>{e(url)}</code> is filled in) and open it: Claude Desktop "
-            "shows the extension and asks for the token.</li>"
+            "<h2>Claude Desktop</h2>"
+            + download
+            + "<ol>"
             + (
-                "<li>Paste the token. If your browser warned about the certificate of this "
+                f"<li>Open the downloaded {MCPB_FILENAME}: Claude Desktop shows the extension. "
+                f"The address <code>{e(url)}</code> and the certificate of this server are "
+                "filled in; the extension trusts only this certificate, so nothing has to "
+                "be imported into the computer.</li>"
+                "<li>Paste the token and install. The token is not part of the file, "
+                "Claude Desktop keeps it as a secret.</li></ol>"
+                if pinned
+                else f"<li>Open the downloaded {MCPB_FILENAME}: Claude Desktop shows the "
+                f"extension and asks for the token. The address <code>{e(url)}</code> is "
+                "filled in.</li>"
+            )
+            + (
+                ""
+                if pinned
+                else "<li>Paste the token. If your browser warned about the certificate of this "
                 "server (xomtra's own certificate), this is required for Claude Desktop: "
                 f"also download <a href='{e(ca)}'>xomtra-ca.crt</a> and select it "
                 "as <em>Certificate of the server</em>.</li></ol>"
@@ -1534,7 +1573,9 @@ class AdminApp:
         return HTMLResponse(page("Connect clients", body, user.get("username")))
 
     async def mcpb(self, request: Request, user: dict[str, Any]) -> Response:
-        data = build_mcpb(self._endpoint())
+        endpoint = self._endpoint()
+        ca = await self._local_ca() if urlparse(endpoint).scheme == "https" else None
+        data = build_mcpb(endpoint, ca_pem=ca)
         return Response(
             data,
             # Not application/zip: Safari then saves it as .zip.

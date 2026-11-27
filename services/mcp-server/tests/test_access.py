@@ -317,6 +317,29 @@ def test_mcpb_contents() -> None:
     assert manifest["user_config"]["allow_http"]["default"] is False
 
 
+PEM = b"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
+
+
+def test_mcpb_carries_the_local_ca() -> None:
+    data = desktop.build_mcpb("https://xomtra.lan/mcp", version="1.2.3", ca_pem=PEM)
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        assert archive.read(desktop.CA_NAME) == PEM
+        manifest = json.loads(archive.read("manifest.json"))
+    assert manifest["user_config"]["ca_file"]["description"] == desktop.BUNDLED_CA_NOTE
+    # Never the token: only the address and the (public) certificate are personalized.
+    assert "xmt_" not in data.decode("latin-1")
+
+
+@pytest.mark.parametrize(
+    "data",
+    [b"", b"hello", PEM + PEM, b"-----BEGIN PRIVATE KEY-----\nx\n-----END CERTIFICATE-----"],
+)
+def test_mcpb_refuses_anything_but_one_certificate(data: bytes) -> None:
+    assert not desktop.is_ca_pem(data)
+    with pytest.raises(ValueError, match="PEM"):
+        desktop.build_mcpb("https://xomtra.lan/mcp", ca_pem=data)
+
+
 def test_mcpb_for_an_http_endpoint_allows_http() -> None:
     """The add-on serves MCP on plain http in the LAN; its download must work as is."""
     plain = desktop.manifest("http://homeassistant.local:8000/mcp")
@@ -359,11 +382,12 @@ def run_bridge(
     env: dict[str, str] | None = None,
     *,
     required: bool = False,
+    script: Path | None = None,
 ) -> list[Any]:
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is not installed")
-    script = Path(desktop.__file__).parent / "server" / "index.js"
+    script = script or Path(desktop.__file__).parent / "server" / "index.js"
     # required: loaded by another module, as Claude Desktop's built-in Node does.
     args = [node, "-e", f"require({json.dumps(str(script))})"] if required else [node, str(script)]
     proc = subprocess.Popen(  # noqa: S603 - test runs our own script
@@ -798,3 +822,30 @@ def test_desktop_bridge_explains_an_untrusted_certificate(
     # With the CA chosen in the extension settings, TLS succeeds (here: token refused).
     trusted = run_bridge(url, "xmt_x", [INIT], wait_for=1, env={"XOMTRA_CA_FILE": str(ca_file)})
     assert "refused the token" in trusted[0]["error"]["message"]
+
+
+def _unpacked(tmp_path: Path, url: str, ca: Path) -> Path:
+    data = desktop.build_mcpb(url, ca_pem=ca.read_bytes())
+    target = tmp_path / "extension"
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        archive.extractall(target)
+    return target / "server" / "index.js"
+
+
+def test_desktop_bridge_trusts_the_bundled_ca(
+    tls_server: tuple[str, Path, Path], tmp_path: Path
+) -> None:
+    """The extension from the admin GUI trusts the server's CA without any setting."""
+    url, ca_file, other_file = tls_server
+    script = _unpacked(tmp_path / "good", url, ca_file)
+    trusted = run_bridge(url, "xmt_x", [INIT], wait_for=1, script=script)
+    assert "refused the token" in trusted[0]["error"]["message"]
+    # A server with a new CA: download the extension again.
+    stale = _unpacked(tmp_path / "stale", url, other_file)
+    message = run_bridge(url, "xmt_x", [INIT], wait_for=1, script=stale)[0]["error"]["message"]
+    assert "Download the extension again" in message
+    # A CA chosen in the settings wins over the bundled one.
+    chosen = run_bridge(
+        url, "xmt_x", [INIT], wait_for=1, script=stale, env={"XOMTRA_CA_FILE": str(ca_file)}
+    )
+    assert "refused the token" in chosen[0]["error"]["message"]

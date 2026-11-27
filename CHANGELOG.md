@@ -11,6 +11,18 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Claude Desktop without trusting a certificate: in the local access mode the extension
+  downloaded from the admin GUI (**Download for Claude Desktop** after issuing a token,
+  also on Connect clients) carries the root certificate of the server's own CA and
+  trusts only it (pinned), so nothing has to be imported into the computer. The admin
+  GUI reads the certificate from Caddy inside the compose network
+  (`XOMTRA_LOCAL_CA_URL`, an internal listener on port 8081 that is not published). The
+  token is still entered at install and never part of the file. An extension from
+  before a new installation of the server says to download it again. Claude Code and
+  other clients still need the CA trusted as described in docs/setup/local-access.md.
+
 ### Changed
 
 - Admin GUI: when Home Assistant cannot be reached (setup page and Overview), a sentence
