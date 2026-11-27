@@ -17,6 +17,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   ([docs/setup/uninstall.md](docs/setup/uninstall.md)): optional backup of the volumes,
   `docker compose down -v --rmi all`, the Claude clients and the CA certificate, the
   token and user in Home Assistant, and the public setup.
+- Release asset `xomtra-<version>-compose.tar.gz` with `xomtra/deploy/compose` of the
+  tag, covered by `SHA256SUMS`: Docker Compose installs and upgrades without git.
+- Docs: cosign runs in its official container pinned by digest, no installation needed.
 
 ## [0.9.2] - 2026-11-27
 
