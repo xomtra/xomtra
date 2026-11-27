@@ -75,7 +75,7 @@ cp .env.example .env && chmod 600 .env
 # xomtra-0.2.0-images.env (release assets) so that the images are pinned by digest
 ```
 
-Verify the release signature of each image (cosign v3) before the first start:
+Optional: verify the release signature of each image (cosign v3) before the first start:
 
 ```bash
 cosign verify ghcr.io/xomtra/xomtra-mcp@sha256:<digest> \
@@ -101,7 +101,7 @@ docker run --rm "$COSIGN" verify ghcr.io/xomtra/xomtra-mcp@sha256:<digest> \
 2. Back up `.env` and the compose directory.
 3. Replace the compose directory with the one of the new tag, keep your `.env`, put in
    the `*_IMAGE` lines of the new release and add any new variables.
-4. Verify the signatures, then `docker compose pull && docker compose up -d`.
+4. Optionally verify the signatures, then `docker compose pull && docker compose up -d`.
 5. Roll back by restoring the backup and the previous `*_IMAGE` lines (pinned by
    digest, so the old images are pulled again).
 

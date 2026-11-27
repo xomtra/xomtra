@@ -11,9 +11,9 @@ and Home Assistant reachable from this machine, usually on port 8123
 (`http://<ha-address>:8123`).
 
 Tools: `git` and `curl` to download the release (`sudo apt-get install -y git curl` on
-Debian and Ubuntu, `sudo dnf install -y git curl` on Fedora and RHEL). cosign, which
-verifies the signatures of the images ([releasing.md](../releasing.md)), runs in a
-container and needs no installation.
+Debian and Ubuntu, `sudo dnf install -y git curl` on Fedora and RHEL). Verifying the
+signatures of the images is optional, with cosign in its container
+([releasing.md](../releasing.md#installing-a-release)).
 
 ## 0. Address (optional, before the first start)
 
