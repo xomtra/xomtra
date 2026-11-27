@@ -132,8 +132,12 @@ async def test_setup_with_code_then_sign_in(
         )
         assert refused.status_code == 400
         assert saved == []
+        # A password manager must not fill in a saved password.
+        assert "autocomplete=new-password" in form.text
+        # Whitespace copied with the token (a wrapped line, a trailing newline) is dropped.
+        pasted = f" {VALID_TOKEN[:10]}\n{VALID_TOKEN[10:]} \n"
         done = await client.post(
-            "/admin/setup", data={"code": code, "url": ha_url + "/", "token": VALID_TOKEN}
+            "/admin/setup", data={"code": code, "url": f" {ha_url}/ ", "token": pasted}
         )
         assert done.status_code == 200, done.text
         assert "is connected" in done.text

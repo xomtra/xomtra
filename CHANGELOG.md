@@ -23,6 +23,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 - An address that answers HTTP but not with a WebSocket upgrade no longer ends in an
   internal error on the setup page; it is reported like any other connection error.
+- Setup page: whitespace copied with the access token (a line break from a wrapped
+  terminal line, a trailing newline) is dropped instead of making Home Assistant reject
+  the token, and the token field asks password managers not to fill in a saved password
+  (`autocomplete=new-password`).
 
 ## [0.9.1] - 2026-11-27
 

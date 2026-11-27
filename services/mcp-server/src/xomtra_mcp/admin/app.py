@@ -1553,7 +1553,8 @@ class AdminApp:
             + "<label>Home Assistant URL <input name=url required maxlength=300 size=40 "
             f"placeholder='http://homeassistant.local:8123' value='{e(url)}'></label>"
             "<label>Long-lived access token <input name=token type=password maxlength=1000 "
-            f"size=40 autocomplete=off{'' if current else ' required'}></label>"
+            f"size=40 autocomplete=new-password spellcheck=false{'' if current else ' required'}>"
+            "</label>"
             "<button>Connect</button></form>"
             + keep
             + "<p class=muted>The address must be reachable from this server (not only from"
@@ -1616,7 +1617,9 @@ class AdminApp:
     ) -> Response:
         title = "Connect Home Assistant"
         who = user.get("username") if user else None
-        token = form.get("token", "") or (current.token if current else "")
+        # A token has no whitespace: a line break or space copied with it (a wrapped
+        # terminal line, a trailing newline) would make Home Assistant reject it.
+        token = "".join(form.get("token", "").split()) or (current.token if current else "")
         try:
             url = normalize_url(form.get("url", ""))
         except ValueError as err:
