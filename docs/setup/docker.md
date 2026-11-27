@@ -9,24 +9,10 @@ cores and 4 GB RAM for the full edition (2 GB for the lite edition), a few GB of
 and Home Assistant reachable from this machine, usually on port 8123
 (`http://<ha-address>:8123`).
 
-Tools: `git` and `curl` to download the release, and [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
-**v3** to verify the images ([releasing.md](../releasing.md)); older cosign packages
-from the distribution are not enough. On macOS `brew install cosign`.
-
-```bash
-# Debian, Ubuntu
-sudo apt-get update && sudo apt-get install -y git curl
-# Fedora, RHEL
-sudo dnf install -y git curl
-# cosign v3 from the official release, checked against its checksums
-ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -fsSLO "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-$ARCH"
-curl -fsSLO https://github.com/sigstore/cosign/releases/latest/download/cosign_checksums.txt
-grep " cosign-linux-$ARCH\$" cosign_checksums.txt | sha256sum -c
-sudo install -m 0755 "cosign-linux-$ARCH" /usr/local/bin/cosign
-rm "cosign-linux-$ARCH" cosign_checksums.txt
-cosign version   # GitVersion: v3.x
-```
+Tools: `git` and `curl` to download the release (`sudo apt-get install -y git curl` on
+Debian and Ubuntu, `sudo dnf install -y git curl` on Fedora and RHEL). cosign, which
+verifies the signatures of the images ([releasing.md](../releasing.md)), runs in a
+container and needs no installation.
 
 ## 0. Address (optional, before the first start)
 
