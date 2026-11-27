@@ -15,8 +15,9 @@ Add-ons → xomtra → Uninstall.)
 > step 1 first.
 
 Run the commands on the server in `xomtra/deploy/compose` (the directory where you ran
-`docker compose up`). The lite edition needs the same `-f` options as at the start,
-otherwise Compose does not see its volume `lake-data` and its `worker`.
+`docker compose up`). The lite edition needs the same `-f` options as at the start
+(not needed if `.env` sets `COMPOSE_FILE=compose.yaml:compose.lite.yaml`), otherwise
+Compose does not see its volume `lake-data` and its `worker`.
 
 ## 1. Back up the volumes (optional)
 
