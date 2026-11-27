@@ -1,7 +1,7 @@
 # Security principles
 
 How xomtra protects a Home Assistant installation and its history, as the code does it
-today (release 0.7.1). Work that is not released yet is listed separately at the end.
+today (release 0.9.0). Proposals that are not decided yet are listed at the end.
 To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 
 ## 1. Read only towards Home Assistant
@@ -156,21 +156,26 @@ How to verify a released image: [releasing.md](releasing.md); a build of `main`:
   Only administrators can change them. They guide the model; they are not a security
   boundary.
 
-## Not released yet
+## 12. Public access with Home Assistant sign-in (ADR 081, 084)
 
-Accepted and in review (ADR 081, ADR 084, pull request #77), not in 0.7.1:
+Since 0.8.0 (`XOMTRA_AUTH_MODE=ha` is the default; Entra ID stays an option with
+`XOMTRA_AUTH_MODE=entra`):
 
-- Sign-in with a Home Assistant account becomes the default for public access, Entra ID
-  stays an option.
-- The MCP connector **revokes the Home Assistant token right after sign-in**, like the
-  admin GUI does today, and keeps its own session (`access.session`, 180 days by default,
-  a notice 14 days before the end). Until then, with `XOMTRA_AUTH_MODE=ha` in public
-  access the OAuth proxy keeps the user's Home Assistant tokens in its encrypted store.
-- Every request is checked against the session and an access list in the admin GUI, with
-  **Disconnect** taking effect within a minute.
-- By default only Home Assistant administrators may connect, and two-factor
-  authentication in Home Assistant is required.
+- By default only Home Assistant administrators may connect
+  (`XOMTRA_HA_ROLE_MAP=admin=xomtra.Admin,user=`); other HA users need a role on the admin
+  page **Access**.
+- The Claude connector requires two-factor authentication in Home Assistant
+  (`XOMTRA_HA_REQUIRE_MFA`, default `true`).
+- Right after sign-in the connector **revokes the user's Home Assistant token**, like the
+  admin GUI does, and keeps its own session (`access.session`, `XOMTRA_SESSION_DAYS`,
+  180 days by default; in the last 14 days `server_info` asks the assistant to tell the
+  user to connect again).
+- Every request is checked against the session and the access list; removed or
+  deactivated HA users and changed admin rights take effect within a minute, and
+  **Disconnect** on the page Access ends a sign-in.
 
-Proposed, not decided: optional TLS for the add-on's MCP port (ADR 076); signed notices
+## Not decided yet
+
+Optional TLS for the add-on's MCP port (ADR 076); signed notices
 from xomtra.com verified with a pinned Ed25519 key, shown only in the admin GUI and never
 passed to the model (ADR 075 as changed by ADR 090).
