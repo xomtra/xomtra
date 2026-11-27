@@ -20,6 +20,15 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Development: `uv run lint-imports` checks the boundaries between the domain-neutral
   modules and the Home Assistant modules (import-linter contracts, also in CI).
 
+### Fixed
+
+- Docker compose: the first `docker compose up -d` of a new installation could stop with
+  "dependency failed to start: container xomtra-seaweedfs-1 is unhealthy". SeaweedFS
+  started alongside `secrets-init`, exited before its S3 keys were written, and compose
+  gave up although the container came up healthy a few seconds later. SeaweedFS now
+  waits for `secrets-init`; a test checks that every service reading the secrets volume
+  does (full and lite edition).
+
 ## [0.9.0] - 2026-11-27
 
 ### Added

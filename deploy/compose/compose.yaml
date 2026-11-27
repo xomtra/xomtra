@@ -167,6 +167,11 @@ services:
       - seaweedfs-data:/data
       - ./seaweedfs/start.sh:/start.sh:ro
       - secrets:/secrets:ro
+    # Reads its S3 keys from the secrets volume: without this, it starts alongside
+    # secrets-init on the first `up`, exits before the file exists and compose reports
+    # it unhealthy.
+    depends_on:
+      secrets-init: { condition: service_completed_successfully }
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:8333/healthz"]
       interval: 10s
