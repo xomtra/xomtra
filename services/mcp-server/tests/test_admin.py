@@ -261,3 +261,18 @@ def test_connection_errors_are_translated() -> None:
     ):
         for lang in ("cs", "de", "pl", "nl"):
             assert i18n.translate(f"<p>{sentence}</p>", lang) != f"<p>{sentence}</p>", lang
+
+
+async def test_catalog_explains_missing_profile(
+    data: DataAccess, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A new installation: no daily profile yet, so the page says why it is empty.
+    monkeypatch.setattr(status, "catalog_rows", lambda *_a, **_k: [])
+    monkeypatch.setattr(status, "catalog_profiled", lambda _d: False)
+    entra, audit = FakeEntra(), MemoryAuditSink()
+    async with client_for(make_app(entra, data, audit)) as client:
+        await sign_in(client, entra)
+        resp = await client.get("/admin/catalog")
+    assert "No profile yet" in resp.text
+    assert "<bdi>UTC</bdi>" in resp.text
+    assert "all kinds" in resp.text

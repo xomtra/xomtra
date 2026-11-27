@@ -202,6 +202,12 @@ def catalog_rows(
         )
 
 
+def catalog_profiled(data: DataAccess) -> bool:
+    """True once the daily profile has written ``catalog.entity`` (False on a new lake)."""
+    with data.trusted_cursor() as cur:
+        return bool(_rows(cur, "SELECT 1 AS x FROM lake.catalog.entity LIMIT 1"))
+
+
 def drift_rows(data: DataAccess, days: int = 30, limit: int = 1000) -> list[Row]:
     with data.trusted_cursor() as cur:
         return _rows(

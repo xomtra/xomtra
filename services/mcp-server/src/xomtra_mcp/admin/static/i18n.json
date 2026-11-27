@@ -328,7 +328,10 @@
    "Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Základní pravidla platí vždy: žádné vtipy o haváriích ani o ohrožení života a zdraví, nic sexistického, rasistického, homofobního, xenofobního, politického ani náboženského.",
    "xomtra gives the assistant the core rules and the active set with the results of server_info, get_findings and get_weekly_summary; nothing comes from xomtra.com. The sets are guidance for the assistant, not a security boundary: roles, hidden entities, read only access and the audit are enforced by xomtra itself.": "xomtra předává asistentovi základní pravidla a aktivní sadu ve výsledcích server_info, get_findings a get_weekly_summary; z xomtra.com nepřichází nic. Sady jsou pokyny pro asistenta, ne bezpečnostní hranice: role, skryté entity, read only přístup a audit vynucuje xomtra sama.",
    "Text of the set": "Text sady",
-   "shown below": "zobrazena níže"
+   "shown below": "zobrazena níže",
+   "all kinds": "všechny druhy",
+   "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Zatím žádný profil. Katalog se profiluje jednou denně ve 4:15; nová instalace ukáže entity po první noci.",
+   "Time zone:": "Časové pásmo:"
   },
   "de": {
    "(max 300)": "(max. 300)",
@@ -620,7 +623,10 @@
    "Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Die Grundregeln gelten immer: keine Witze über Unfälle oder Gefahren für Leben und Gesundheit, nichts Sexistisches, Rassistisches, Homophobes, Fremdenfeindliches, Politisches oder Religiöses.",
    "xomtra gives the assistant the core rules and the active set with the results of server_info, get_findings and get_weekly_summary; nothing comes from xomtra.com. The sets are guidance for the assistant, not a security boundary: roles, hidden entities, read only access and the audit are enforced by xomtra itself.": "xomtra gibt dem Assistenten die Grundregeln und das aktive Set mit den Ergebnissen von server_info, get_findings und get_weekly_summary; von xomtra.com kommt nichts. Die Sets sind Hinweise für den Assistenten, keine Sicherheitsgrenze: Rollen, verborgene Entitäten, read only Zugriff und das Audit erzwingt xomtra selbst.",
    "Text of the set": "Text des Sets",
-   "shown below": "unten angezeigt"
+   "shown below": "unten angezeigt",
+   "all kinds": "alle Arten",
+   "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Noch kein Profil. Der Katalog wird einmal am Tag um 04:15 profiliert; eine neue Installation zeigt ihre Entitäten nach der ersten Nacht.",
+   "Time zone:": "Zeitzone:"
   },
   "nl": {
    "(max 300)": "(max. 300)",
@@ -911,7 +917,10 @@
    "Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "De basisregels gelden altijd: geen grappen over ongelukken of gevaar voor leven en gezondheid, niets seksistisch, racistisch, homofoob, xenofoob, politiek of religieus.",
    "xomtra gives the assistant the core rules and the active set with the results of server_info, get_findings and get_weekly_summary; nothing comes from xomtra.com. The sets are guidance for the assistant, not a security boundary: roles, hidden entities, read only access and the audit are enforced by xomtra itself.": "xomtra geeft de assistent de basisregels en de actieve set mee met de resultaten van server_info, get_findings en get_weekly_summary; van xomtra.com komt niets. De sets zijn richtlijnen voor de assistent, geen beveiligingsgrens: rollen, verborgen entiteiten, read only toegang en de audit dwingt xomtra zelf af.",
    "Text of the set": "Tekst van de set",
-   "shown below": "hieronder getoond"
+   "shown below": "hieronder getoond",
+   "all kinds": "alle soorten",
+   "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Nog geen profiel. De catalogus wordt eens per dag om 04:15 geprofileerd; een nieuwe installatie toont haar entiteiten na de eerste nacht.",
+   "Time zone:": "Tijdzone:"
   },
   "pl": {
    "(max 300)": "(maks. 300)",
@@ -1205,7 +1214,10 @@
    "Core rules always apply: no jokes about accidents or threats to life and health, nothing sexist, racist, homophobic, xenophobic, political or religious.": "Podstawowe zasady obowiązują zawsze: żadnych żartów o awariach ani o zagrożeniu życia i zdrowia, nic seksistowskiego, rasistowskiego, homofobicznego, ksenofobicznego, politycznego ani religijnego.",
    "xomtra gives the assistant the core rules and the active set with the results of server_info, get_findings and get_weekly_summary; nothing comes from xomtra.com. The sets are guidance for the assistant, not a security boundary: roles, hidden entities, read only access and the audit are enforced by xomtra itself.": "xomtra przekazuje asystentowi podstawowe zasady i aktywny zestaw w wynikach server_info, get_findings i get_weekly_summary; z xomtra.com nic nie przychodzi. Zestawy są wskazówkami dla asystenta, a nie granicą bezpieczeństwa: role, ukryte encje, dostęp read only i audyt wymusza sama xomtra.",
    "Text of the set": "Tekst zestawu",
-   "shown below": "pokazany niżej"
+   "shown below": "pokazany niżej",
+   "all kinds": "wszystkie rodzaje",
+   "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Jeszcze brak profilu. Katalog jest profilowany raz dziennie o 04:15; nowa instalacja pokaże swoje encje po pierwszej nocy.",
+   "Time zone:": "Strefa czasowa:"
   }
  },
  "th": {
