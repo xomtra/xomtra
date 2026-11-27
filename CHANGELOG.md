@@ -11,6 +11,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-27
+
 ### Added
 
 - Claude Desktop without trusting a certificate: in the local access mode the extension
@@ -22,6 +24,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   token is still entered at install and never part of the file. An extension from
   before a new installation of the server says to download it again. Claude Code and
   other clients still need the CA trusted as described in docs/setup/local-access.md.
+
+  Upgrade note (Docker compose): take the new `deploy/compose/compose.yaml` together
+  with the new images (it sets `XOMTRA_LOCAL_CA_URL`), then `docker compose up -d`.
+  With an older compose file the download keeps working, only without the certificate.
 
 ### Changed
 
@@ -592,7 +598,8 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/xomtra/xomtra/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/xomtra/xomtra/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/xomtra/xomtra/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/xomtra/xomtra/compare/v0.7.1...v0.8.0

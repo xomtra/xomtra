@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.9.2 - 2026-11-27
+
+### Added
+
+- Claude Desktop without trusting a certificate: in the local access mode the extension
+  downloaded from the admin GUI (**Download for Claude Desktop** after issuing a token,
+  also on Connect clients) carries the root certificate of the server's own CA and
+  trusts only it (pinned), so nothing has to be imported into the computer. The admin
+  GUI reads the certificate from Caddy inside the compose network
+  (`XOMTRA_LOCAL_CA_URL`, an internal listener on port 8081 that is not published). The
+  token is still entered at install and never part of the file. An extension from
+  before a new installation of the server says to download it again. Claude Code and
+  other clients still need the CA trusted as described in docs/setup/local-access.md.
+
+### Changed
+
+- Admin GUI: when Home Assistant cannot be reached (setup page and Overview), a sentence
+  says why and what to try, in every language of the admin GUI: `https://` on a plain
+  HTTP port ("try http://"), an untrusted certificate, a name this server cannot
+  resolve, nothing listening on the port, another server or a proxy without WebSockets
+  answering, a timeout, or a rejected token. The technical message follows as a detail.
+
+### Fixed
+
+- An address that answers HTTP but not with a WebSocket upgrade no longer ends in an
+  internal error on the setup page; it is reported like any other connection error.
+- Setup page: whitespace copied with the access token (a line break from a wrapped
+  terminal line, a trailing newline) is dropped instead of making Home Assistant reject
+  the token, and the token field asks password managers not to fill in a saved password
+  (`autocomplete=new-password`).
+- Setup page: an address without a port (`http://192.168.1.10`) means port 80 or 443,
+  where often another server answers. The setup now tries Home Assistant's port 8123 as
+  well and stores that address if it works; otherwise the error says that the port is
+  missing. The example in the URL field shows the port.
+- Claude Desktop extension: a certificate the computer does not trust
+  (`unable to get local issuer certificate`) is no longer reported with the network
+  hint (Local Network permission). The message says to choose `xomtra-ca.crt` as
+  *Certificate of the server*, that a chosen file is not the CA of this server, or that
+  the certificate is for another name.
+- Docs (local access) and the Connect page: trusting xomtra's CA is required for Claude
+  Desktop and Claude Code, with the commands for macOS, Windows and Linux and how to
+  compare the fingerprint on both sides.
+
 ## 0.9.1 - 2026-11-27
 
 ### Added
@@ -140,39 +183,5 @@
   theme: no jokes, irony or vulgarity about accidents, faults, outages, risky
   situations or threats to life or health; no sexist, racist, homophobic, xenophobic
   or political jokes or innuendo and no slurs against any group.
-
-## 0.7.0 - 2026-11-26
-
-### Added
-
-- Docker Compose installs with one command (ADR 077): `docker compose up -d` works
-  without a `.env`. The new one-shot service `secrets-init` generates every internal
-  password and key into the Docker volume `secrets` (one file per service, readable
-  only by its user) and finds the server's LAN address for the local access mode.
-- Setup page in the admin GUI (`/admin/setup`): the Home Assistant URL and token are
-  entered in the browser after the first start, checked against Home Assistant and
-  stored encrypted in Postgres. Until then a one-time link is printed to
-  `docker compose logs admin`; the stream and the hourly ingest wait for the connection.
-  Signed-in administrators can change the URL or token later on the same page.
-- Guide [docs/setup/docker.md](docs/setup/docker.md).
-
-### Changed
-
-- Tone of answers with xomtra data: humour is now the default style, with at least one
-  joke or witty remark in every answer (about the house and the data, never about people,
-  safety, health or a fault, and never at the cost of exact facts). Applies to the server
-  instructions, `answer_guidelines` and the rules in tool descriptions (ADR 073, 080).
-- Compose defaults: `XOMTRA_ACCESS_MODE=local`, `XOMTRA_AUTH_MODE=ha`, `ADMIN_CIDR` all
-  private ranges; no variable is required any more. Public access still needs its
-  values in `.env`.
-- `init-env.sh` is an optional guide and no longer writes internal passwords.
-  **Upgrade note:** an existing `.env` with passwords keeps working; on the first start
-  `secrets-init` takes them over into the volume `secrets`, after which they can be
-  removed from `.env`. Back up the volume `secrets` together with the data volumes.
-- The documentation and the Claude Desktop extension now say precisely what "read only"
-  means: xomtra only reads and never calls Home Assistant services, and the assistant
-  gets read-only tools over xomtra's own data. Home Assistant has no read-only tokens,
-  so this is guaranteed by xomtra's code; the Docker guide explains why a separate
-  non-admin user is still recommended (access can be revoked at any time).
 
 Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md
