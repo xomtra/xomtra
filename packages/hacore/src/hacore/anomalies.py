@@ -56,6 +56,8 @@ type FloatArray = npt.NDArray[np.float64]
 
 ANOMALY = "anomaly"
 CHANGE_POINT = "change_point"
+# Analyzer that writes anomalies and change points (ADR 089: provenance of a finding).
+ANALYZER = "anomalies"
 
 # 1.4826 x MAD estimates the standard deviation of normally distributed values.
 MAD_SD = 1.4826
@@ -1034,6 +1036,7 @@ def run(
         method=method,
         now=now,
         finding_type=ANOMALY,
+        analyzer=ANALYZER,
         alias=alias,
     )
     corr.write_findings(
@@ -1045,6 +1048,7 @@ def run(
         method=cp_method,
         now=now,
         finding_type=CHANGE_POINT,
+        analyzer=ANALYZER,
         alias=alias,
     )
     result.anomalies = len(anomalies)

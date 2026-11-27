@@ -224,6 +224,7 @@ A real and direct finding can still be trivial or of no use. Every finding gets
 | `action_category` | fault, savings, automation, behaviour, none, or unclassified, from the rulebook |
 | `usefulness` | R0 = √(strength · evidence) |
 | `rules_version`, `ranking_version` | version of the rulebook and of the ranking (`r0-<rules_version>`) |
+| `analyzer`, `pack`, `pack_version`, `source_instance` | provenance (ADR 089): the analyzer that produced the finding (`correlations`, `anomalies`), the parameter pack (`home`) and its version, and the instance of the data source (`ha`); empty in findings written by earlier versions |
 
 A trivial relation gets the flag `trivial`: it is kept, ranked last and hidden by
 `get_findings` by default. Relations flagged `indirect` or `common_factor` are hidden

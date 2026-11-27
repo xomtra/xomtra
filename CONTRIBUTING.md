@@ -4,7 +4,7 @@
   (`lint`, `test`, `trivy`, `build`), signed commits and linear history.
 - Add a line under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) for every user-visible
   change. Releases are cut by the maintainer, see [docs/releasing.md](docs/releasing.md).
-- Run `uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest`
+- Run `uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run lint-imports && uv run pytest`
   before pushing.
 - **Never commit installation-specific data**: IP addresses, hostnames, tenant/client IDs,
   secrets, entity IDs or exports from a real Home Assistant. Use `.env` files (ignored by git)

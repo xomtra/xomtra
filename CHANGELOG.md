@@ -11,6 +11,15 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Findings record their provenance in `catalog.finding` and the weekly snapshots:
+  `analyzer` (`correlations` or `anomalies`), `pack` and `pack_version` (the parameter
+  pack, `home`) and `source_instance` (`ha`). The columns are added to existing lakes on
+  the next analysis run; older rows stay empty (ADR 089, preparation for data plugins).
+- Development: `uv run lint-imports` checks the boundaries between the domain-neutral
+  modules and the Home Assistant modules (import-linter contracts, also in CI).
+
 ## [0.9.0] - 2026-11-27
 
 ### Added

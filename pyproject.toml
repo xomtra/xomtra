@@ -8,6 +8,7 @@ dependencies = ["hacore", "xomtra-ingest", "xomtra-mcp"]
 
 [dependency-groups]
 dev = [
+  "import-linter>=2.17",
   "mypy>=1.18",
   "pytest>=8.4",
   "pytest-asyncio>=1.2",
@@ -80,3 +81,61 @@ markers = ["contract: needs a real Home Assistant (XOMTRA_CONTRACT_HA_URL)"]
 [tool.coverage.run]
 source = ["hacore", "xomtra_ingest", "xomtra_mcp"]
 branch = true
+
+# Boundaries between the domain-neutral core and the Home Assistant part (ADR 089, P0).
+# The listed modules already respect them; more join as the code is split (M3-M7 of
+# the plugin preparation). `uv run lint-imports` checks them in CI.
+[tool.importlinter]
+root_packages = ["hacore", "xomtra_mcp", "xomtra_ingest"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "The core library does not depend on the services"
+type = "forbidden"
+source_modules = ["hacore"]
+forbidden_modules = ["xomtra_mcp", "xomtra_ingest"]
+
+[[tool.importlinter.contracts]]
+name = "The MCP server and the ingest service are independent"
+type = "independence"
+modules = ["xomtra_mcp", "xomtra_ingest"]
+
+[[tool.importlinter.contracts]]
+name = "Domain-neutral modules do not depend on Home Assistant modules"
+type = "forbidden"
+source_modules = [
+  "hacore.significance",
+  "hacore.context",
+  "hacore.confidence",
+  "hacore.usefulness",
+  "hacore.analysis_settings",
+  "hacore.lake",
+  "hacore.edition",
+  "hacore.secretstore",
+]
+forbidden_modules = [
+  "hacore.client",
+  "hacore.history",
+  "hacore.registry",
+  "hacore.stream",
+  "hacore.ingest",
+  "hacore.bronze",
+  "hacore.ha_connection",
+  "hacore.onboarding",
+  "hacore.testing",
+  "hacore.areas",
+  "hacore.exclusions",
+  "hacore.actionability",
+]
+
+[[tool.importlinter.contracts]]
+name = "The analysis engine is pure computation (no lake, database or network)"
+type = "forbidden"
+source_modules = [
+  "hacore.significance",
+  "hacore.context",
+  "hacore.confidence",
+  "hacore.usefulness",
+  "hacore.analysis_settings",
+]
+forbidden_modules = ["hacore.lake", "duckdb", "psycopg2", "httpx", "aiohttp", "websockets"]
