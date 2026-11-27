@@ -72,12 +72,19 @@ DNS server for xomtra, remove that entry too.
 
 On every computer that used xomtra:
 
-- **Claude Desktop:** Settings → Extensions → xomtra → Uninstall. Delete the
-  downloaded `xomtra.mcpb`.
-- **Claude Code:** `claude mcp remove xomtra` (add `-s user` or `-s project` if you
-  added it with that scope), and remove `NODE_EXTRA_CA_CERTS` from your shell profile if
-  you set it for xomtra.
-- **Other MCP clients:** delete the `xomtra` entry from their configuration.
+- **Claude Desktop:** Settings → Extensions → the extension from the admin GUI
+  (shown as xomtra) → Uninstall. Delete the downloaded `xomtra.mcpb`.
+- **Claude Code:** the server may have any name you gave it in `claude mcp add`. Find
+  the one with the address of your server, then remove it by that name:
+
+  ```bash
+  claude mcp list                  # find the server with https://<local-host>/mcp
+  claude mcp remove <name>         # add -s user or -s project if you added it with that scope
+  ```
+
+  Remove `NODE_EXTRA_CA_CERTS` from your shell profile if you set it for xomtra.
+- **Other MCP clients:** delete the entry with the address of your server
+  (`https://<local-host>/mcp`) from their configuration, whatever its name.
 - **The CA certificate**, if you added it to the computer's trust store
   ([local access, step 2](local-access.md#2-trust-the-servers-certificate)). The
   certificate is named `xomtra local CA - <year> ECC Root`. Remove only this one:
