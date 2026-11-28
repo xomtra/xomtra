@@ -15,6 +15,9 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 - Local access: `https://<address>/` redirects to the admin GUI (`/admin/`) instead of
   answering "Not found".
+- Docs: [Docker Compose](docs/setup/docker.md) names the admin GUI address
+  `https://<address>/admin/` and that `docker compose up -d` alone does not print the
+  setup link.
 
 ## [0.10.0] - 2026-11-28
 
