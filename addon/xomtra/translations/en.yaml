@@ -4,13 +4,13 @@ configuration:
     description: Log level of the xomtra services.
   states_retention_days:
     name: State history (days)
-    description: Days of state history kept in the lake.
+    description: Days of state history kept in the lake. Default; the page Retention in xomtra's admin can override it.
   statistics_5min_retention_days:
     name: 5-minute statistics (days)
-    description: Days of 5-minute statistics kept in the lake.
+    description: Days of 5-minute statistics kept in the lake. Default; the page Retention in xomtra's admin can override it.
   statistics_hour_retention_days:
     name: Hourly statistics (days)
-    description: Days of hourly statistics kept in the lake.
+    description: Days of hourly statistics kept in the lake. Default; the page Retention in xomtra's admin can override it.
   mcp_url:
     name: MCP address
     description: >-

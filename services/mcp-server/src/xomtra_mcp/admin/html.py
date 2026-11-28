@@ -311,15 +311,35 @@ def _num(value: float, pct: bool) -> str:
     return f'<data class="{kind}" value="{value!r}">{escape(shown)}</data>'
 
 
+# Date as the admin's language writes it (Intl.DateTimeFormat with 2-digit day and month
+# gives the same); ui.js then follows Home Assistant's date format and time zone.
+_DATE_FORMATS = {
+    "en": "{m:02}/{d:02}/{y}",
+    "cs": "{d}. {m}. {y}",
+    "de": "{d:02}.{m:02}.{y}",
+    "pl": "{d:02}.{m:02}.{y}",
+    "nl": "{d:02}-{m:02}-{y}",
+}
+
+
+def local_date(value: date, lang: str | None = None) -> str:
+    """``value`` in the date format of ``lang`` (default: the language of the request)."""
+    lang = lang or view.current.get().lang
+    pattern = _DATE_FORMATS.get(lang, _DATE_FORMATS["en"])
+    return pattern.format(d=value.day, m=value.month, y=value.year)
+
+
 def _when(value: datetime | date) -> str:
     """A time in UTC; ui.js shows it in Home Assistant's time zone and date format."""
     if isinstance(value, datetime):
         if value.tzinfo is None:
             value = value.replace(tzinfo=UTC)
-        iso = value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
-        shown = value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+        utc = value.astimezone(UTC)
+        iso = utc.isoformat(timespec="seconds").replace("+00:00", "Z")
+        shown = f"{local_date(utc.date())} {utc:%H:%M} UTC"
     else:
-        iso = shown = value.isoformat()
+        iso = value.isoformat()
+        shown = local_date(value)
     return f'<time datetime="{iso}">{escape(shown)}</time>'
 
 

@@ -54,6 +54,10 @@ XOMTRA_DAGSTER_BIND=127.0.0.1           # Dagster UI on loopback only
 
 Verify the image signature like the others (README, `cosign verify`) and pin the digest.
 
+The three retention values are the defaults: a period saved in the admin GUI on the page
+Retention wins over them and applies from the next run, without a restart
+([admin GUI](admin-gui.md#retention-adr-094)).
+
 ### Editions: full and lite (ADR 050)
 
 `XOMTRA_EDITION` selects the defaults of a resource profile; every value can still be
