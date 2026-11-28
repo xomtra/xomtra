@@ -132,6 +132,14 @@ def _default_ha_port(url: str) -> str | None:
     return parts._replace(netloc=f"{host}:8123").geturl()
 
 
+def ha_host(url: str | None) -> str:
+    """The FQDN or IP of the connected Home Assistant, shown instead of its version."""
+    parts = urlparse(url or "")
+    if parts.hostname == "supervisor":  # the add-on reaches Core through the Supervisor
+        return "this Home Assistant"
+    return parts.hostname or "?"
+
+
 def _url_host(hostname: str) -> str:
     return f"[{hostname}]" if ":" in hostname else hostname
 
@@ -554,7 +562,7 @@ class AdminApp:
         if not ha.get("configured"):
             ha_card = ("Home Assistant", "not configured", "warn")
         elif ha.get("ok"):
-            ha_card = ("Home Assistant", f"{ha['version']} · {ha['latency_ms']} ms", "ok")
+            ha_card = ("Home Assistant", ha_host(conn.url if conn else None), "ok")
         else:
             ha_card = ("Home Assistant", "unreachable", "bad")
         disk = self._disk()
@@ -1889,7 +1897,7 @@ class AdminApp:
             "<p class=ok>Home Assistant is connected.</p>"
             + cards(
                 [
-                    ("Home Assistant", ha["version"], "ok"),
+                    ("Home Assistant", ha_host(url), "ok"),
                     ("Entities in HA", ha.get("entities"), ""),
                 ]
             )

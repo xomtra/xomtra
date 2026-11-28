@@ -12,7 +12,7 @@ from pydantic import SecretStr
 
 from hacore.testing import VALID_TOKEN, running_fake_ha
 from xomtra_mcp.admin import status
-from xomtra_mcp.admin.app import SESSION_COOKIE, AdminApp
+from xomtra_mcp.admin.app import SESSION_COOKIE, AdminApp, ha_host
 from xomtra_mcp.admin.config import AdminSettings
 from xomtra_mcp.admin.oidc import EntraOIDC
 from xomtra_mcp.admin.session import Signer
@@ -213,6 +213,14 @@ async def test_ha_status() -> None:
     assert bad["ok"] is False
     assert bad["error"].startswith("Home Assistant rejected the access token.")
     assert "HAAuthError" in bad["detail"]
+    assert "latency_ms" not in ok
+
+
+def test_ha_host_shows_the_address_not_the_version() -> None:
+    assert ha_host("http://ha.example.org:8123") == "ha.example.org"
+    assert ha_host("https://192.0.2.10/") == "192.0.2.10"
+    assert ha_host("http://[2001:db8::1]:8123") == "2001:db8::1"
+    assert ha_host("http://supervisor/core") == "this Home Assistant"
 
 
 async def _plain_http_server() -> tuple[asyncio.Server, int]:

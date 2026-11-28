@@ -32,6 +32,9 @@
 - Docs: Docker Compose installs and upgrades from the release archive
   `xomtra-<version>-compose.tar.gz` checked with `SHA256SUMS` (`curl` and `tar`, no
   git); [docs/setup/docker.md](docs/setup/docker.md) has a new section *Upgrade*.
+- Admin: the Home Assistant card on *Overview* and after the setup shows the address
+  (FQDN or IP) of the connected Home Assistant instead of its version and response time;
+  in the add-on it says *this Home Assistant*.
 
 ### Removed
 

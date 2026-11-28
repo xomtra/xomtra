@@ -6,7 +6,6 @@ import asyncio
 import errno
 import socket
 import ssl
-import time
 from collections.abc import Callable
 from typing import Any
 
@@ -22,7 +21,6 @@ type Row = dict[str, Any]
 async def ha_status(url: str | None, token: str | None) -> Row:
     if not (url and token):
         return {"configured": False}
-    started = time.monotonic()
     try:
         async with asyncio.timeout(15), HAClient(url, token) as ha:
             snapshot = await fetch_registries(ha)
@@ -38,7 +36,6 @@ async def ha_status(url: str | None, token: str | None) -> Row:
         "configured": True,
         "ok": True,
         "version": version,
-        "latency_ms": round((time.monotonic() - started) * 1000),
         "areas": len(snapshot.areas),
         "devices": len(snapshot.devices),
         "entities": sum(snapshot.domain_counts().values()),
