@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     query_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     # Time zone of daily buckets in get_timeseries.
     timezone: str = "UTC"
-    # Answer guidelines: chosen on the admin page Answers and read from the audit
+    # Answer guidelines: chosen on the admin page MCP setup and read from the audit
     # database (ADR 090); there are no environment variables for them.
 
     # Audit database (ADR 040). Required with Entra auth: every call must be audited.

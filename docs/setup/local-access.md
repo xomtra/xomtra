@@ -72,7 +72,7 @@ exception nor a CA it has not been given; without it, it fails with
 ## 3. Issue a token
 
 Open `https://<local-host>/admin/`, sign in (Home Assistant administrator) and go to
-**Tokens**: who it is for, a description (device or app), role (`xomtra.Reader` or
+**MCP tokens**: who it is for, a description (device or app), role (`xomtra.Reader` or
 `xomtra.Admin`) and expiry. The token (`xmt_…`) is shown **once**, together with ready
 instructions for the clients. Only its SHA-256 hash is stored; revoking takes effect
 within 30 seconds. Issue one token per person and device, so that you can revoke one
@@ -82,7 +82,7 @@ without the others and the audit shows who asked what.
 
 ### Claude Desktop
 
-1. Admin GUI → **Tokens** → issue a token → **Download for Claude Desktop**
+1. Admin GUI → **MCP tokens** → issue a token → **Download for Claude Desktop**
    (`xomtra.mcpb`, also on **Connect clients**). The file is made for this server: the
    address and the certificate of its local CA are filled in, and the extension trusts
    only this certificate (pinned) instead of the computer's trust store. Nothing has

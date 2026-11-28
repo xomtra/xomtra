@@ -1370,14 +1370,14 @@ class AdminApp:
         return HTMLResponse(page(title, body, user.get("username")))
 
     async def tokens_page(self, request: Request, user: dict[str, Any]) -> Response:
-        refused = self._local_only(user, "Tokens")
+        refused = self._local_only(user, "MCP tokens")
         if refused is not None or self.tokens is None:
             return refused or Response(status_code=404)
         try:
             items = await asyncio.to_thread(self.tokens.list)
         except TokenStoreError:
             return HTMLResponse(
-                page("Tokens", "<p class=bad>The token store is unavailable.</p>", None), 503
+                page("MCP tokens", "<p class=bad>The token store is unavailable.</p>", None), 503
             )
         roles = "".join(f"<option>{e(r)}</option>" for r in TOKEN_ROLES)
         days = "".join(
@@ -1430,14 +1430,14 @@ class AdminApp:
                 trusted_html={7},
             )
         )
-        return HTMLResponse(page("Tokens", body, user.get("username")))
+        return HTMLResponse(page("MCP tokens", body, user.get("username")))
 
     async def _form(self, request: Request, limit: int = 10_000) -> dict[str, str]:
         raw = (await request.body())[:limit].decode(errors="replace")
         return {k: v[0].strip() for k, v in parse_qs(raw).items() if v}
 
     async def token_issue(self, request: Request, user: dict[str, Any]) -> Response:
-        refused = self._local_only(user, "Tokens")
+        refused = self._local_only(user, "MCP tokens")
         if refused is not None or self.tokens is None:
             return refused or Response(status_code=404)
         form = await self._form(request)
@@ -1449,7 +1449,7 @@ class AdminApp:
             days = -1
         if not owner or not description or role not in TOKEN_ROLES or days not in TOKEN_DAYS:
             return HTMLResponse(
-                page("Tokens", "<p class=bad>Fill in all fields.</p>", user.get("username")),
+                page("MCP tokens", "<p class=bad>Fill in all fields.</p>", user.get("username")),
                 400,
             )
         try:
@@ -1475,7 +1475,7 @@ class AdminApp:
         except (TokenStoreError, AuditError):
             return HTMLResponse(
                 page(
-                    "Tokens",
+                    "MCP tokens",
                     "<p class=bad>Not issued: the token store or audit is unavailable.</p>",
                     user.get("username"),
                 ),
@@ -1493,7 +1493,7 @@ class AdminApp:
         return HTMLResponse(page("New token", body, user.get("username")))
 
     async def token_revoke(self, request: Request, user: dict[str, Any]) -> Response:
-        refused = self._local_only(user, "Tokens")
+        refused = self._local_only(user, "MCP tokens")
         if refused is not None or self.tokens is None:
             return refused or Response(status_code=404)
         token_id = (await self._form(request)).get("id", "")[:40]
@@ -1509,7 +1509,7 @@ class AdminApp:
         except (TokenStoreError, AuditError):
             return HTMLResponse(
                 page(
-                    "Tokens",
+                    "MCP tokens",
                     "<p class=bad>The token store or audit is unavailable.</p>",
                     user.get("username"),
                 ),
@@ -1756,7 +1756,7 @@ class AdminApp:
         if refused is not None:
             return refused
         body = (
-            f"<p>Issue a personal token on <a href='{prefix()}/tokens'>Tokens</a> first, one "
+            f"<p>Issue a personal token on <a href='{prefix()}/tokens'>MCP tokens</a> first, one "
             "per person and device.</p>" + CLIENTS_NOTE + self._connect_help()
         )
         return HTMLResponse(page("Connect clients", body, user.get("username")))

@@ -19,7 +19,7 @@ An installation runs **either** local **or** public access, never both:
 | | Local (default) | Public |
 | --- | --- | --- |
 | Who connects to `/mcp` | MCP clients in your LAN or VPN (`LAN_CIDR`) | only Claude's servers (`CLAUDE_IP_RANGES`) |
-| Sign-in of MCP clients | personal tokens `xmt_…` (page **Tokens**) | OAuth: Claude registers itself, you sign in with your HA account (2FA) |
+| Sign-in of MCP clients | personal tokens `xmt_…` (page **MCP tokens**) | OAuth: Claude registers itself, you sign in with your HA account (2FA) |
 | Certificate | Caddy's own local CA | Let's Encrypt (ACME DNS-01 at Cloudflare) |
 | Reachable from the internet | no | port 443 |
 | Admin GUI | `https://<local-host>/admin/` from `ADMIN_CIDR` | `https://<public-host>/admin/` from `ADMIN_CIDR` |
@@ -49,7 +49,7 @@ What changes when you switch to public:
   Caddy lets `/mcp` through only from Claude's IP ranges. Use the claude.ai connector
   instead (it also appears in Claude Desktop when you are signed in with the same
   account).
-- The page **Tokens** only explains that tokens belong to the local mode; issued tokens
+- The page **MCP tokens** only explains that tokens belong to the local mode; issued tokens
   stay stored and work again if you switch back (unless they expired or you revoked
   them).
 - The page **Access** appears: who may use the connector and their sessions.

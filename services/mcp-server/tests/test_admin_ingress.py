@@ -243,7 +243,7 @@ async def test_ingress_page_has_the_xomtra_look() -> None:
         missing = await client.get("/fonts/..%2Fapp.py", headers=HA)
     assert f'<script src="{INGRESS}/ui.js?v={ASSET_VERSION}"></script>' in resp.text
     assert f'href="{INGRESS}/favicon.svg?v={ASSET_VERSION}"' in resp.text
-    assert '<a href="' + INGRESS + '/tokens" aria-current=page>Tokens</a>' in resp.text
+    assert '<a href="' + INGRESS + '/tokens" aria-current=page>MCP tokens</a>' in resp.text
     assert "<b>xomtra</b><small>admin</small>" in resp.text
     # Fonts resolve relative to the stylesheet, so they work under the Ingress path too.
     assert 'url("fonts/Geist-Variable.woff2")' in css.text
@@ -309,7 +309,7 @@ async def test_gui_follows_the_language_cookie_and_accept_language() -> None:
     assert "Home Assistant backups do not include" not in cs.text
     assert ">Vydat token</button>" in tokens.text
     assert "placeholder='pro koho'" in tokens.text
-    assert "<title>Tokeny · xomtra admin</title>" in tokens.text
+    assert "<title>MCP Tokeny · xomtra admin</title>" in tokens.text
     assert "<html lang=de>" in de.text
     assert "<h1>Übersicht</h1>" in de.text
     assert "<html lang=en>" in en.text

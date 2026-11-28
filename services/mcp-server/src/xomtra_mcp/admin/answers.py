@@ -1,4 +1,4 @@
-"""Admin page Answers: the answer guidelines sets (ADR 090).
+"""Admin page MCP setup (/answers): the answer guidelines sets (ADR 090).
 
 Factory sets come with the code and are read only; custom sets are kept in the audit
 database with their history. One set is active for the installation; the MCP server
@@ -37,7 +37,7 @@ from xomtra_mcp.guidelines import (
     compose,
 )
 
-TITLE = "Answers"
+TITLE = "MCP setup"
 EXPORT_FORMAT = 1
 # A form with a whole set (8,000 characters, percent-encoded) or an import of 20 sets.
 FORM_LIMIT = 1_000_000

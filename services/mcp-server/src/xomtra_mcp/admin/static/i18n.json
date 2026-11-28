@@ -168,7 +168,7 @@
    "This server runs in your local network and accepts personal tokens. Assistants that run on a computer in this network can use it: Claude Desktop (the extension below), Claude Code and other MCP clients that send a bearer token, such as VS Code or Cursor.": "Tento server běží ve vaší místní síti a přijímá osobní tokeny. Mohou ho používat asistenti, kteří běží na počítači v této síti: Claude Desktop (rozšíření níže), Claude Code a další MCP klienti, kteří posílají bearer token, například VS Code nebo Cursor.",
    "This setup code is not valid.": "Tento kód pro nastavení není platný.",
    "Tick the box to confirm.": "Potvrďte zaškrtnutím políčka.",
-   "Tokens": "Tokeny",
+   "MCP tokens": "MCP Tokeny",
    "Undo": "Vrátit",
    "Unknown setting.": "Neznámé nastavení.",
    "Which AI assistants can connect": "Které AI asistenty lze připojit",
@@ -236,7 +236,7 @@
    "The access store or audit is unavailable.": "Úložiště přístupů nebo audit nejsou dostupné.",
    "Unknown role.": "Neznámá role.",
    "With Entra ID, who may use xomtra and with which role is set in Entra (app roles of the enterprise application). Sign-ins end in Entra too.": "S Entra ID se nastavuje v Entra, kdo smí xomtru používat a s jakou rolí (role aplikace v podnikové aplikaci). Přihlášení se ukončují také v Entra.",
-   "Answers": "Odpovědi",
+   "MCP setup": "MCP Setup",
    "A factory set comes with xomtra and changes with updates. Duplicate it to write your own.": "Sada z výroby je součástí xomtry a mění se s aktualizacemi. Pro vlastní úpravy ji zduplikujte.",
    "A set called": "Sada s názvem",
    "exists already.": "už existuje.",
@@ -543,7 +543,7 @@
    "The access store or audit is unavailable.": "Der Zugriffsspeicher oder das Audit ist nicht verfügbar.",
    "Unknown role.": "Unbekannte Rolle.",
    "With Entra ID, who may use xomtra and with which role is set in Entra (app roles of the enterprise application). Sign-ins end in Entra too.": "Mit Entra ID wird in Entra festgelegt, wer xomtra mit welcher Rolle nutzen darf (App-Rollen der Unternehmensanwendung). Anmeldungen werden ebenfalls in Entra beendet.",
-   "Answers": "Antworten",
+   "MCP setup": "MCP-Setup",
    "A factory set comes with xomtra and changes with updates. Duplicate it to write your own.": "Ein Werks-Set gehört zu xomtra und ändert sich mit Updates. Dupliziere es, um dein eigenes zu schreiben.",
    "A set called": "Ein Set namens",
    "exists already.": "existiert bereits.",
@@ -648,7 +648,8 @@
    "all kinds": "alle Arten",
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Noch kein Profil. Der Katalog wird einmal am Tag um 04:15 profiliert; eine neue Installation zeigt ihre Entitäten nach der ersten Nacht.",
    "Time zone:": "Zeitzone:",
-   "Data retention in the xomtra data lake": "Datenaufbewahrung im Data Lake von xomtra"
+   "Data retention in the xomtra data lake": "Datenaufbewahrung im Data Lake von xomtra",
+   "MCP tokens": "MCP-Tokens"
   },
   "nl": {
    "(max 300)": "(max. 300)",
@@ -848,7 +849,7 @@
    "The access store or audit is unavailable.": "De toegangsopslag of de audit is niet beschikbaar.",
    "Unknown role.": "Onbekende rol.",
    "With Entra ID, who may use xomtra and with which role is set in Entra (app roles of the enterprise application). Sign-ins end in Entra too.": "Met Entra ID stel je in Entra in wie xomtra mag gebruiken en met welke rol (app-rollen van de bedrijfstoepassing). Aanmeldingen worden ook in Entra beëindigd.",
-   "Answers": "Antwoorden",
+   "MCP setup": "MCP-setup",
    "A factory set comes with xomtra and changes with updates. Duplicate it to write your own.": "Een fabrieksset hoort bij xomtra en verandert met updates. Dupliceer hem om je eigen set te schrijven.",
    "A set called": "Een set met de naam",
    "exists already.": "bestaat al.",
@@ -953,7 +954,8 @@
    "all kinds": "alle soorten",
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Nog geen profiel. De catalogus wordt eens per dag om 04:15 geprofileerd; een nieuwe installatie toont haar entiteiten na de eerste nacht.",
    "Time zone:": "Tijdzone:",
-   "Data retention in the xomtra data lake": "Bewaartermijn van gegevens in het data lake van xomtra"
+   "Data retention in the xomtra data lake": "Bewaartermijn van gegevens in het data lake van xomtra",
+   "MCP tokens": "MCP-tokens"
   },
   "pl": {
    "(max 300)": "(maks. 300)",
@@ -1087,7 +1089,7 @@
    "This server runs in your local network and accepts personal tokens. Assistants that run on a computer in this network can use it: Claude Desktop (the extension below), Claude Code and other MCP clients that send a bearer token, such as VS Code or Cursor.": "Ten serwer działa w Twojej sieci lokalnej i przyjmuje osobiste tokeny. Mogą z niego korzystać asystenty działające na komputerze w tej sieci: Claude Desktop (rozszerzenie poniżej), Claude Code i inni klienci MCP wysyłający token bearer, np. VS Code lub Cursor.",
    "This setup code is not valid.": "Ten kod konfiguracji jest nieprawidłowy.",
    "Tick the box to confirm.": "Zaznacz pole, aby potwierdzić.",
-   "Tokens": "Tokeny",
+   "MCP tokens": "Tokeny MCP",
    "Undo": "Cofnij",
    "Unknown setting.": "Nieznane ustawienie.",
    "Which AI assistants can connect": "Które asystenty AI mogą się połączyć",
@@ -1156,7 +1158,7 @@
    "The access store or audit is unavailable.": "Magazyn dostępów lub audyt jest niedostępny.",
    "Unknown role.": "Nieznana rola.",
    "With Entra ID, who may use xomtra and with which role is set in Entra (app roles of the enterprise application). Sign-ins end in Entra too.": "Przy Entra ID w Entra ustawia się, kto może używać xomtry i z jaką rolą (role aplikacji w aplikacji przedsiębiorstwa). Logowania kończy się również w Entra.",
-   "Answers": "Odpowiedzi",
+   "MCP setup": "Konfiguracja MCP",
    "A factory set comes with xomtra and changes with updates. Duplicate it to write your own.": "Zestaw fabryczny jest częścią xomtry i zmienia się z aktualizacjami. Zduplikuj go, aby napisać własny.",
    "A set called": "Zestaw o nazwie",
    "exists already.": "już istnieje.",

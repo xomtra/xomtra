@@ -220,8 +220,8 @@ MARK = (
 NAV = (
     ("/", "Overview"),
     ("/findings", "Findings"),
-    ("/answers", "Answers"),
-    ("/tokens", "Tokens"),
+    ("/answers", "MCP setup"),
+    ("/tokens", "MCP tokens"),
     ("/access", "Access"),
     ("/catalog", "Catalog"),
     ("/drift", "Entity changes"),
