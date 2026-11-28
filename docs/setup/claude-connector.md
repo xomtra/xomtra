@@ -31,6 +31,18 @@ configuration (`Caddyfile.local` or `Caddyfile`, chosen in `deploy/caddy/start.s
 Accepting personal tokens on a public address would let anyone who obtains a token use
 it from the internet, so the two are not mixed.
 
+`XOMTRA_AUTH_MODE` is independent of the access mode and sets who signs in where:
+
+| `XOMTRA_AUTH_MODE` | Local access | Public access |
+| --- | --- | --- |
+| `ha` (default) | admin GUI: HA administrators; MCP: personal tokens | admin GUI and Claude connector: HA account (connector with 2FA) |
+| `entra` | admin GUI: Entra role `xomtra.Admin`; MCP: personal tokens | admin GUI and Claude connector: Entra ID |
+| `none` | development only, the server refuses to start unless it listens on loopback | the same |
+
+In the local mode the MCP endpoint always takes personal tokens; `XOMTRA_AUTH_MODE`
+only decides the sign-in of the admin GUI there. (The Home Assistant add-on uses its own
+fixed combination: admin through HA Ingress, MCP with personal tokens.)
+
 What changes when you switch to public:
 
 - Claude Desktop extensions and Claude Code with personal tokens **stop working**:
