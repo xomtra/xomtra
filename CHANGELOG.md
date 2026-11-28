@@ -24,6 +24,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   Upgrade note: nothing to do. `XOMTRA_*_RETENTION_DAYS` in `.env` and the add-on's
   options `*_retention_days` keep working and are now the default that a value saved in
   the admin GUI overrides.
+- Docs: complete uninstall of the Docker Compose installation
+  ([docs/setup/uninstall.md](docs/setup/uninstall.md)): optional backup of the volumes,
+  `docker compose down -v --rmi all`, the Claude clients and the CA certificate, the
+  token and user in Home Assistant, and the public setup.
+- Release asset `xomtra-<version>-compose.tar.gz` with `xomtra/deploy/compose` of the
+  tag, covered by `SHA256SUMS`: Docker Compose installs and upgrades without git.
+- Docs: cosign runs in its official container pinned by digest, no installation needed.
 
 ### Removed
 

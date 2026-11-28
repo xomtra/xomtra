@@ -4,9 +4,16 @@ xomtra on any Linux machine with Docker (a virtual machine, a mini PC, a NAS). N
 fill in before the start (ADR 077): the internal passwords and keys are generated on the
 first start, and Home Assistant is connected in the browser afterwards.
 
-Requirements: Docker Engine with the Compose plugin (`docker compose version`), 2 CPU
+Requirements: Docker Engine with the Compose plugin v2 ([official install](https://docs.docker.com/engine/install/),
+check with `docker compose version`), 2 CPU
 cores and 4 GB RAM, a few GB of disk,
-and Home Assistant reachable from this machine.
+and Home Assistant reachable from this machine, usually on port 8123
+(`http://<ha-address>:8123`).
+
+Tools: `git` and `curl` to download the release (`sudo apt-get install -y git curl` on
+Debian and Ubuntu, `sudo dnf install -y git curl` on Fedora and RHEL). Verifying the
+signatures of the images is optional, with cosign in its container
+([releasing.md](../releasing.md#installing-a-release)).
 
 ## 0. Address (optional, before the first start)
 
@@ -14,11 +21,11 @@ Nothing is needed: without settings xomtra uses this machine's LAN address
 (`https://192.168.1.20/`). Reserve that address in your router so that DHCP does not
 change it.
 
-If you want a name instead (`https://xomtra.lan/`), set it in step 1 after the download
+If you want a name instead (`https://xomtra.home.arpa/`), set it in step 1 after the download
 and before the first `docker compose up`:
 
 ```bash
-echo 'XOMTRA_LOCAL_HOST=xomtra.lan' >> .env   # in xomtra/deploy/compose
+echo 'XOMTRA_LOCAL_HOST=xomtra.home.arpa' >> .env   # in xomtra/deploy/compose
 ```
 
 The name only has to resolve to this machine on the clients (browser, Claude Desktop,
@@ -96,7 +103,7 @@ what you need, for example:
 
 | Setting | Default | When to change it |
 | --- | --- | --- |
-| `XOMTRA_LOCAL_HOST` | the LAN address found at start | a DNS name (`xomtra.lan`), or the address changes (DHCP) |
+| `XOMTRA_LOCAL_HOST` | the LAN address found at start | a DNS name (`xomtra.home.arpa`), or the address changes (DHCP) |
 | `ADMIN_CIDR` | all private ranges | limit the admin GUI to your admin machine's network |
 | `LAN_CIDR` | all private ranges | limit who may use the MCP endpoint |
 | `XOMTRA_HA_URL`, `XOMTRA_HA_TOKEN` | entered in the admin GUI | non-interactive install (they win over the GUI) |
@@ -133,3 +140,8 @@ into the volume `secrets`, so the Postgres roles and S3 keys keep matching
 values in the volume always win. `XOMTRA_HA_URL` and `XOMTRA_HA_TOKEN` in `.env` keep
 working; to move them to the admin GUI, delete them from `.env`, run
 `docker compose up -d` and use the setup link.
+
+## Uninstall
+
+To remove xomtra with its data, images, the clients' extension and certificate and the
+token in Home Assistant, see [uninstall.md](uninstall.md).
