@@ -11,7 +11,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pytest
 import yaml
 
 COMPOSE = Path(__file__).resolve().parents[2] / "deploy" / "compose"
@@ -46,7 +45,7 @@ def _merged(*files: str) -> dict[str, dict[str, Any]]:
             merged = dict(services.get(service, {}))
             merged.update(spec or {})
             services[service] = merged
-    return {s: spec for s, spec in services.items() if "full" not in spec.get("profiles", [])}
+    return {s: spec for s, spec in services.items() if not spec.get("profiles")}
 
 
 def _needs(services: dict[str, dict[str, Any]], service: str) -> set[str]:
@@ -60,13 +59,8 @@ def _needs(services: dict[str, dict[str, Any]], service: str) -> set[str]:
     return seen
 
 
-@pytest.mark.parametrize(
-    "files",
-    [("compose.yaml",), ("compose.yaml", "compose.lite.yaml")],
-    ids=["full", "lite"],
-)
-def test_secrets_readers_wait_for_secrets_init(files: tuple[str, ...]) -> None:
-    services = _merged(*files)
+def test_secrets_readers_wait_for_secrets_init() -> None:
+    services = _merged("compose.yaml")
     readers = [
         name
         for name, spec in services.items()
@@ -76,3 +70,11 @@ def test_secrets_readers_wait_for_secrets_init(files: tuple[str, ...]) -> None:
     assert readers
     missing = [name for name in readers if "secrets-init" not in _needs(services, name)]
     assert not missing, f"start before secrets-init has written their files: {missing}"
+
+
+def test_compose_is_the_full_edition_only() -> None:
+    """Docker compose is the full edition; the lite edition is the add-on (ADR 095)."""
+    assert not (COMPOSE / "compose.lite.yaml").exists()
+    services = _merged("compose.yaml")
+    assert {"seaweedfs", "dagster-daemon", "ingest-stream"} <= set(services)
+    assert "worker" not in services

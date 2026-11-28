@@ -15,9 +15,7 @@ Add-ons → xomtra → Uninstall.)
 > step 1 first.
 
 Run the commands on the server in `xomtra/deploy/compose` (the directory where you ran
-`docker compose up`). The lite edition needs the same `-f` options as at the start
-(not needed if `.env` sets `COMPOSE_FILE=compose.yaml:compose.lite.yaml`), otherwise
-Compose does not see its volume `lake-data` and its `worker`.
+`docker compose up`).
 
 ## 1. Back up the volumes (optional)
 
@@ -25,7 +23,7 @@ Stop the stack so that the databases are consistent, then pack every volume of t
 project into `~/xomtra-backup`:
 
 ```bash
-docker compose stop        # lite: docker compose -f compose.yaml -f compose.lite.yaml stop
+docker compose stop
 mkdir -p ~/xomtra-backup
 for v in $(docker volume ls -q --filter label=com.docker.compose.project=xomtra); do
   docker run --rm -v "$v":/v:ro -v ~/xomtra-backup:/b alpine \
@@ -42,14 +40,11 @@ folder. Afterwards `docker rmi alpine` removes the helper image.
 ## 2. Remove the server
 
 ```bash
-# full edition
 docker compose down -v --rmi all --remove-orphans
-# lite edition
-docker compose -f compose.yaml -f compose.lite.yaml down -v --rmi all --remove-orphans
 ```
 
 This stops and deletes the containers and the networks of the project `xomtra`, its
-volumes (`-v`: `secrets`, `postgres-data`, `seaweedfs-data` or `lake-data`,
+volumes (`-v`: `secrets`, `postgres-data`, `seaweedfs-data`,
 `caddy-data`, `caddy-config`, `mcp-data`, `ingest-data`, in Docker named `xomtra_…`)
 and the images it used (`--rmi all`: `ghcr.io/xomtra/xomtra-*`, `postgres`,
 `chrislusf/seaweedfs`). An image that another container on this machine still uses is

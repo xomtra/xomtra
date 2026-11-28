@@ -6,7 +6,7 @@ first start, and Home Assistant is connected in the browser afterwards.
 
 Requirements: Docker Engine with the Compose plugin v2 ([official install](https://docs.docker.com/engine/install/),
 check with `docker compose version`), 2 CPU
-cores and 4 GB RAM for the full edition (2 GB for the lite edition), a few GB of disk,
+cores and 4 GB RAM, a few GB of disk,
 and Home Assistant reachable from this machine, usually on port 8123
 (`http://<ha-address>:8123`).
 
@@ -44,10 +44,7 @@ link:
 ```bash
 git clone --depth 1 --branch v<version> https://github.com/xomtra/xomtra.git
 cd xomtra/deploy/compose
-# full edition
 docker compose up -d && docker compose exec admin xomtra-admin setup-link
-# or, on a small machine (lite edition: no SeaweedFS, no Dagster)
-docker compose -f compose.yaml -f compose.lite.yaml up -d && docker compose exec admin xomtra-admin setup-link
 ```
 
 `docker compose up -d` returns once the admin GUI is up (it waits for the databases,
@@ -97,7 +94,7 @@ personal token and connect Claude Desktop, Claude Code or another MCP client.
 
 To change the Home Assistant URL or token later: Overview → "Change the Home Assistant
 URL or token" (signed-in administrators only). The live stream picks up a new token
-after `docker compose restart ingest-stream` (`worker` in the lite edition).
+after `docker compose restart ingest-stream`.
 
 ## Optional settings (.env)
 
@@ -127,9 +124,9 @@ bookmarks) has to be updated.
 ## Backups
 
 Back up the Docker volumes `secrets` (passwords and keys), `postgres-data` (catalog,
-tokens, settings, the Home Assistant connection) and the lake (`seaweedfs-data`, or
-`lake-data` in the lite edition). Without the volume `secrets` the databases and the
-stored Home Assistant token cannot be opened. The simplest robust backup is a backup of
+tokens, settings, the Home Assistant connection) and the lake (`seaweedfs-data`).
+Without the volume `secrets` the databases and the stored Home Assistant token cannot
+be opened. The simplest robust backup is a backup of
 the whole virtual machine.
 
 ## Upgrading from a version with secrets in .env
