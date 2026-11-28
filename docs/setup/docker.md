@@ -74,8 +74,7 @@ On the first start the service `secrets-init`:
   service gets a file with only the values it needs, readable only by its user);
 - finds this machine's address in the LAN; the admin GUI is then at
   `https://<that address>/admin/` (the local access mode, LAN only). Open it the first
-  time through the setup link (step 2): until Home Assistant is connected, the sign-in
-  goes through Home Assistant and needs it.
+  time through the setup link (step 2).
 
 Later starts keep everything; a new version only adds keys it introduces.
 
