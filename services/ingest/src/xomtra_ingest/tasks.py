@@ -122,8 +122,33 @@ def lake_maintenance(settings: IngestSettings | None = None) -> None:
         maintenance.compact_and_expire(con, timedelta(days=s.snapshot_retention_days))
 
 
+def _has_silver_entities() -> bool:
+    with open_lake() as con:
+        return (
+            con.execute(
+                "SELECT 1 FROM duckdb_tables() WHERE database_name = ? "
+                "AND schema_name = 'silver' AND table_name = 'entities'",
+                [lake.LAKE_ALIAS],
+            ).fetchone()
+            is not None
+        )
+
+
 def profile_catalog(settings: IngestSettings | None = None) -> dict[str, Any]:
     s = settings or IngestSettings()
+    # A new installation has no silver before its first hourly ingest (:07); the catalog
+    # profiles silver, so build it first instead of failing on a missing table.
+    if not _has_silver_entities():
+        logger.info("No silver yet (new installation): running the ingest sync first")
+        sync_registries()
+        sync_statistics(s)
+        run_transform()
+        if not _has_silver_entities():
+            raise RuntimeError(
+                "silver.entities does not exist even after the ingest sync: check that "
+                "Home Assistant is connected (admin GUI, Overview) and see "
+                "`xomtra-ingest sync`"
+            )
     with open_lake() as con:
         result = catalog.profile(con, window=timedelta(days=s.catalog_window_days))
     return {"entities": result.entities, "drift": result.drift}

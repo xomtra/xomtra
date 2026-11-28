@@ -18,6 +18,13 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Docs: [Docker Compose](docs/setup/docker.md) names the admin GUI address
   `https://<address>/admin/` and that `docker compose up -d` alone does not print the
   setup link.
+- A new installation before its first catalog run: `search_catalog` and `get_findings`
+  return an empty result with a note that the catalog is not built yet, and
+  `describe_entity` says so, instead of the DuckDB error *Table with name
+  catalog_entity does not exist*.
+- `xomtra-ingest catalog` on a new installation before the first hourly ingest runs the
+  ingest sync first (registries, statistics, SQLMesh) instead of failing with *Table
+  silver.entities does not exist*.
 
 ## [0.10.0] - 2026-11-28
 
