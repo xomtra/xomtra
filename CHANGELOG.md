@@ -11,6 +11,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Changed
+
+- Admin: the heading of the page *Retention* reads "Data retention in the xomtra data
+  lake", so it is not mistaken for the retention of the Home Assistant recorder; the
+  menu item stays *Retention*.
+
 ## [0.10.0] - 2026-11-28
 
 ### Added

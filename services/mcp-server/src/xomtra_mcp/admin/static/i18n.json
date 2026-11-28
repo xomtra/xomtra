@@ -341,7 +341,8 @@
    "Shorten": "Zkrátit",
    "all kinds": "všechny druhy",
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Zatím žádný profil. Katalog se profiluje jednou denně ve 4:15; nová instalace ukáže entity po první noci.",
-   "Time zone:": "Časové pásmo:"
+   "Time zone:": "Časové pásmo:",
+   "Data retention in the xomtra data lake": "Retence dat v data lake xomtry"
   },
   "de": {
    "(max 300)": "(max. 300)",
@@ -646,7 +647,8 @@
    "Shorten": "Verkürzen",
    "all kinds": "alle Arten",
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Noch kein Profil. Der Katalog wird einmal am Tag um 04:15 profiliert; eine neue Installation zeigt ihre Entitäten nach der ersten Nacht.",
-   "Time zone:": "Zeitzone:"
+   "Time zone:": "Zeitzone:",
+   "Data retention in the xomtra data lake": "Datenaufbewahrung im Data Lake von xomtra"
   },
   "nl": {
    "(max 300)": "(max. 300)",
@@ -950,7 +952,8 @@
    "Shorten": "Inkorten",
    "all kinds": "alle soorten",
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Nog geen profiel. De catalogus wordt eens per dag om 04:15 geprofileerd; een nieuwe installatie toont haar entiteiten na de eerste nacht.",
-   "Time zone:": "Tijdzone:"
+   "Time zone:": "Tijdzone:",
+   "Data retention in the xomtra data lake": "Bewaartermijn van gegevens in het data lake van xomtra"
   },
   "pl": {
    "(max 300)": "(maks. 300)",
@@ -1257,7 +1260,8 @@
    "Shorten": "Skróć",
    "all kinds": "wszystkie rodzaje",
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Jeszcze brak profilu. Katalog jest profilowany raz dziennie o 04:15; nowa instalacja pokaże swoje encje po pierwszej nocy.",
-   "Time zone:": "Strefa czasowa:"
+   "Time zone:": "Strefa czasowa:",
+   "Data retention in the xomtra data lake": "Retencja danych w data lake xomtry"
   }
  },
  "th": {

@@ -808,7 +808,8 @@ class AdminApp:
                 [list(r.values()) for r in sizes],
                 {2, 3, 4, 5},
             )
-        return HTMLResponse(page(title, body, user.get("username")), status_code)
+        heading = "Data retention in the xomtra data lake"
+        return HTMLResponse(page(title, body, user.get("username"), heading=heading), status_code)
 
     async def retention_post(self, request: Request, user: dict[str, Any]) -> Response:
         """Store a retention period (ADR 094); shortening needs a confirmation."""
