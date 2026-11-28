@@ -141,6 +141,11 @@ def lake_overview(data: DataAccess) -> Row:
             "SELECT max(period_start) AS last_statistic FROM lake.bronze.ha_statistics "
             "WHERE period_start >= now() - INTERVAL 3 DAY",
         )
+        size = _rows(
+            cur,
+            "SELECT sum(file_size_bytes + delete_file_size_bytes) AS lake_bytes "
+            "FROM ducklake_table_info('lake')",
+        )
         kinds = _rows(
             cur,
             "SELECT kind, count(*) AS entities, count(*) FILTER (WHERE stale) AS stale, "
@@ -154,6 +159,7 @@ def lake_overview(data: DataAccess) -> Row:
     return {
         "last_state": (fresh[0]["last_state"] if fresh else None),
         "last_statistic": (stats[0]["last_statistic"] if stats else None),
+        "lake_bytes": (size[0]["lake_bytes"] if size else None),
         "kinds": kinds,
         "drift_7d": drift,
     }

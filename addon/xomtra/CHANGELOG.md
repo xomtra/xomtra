@@ -4,6 +4,8 @@
 
 ### Added
 
+- Admin: *Overview* shows the size of the data lake (its data files according to the
+  DuckLake catalog).
 - Docs: [backup and restore](docs/setup/backup.md) of the Docker Compose installation,
   cold (volumes with the stack stopped) and hot (Postgres dump first, then the lake
   files through S3 with rclone), with the reason for the order and what to restore.

@@ -140,6 +140,13 @@ def ha_host(url: str | None) -> str:
     return parts.hostname or "?"
 
 
+def lake_size(n: int | None) -> str | None:
+    """Size of the lake's data files (DuckLake catalog), in MiB or GiB."""
+    if n is None:
+        return None
+    return f"{n / 2**30:,.1f} GiB" if n >= 2**30 else f"{n / 2**20:,.1f} MiB"
+
+
 def _url_host(hostname: str) -> str:
     return f"[{hostname}]" if ":" in hostname else hostname
 
@@ -570,6 +577,7 @@ class AdminApp:
             [
                 ha_card,
                 *([disk[0]] if disk else []),
+                ("Data lake size", lake_size(lake.get("lake_bytes")), ""),
                 ("Entities in HA", ha.get("entities"), ""),
                 ("Last data state change", last_state, fresh_cls),
                 ("Last statistic", lake.get("last_statistic"), ""),
