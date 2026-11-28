@@ -58,7 +58,17 @@ from xomtra_mcp.admin.analysis import (
 )
 from xomtra_mcp.admin.answers import AnswersPage
 from xomtra_mcp.admin.config import PREFIX, AdminSettings
-from xomtra_mcp.admin.html import CSS, cards, e, fmt, page, table, token_flow
+from xomtra_mcp.admin.html import (
+    BACKUP_DOCS,
+    CSS,
+    cards,
+    e,
+    fmt,
+    out_link,
+    page,
+    table,
+    token_flow,
+)
 from xomtra_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
 from xomtra_mcp.admin.session import Signer
 from xomtra_mcp.admin.view import View, prefix
@@ -155,18 +165,28 @@ type Handler = Callable[[Request, dict[str, Any]], Awaitable[Response]]
 
 
 # The add-on keeps the lake out of Home Assistant backups (config.yaml backup_exclude).
+# Shown on the page Retention, in the section Data Lake, above the lake's tables.
 BACKUP_NOTE = (
-    "<h2 id=backups>Backups</h2>"
-    "<p class=warn>Home Assistant backups do not include xomtra's analytics. They keep "
-    "the tokens, the settings and the dismissed findings, but not the lake: the "
-    "history, the findings and the weekly summaries, which take tens of GB. After a "
-    "restore xomtra starts a new lake and loads the history again from Home "
-    "Assistant, only as far back as Home Assistant still keeps it, and computes the "
-    "findings again.<span class=more>For a robust setup with backups of the whole "
+    "<p id=backups class='warn loud'>Home Assistant backups do not include xomtra's "
+    "analytics. They keep the tokens, the settings and the dismissed findings, but not "
+    "the lake: the history, the findings and the weekly summaries, which take tens of "
+    "GB. After a restore xomtra starts a new lake and loads the history again from "
+    "Home Assistant, only as far back as Home Assistant still keeps it, and computes "
+    "the findings again.<span class=more>For a robust setup with backups of the whole "
     "history, run xomtra on its own virtual machine (Proxmox, VMware or Docker on "
     "Linux) and back up that machine.</span></p>"
 )
 
+
+# The standard (Docker) edition is outside Home Assistant backups altogether.
+STANDARD_BACKUP_NOTE = (
+    "<p id=backups class='warn loud'>Home Assistant backups do not include xomtra. "
+    "Back up the Data Lake yourself, together with the other volumes (Postgres, "
+    "secrets, Caddy); without that backup, the history that Home Assistant no longer "
+    "keeps is lost for good.<span class=more>How to back up cold or while running: "
+    + out_link(BACKUP_DOCS, "Backups of the Docker installation")
+    + "</span></p>"
+)
 
 # Shown on the page Connect clients: the local access mode only serves clients in the LAN.
 CLIENTS_NOTE = (
@@ -608,8 +628,6 @@ class AdminApp:
             if drift
             else "<p class=muted>None.</p>"
         )
-        if self.ingress:
-            body += BACKUP_NOTE
         return HTMLResponse(page("Overview", body, user.get("username")))
 
     def _disk(self) -> tuple[tuple[str, Any, str], str] | None:
@@ -752,6 +770,8 @@ class AdminApp:
             status_code = max(status_code, 503)
         stored, history = stored_all or ({}, [])
         body = note + (
+            "<p><strong>These are the retention periods of the xomtra Data Lake, not of "
+            "Home Assistant.</strong></p>"
             "<p class=muted>Applied daily at 03:30; the data files disappear 7 days later. "
             "A value saved here wins over the installation's configuration and is used by "
             "the next run, without a restart. Reset hands the period back to the "
@@ -801,6 +821,8 @@ class AdminApp:
                     for c in history
                 ],
             )
+        # Both editions: the section Data Lake starts with what backups cover.
+        body += "<h2>Data Lake</h2>" + (BACKUP_NOTE if self.ingress else STANDARD_BACKUP_NOTE)
         if self.data is not None:
             sizes = await asyncio.to_thread(status.table_sizes, self.data)
             body += "<h2>Tables in the lake</h2>" + table(
@@ -907,7 +929,7 @@ class AdminApp:
             body += "<p class=warn>The audit database is not configured for the admin GUI.</p>"
         else:
             body += table(cols, [[r.get(c) for c in cols] for r in rows], {6, 7})
-        return HTMLResponse(page("Audit", body, user.get("username")))
+        return HTMLResponse(page("Audit log", body, user.get("username")))
 
     async def recent_audit(self) -> list[dict[str, Any]] | None:
         dsn = self.settings.audit_dsn
@@ -979,7 +1001,7 @@ class AdminApp:
     async def analysis_page(
         self, request: Request, user: dict[str, Any], *, note: str = "", status_code: int = 200
     ) -> Response:
-        title = "Analysis settings"
+        title = "Analysis parameters"
         if self.analysis is None:
             body = "<p class=warn>The audit database is not configured for the admin GUI.</p>"
             return HTMLResponse(page(title, body, user.get("username")))
@@ -1369,14 +1391,14 @@ class AdminApp:
         return HTMLResponse(page(title, body, user.get("username")))
 
     async def tokens_page(self, request: Request, user: dict[str, Any]) -> Response:
-        refused = self._local_only(user, "Tokens")
+        refused = self._local_only(user, "MCP tokens")
         if refused is not None or self.tokens is None:
             return refused or Response(status_code=404)
         try:
             items = await asyncio.to_thread(self.tokens.list)
         except TokenStoreError:
             return HTMLResponse(
-                page("Tokens", "<p class=bad>The token store is unavailable.</p>", None), 503
+                page("MCP tokens", "<p class=bad>The token store is unavailable.</p>", None), 503
             )
         roles = "".join(f"<option>{e(r)}</option>" for r in TOKEN_ROLES)
         days = "".join(
@@ -1429,14 +1451,14 @@ class AdminApp:
                 trusted_html={7},
             )
         )
-        return HTMLResponse(page("Tokens", body, user.get("username")))
+        return HTMLResponse(page("MCP tokens", body, user.get("username")))
 
     async def _form(self, request: Request, limit: int = 10_000) -> dict[str, str]:
         raw = (await request.body())[:limit].decode(errors="replace")
         return {k: v[0].strip() for k, v in parse_qs(raw).items() if v}
 
     async def token_issue(self, request: Request, user: dict[str, Any]) -> Response:
-        refused = self._local_only(user, "Tokens")
+        refused = self._local_only(user, "MCP tokens")
         if refused is not None or self.tokens is None:
             return refused or Response(status_code=404)
         form = await self._form(request)
@@ -1448,7 +1470,7 @@ class AdminApp:
             days = -1
         if not owner or not description or role not in TOKEN_ROLES or days not in TOKEN_DAYS:
             return HTMLResponse(
-                page("Tokens", "<p class=bad>Fill in all fields.</p>", user.get("username")),
+                page("MCP tokens", "<p class=bad>Fill in all fields.</p>", user.get("username")),
                 400,
             )
         try:
@@ -1474,7 +1496,7 @@ class AdminApp:
         except (TokenStoreError, AuditError):
             return HTMLResponse(
                 page(
-                    "Tokens",
+                    "MCP tokens",
                     "<p class=bad>Not issued: the token store or audit is unavailable.</p>",
                     user.get("username"),
                 ),
@@ -1492,7 +1514,7 @@ class AdminApp:
         return HTMLResponse(page("New token", body, user.get("username")))
 
     async def token_revoke(self, request: Request, user: dict[str, Any]) -> Response:
-        refused = self._local_only(user, "Tokens")
+        refused = self._local_only(user, "MCP tokens")
         if refused is not None or self.tokens is None:
             return refused or Response(status_code=404)
         token_id = (await self._form(request)).get("id", "")[:40]
@@ -1508,7 +1530,7 @@ class AdminApp:
         except (TokenStoreError, AuditError):
             return HTMLResponse(
                 page(
-                    "Tokens",
+                    "MCP tokens",
                     "<p class=bad>The token store or audit is unavailable.</p>",
                     user.get("username"),
                 ),
@@ -1755,7 +1777,7 @@ class AdminApp:
         if refused is not None:
             return refused
         body = (
-            f"<p>Issue a personal token on <a href='{prefix()}/tokens'>Tokens</a> first, one "
+            f"<p>Issue a personal token on <a href='{prefix()}/tokens'>MCP tokens</a> first, one "
             "per person and device.</p>" + CLIENTS_NOTE + self._connect_help()
         )
         return HTMLResponse(page("Connect clients", body, user.get("username")))

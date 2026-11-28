@@ -5,7 +5,7 @@ Two layers, strongest first (ADR 090):
 1. The core rules below. They are part of the code, cannot be edited or turned off and
    come before any answer guidelines set.
 2. The active answer guidelines set: a named text kept in this installation's database
-   and chosen on the admin page Answers. The factory sets ship with the code (read only,
+   and chosen on the admin page MCP setup. The factory sets ship with the code (read only,
    updated with releases); custom sets are written by the operator. "Core only" sends
    no set at all.
 

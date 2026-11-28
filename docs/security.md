@@ -151,7 +151,7 @@ How to verify a released image: [releasing.md](releasing.md); a build of `main`:
   fixed core rules (no conclusions about a person's presence, sleep or health unless
   asked, only fetched values, xomtra only reads, no jokes about accidents or threats to
   life and health, nothing discriminating, political or religious) and the answer
-  guidelines set chosen on the admin page Answers. The sets are kept in the local audit
+  guidelines set chosen on the admin page MCP setup. The sets are kept in the local audit
   database; no text for the model comes from xomtra.com or any other central service.
   Only administrators can change them. They guide the model; they are not a security
   boundary.

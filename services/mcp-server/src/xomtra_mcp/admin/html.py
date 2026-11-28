@@ -106,6 +106,8 @@ p.ok, p.bad, p.warn { color:var(--ink); background:var(--surface); border:1px so
   border-left:3px solid var(--c); border-radius:8px; padding:10px 14px; }
 p.ok { --c:var(--ok); } p.bad { --c:var(--bad); } p.warn { --c:var(--warn); }
 p .more { display:block; margin-top:8px; color:var(--muted); }
+p.loud { border-color:var(--c); border-left-width:5px; font-weight:500; padding:14px 18px; }
+p.loud .more { font-weight:400; }
 .scroll + p, .scroll + h2 + p { margin-top:14px; }
 .scroll { overflow-x:auto; background:var(--surface); border:1px solid var(--line);
   border-radius:12px; }
@@ -220,14 +222,14 @@ MARK = (
 NAV = (
     ("/", "Overview"),
     ("/findings", "Findings"),
-    ("/answers", "Answers"),
-    ("/tokens", "Tokens"),
+    ("/answers", "MCP setup"),
+    ("/tokens", "MCP tokens"),
     ("/access", "Access"),
     ("/catalog", "Catalog"),
     ("/drift", "Entity changes"),
     ("/retention", "Retention"),
-    ("/analysis", "Analysis settings"),
-    ("/audit", "Audit"),
+    ("/analysis", "Analysis parameters"),
+    ("/audit", "Audit log"),
 )
 
 
@@ -248,6 +250,13 @@ def _out(href: str, label: str) -> str:
 
 
 _REPO = "https://github.com/xomtra/xomtra"
+BACKUP_DOCS = f"{_REPO}/blob/main/docs/setup/backup.md"
+
+
+def out_link(href: str, label: str) -> str:
+    return _out(href, label)
+
+
 FOOTER = (
     "<footer>"
     + _out(f"{_REPO}/releases/tag/v{__version__}", f"<code>xomtra {escape(__version__)}</code>")

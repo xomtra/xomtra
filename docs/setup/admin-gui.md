@@ -14,9 +14,9 @@ sign-ins of the Claude connector, each with **Disconnect**.
 | Drift | changes between daily profiles, last 30 days |
 | Retention | retention periods of states, 5-minute and hourly statistics, each with its cut-off date, a form to change it and the history of changes; size of every lake table |
 | Findings | confidence of the last correlation runs (low power, area coverage, analysed entities without an area, ADR 067), current findings with *Dismiss* (for good or for 30/90/365 days, with a reason) and the list of dismissed findings with *Undo* |
-| Analysis settings | thresholds of correlations, anomalies and change points (target q, minimum \|r\|, z cap, windows, method, display of indirect and common-factor relations), with a preview of their effect on the current findings and the history of changes |
-| Audit | last 200 calls of MCP tools and of this GUI, with the identity provider (`entra`, `ha`, `token`) |
-| Tokens | local access only: issue and revoke personal tokens, connect instructions and the Claude Desktop extension ([local access](local-access.md)) |
+| Analysis parameters | thresholds of correlations, anomalies and change points (target q, minimum \|r\|, z cap, windows, method, display of indirect and common-factor relations), with a preview of their effect on the current findings and the history of changes |
+| Audit log | last 200 calls of MCP tools and of this GUI, with the identity provider (`entra`, `ha`, `token`) |
+| MCP tokens | local access only: issue and revoke personal tokens, connect instructions and the Claude Desktop extension ([local access](local-access.md)) |
 | Dagster | the Dagster UI (`/admin/dagster/`): runs, schedules, launching jobs |
 
 ### Retention (ADR 094)
@@ -32,7 +32,7 @@ Home Assistant still keeps). Changes are stored like the analysis settings (sche
 `analysis` of the audit database, with who, when, value and reason) and every change is
 in the audit (`admin:retention_setting`, with the previous value).
 
-### Analysis settings (ADR 060)
+### Analysis parameters (ADR 060)
 
 A value saved on this page wins over the ingest's environment variable
 (`XOMTRA_CORRELATION_MAX_Q`, …), which wins over the default. The next analysis run
