@@ -229,7 +229,7 @@ jobs:
               assert err.code == 401, err.code
           print(urllib.request.urlopen("http://127.0.0.1:8000/.well-known/oauth-protected-resource/mcp").read())
           PY
-      - name: Smoke test lite lake (Postgres catalog + local data files, ADR 050)
+      - name: Smoke test local lake of the add-on (Postgres catalog + local data files, ADR 050)
         working-directory: deploy/compose
         run: |
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres \
@@ -259,7 +259,7 @@ jobs:
             | tail -n 1)
           export XOMTRA_HA_TOKEN
           echo "::add-mask::$XOMTRA_HA_TOKEN"
-          # Token of the throwaway CI Home Assistant, reused by the lite smoke test.
+          # Token of the throwaway CI Home Assistant, reused by the zero-config smoke test.
           echo "XOMTRA_HA_TOKEN=$XOMTRA_HA_TOKEN" >> "$GITHUB_ENV"
           docker compose up -d --wait --wait-timeout 240 ingest-stream dagster-daemon dagster-webserver
           docker compose exec -T dagster-daemon xomtra-ingest sync
@@ -412,37 +412,6 @@ jobs:
                   assert target in err.headers["location"], (path, err.headers["location"])
           print(urllib.request.urlopen("http://dagster-webserver:3000/admin/dagster/server_info").read())
           PY
-      - name: Smoke test lite edition (worker, local lake, no SeaweedFS/Dagster, ADR 050)
-        working-directory: deploy/compose
-        env:
-          COMPOSE_PROJECT_NAME: xomtra-lite
-          COMPOSE_FILE: compose.yaml:compose.lite.yaml
-        run: |
-          services=$(docker compose config --services | sort | tr '\n' ' ')
-          echo "$services"
-          [ "$services" = "admin caddy ducklake-init mcp postgres postgres-init secrets-init worker " ]
-          docker compose up -d --wait --wait-timeout 180 mcp
-          docker compose up --no-start worker
-          docker network connect xomtra-lite_egress ha
-          # One job through the run store (ops DB), then the worker itself.
-          docker compose run --rm --no-deps -T worker xomtra-ingest job ingest_hourly
-          docker compose up -d --wait --wait-timeout 240 worker
-          docker compose exec -T worker xomtra-ingest runs | tee /tmp/runs.json
-          grep -q '"status": "success"' /tmp/runs.json
-          docker compose exec -T worker python - <<'PY'
-          import os
-          from hacore import lake
-          settings = lake.LakeSettings.from_env()
-          assert settings.is_local, settings
-          con = lake.connect(settings)
-          (n,) = con.execute("SELECT count(*) FROM lake.bronze.ha_registry").fetchone()
-          print("registry rows", n)
-          assert n > 0
-          files = [f for _, _, fs in os.walk("/lake") for f in fs if f.endswith(".parquet")]
-          print("parquet files in /lake", len(files))
-          assert files
-          PY
-          docker compose exec -T mcp python -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8000/healthz').read())"
       - name: Smoke test zero-config install (no .env, setup page, ADR 077)
         working-directory: deploy/compose
         env:
@@ -514,7 +483,6 @@ jobs:
         working-directory: deploy/compose
         run: |
           docker compose logs --no-color || true
-          docker compose -p xomtra-lite -f compose.yaml -f compose.lite.yaml logs --no-color || true
           docker compose -p xomtra-fresh logs --no-color || true
 
   # Home Assistant add-on (lite edition in one container): build, scan and start it like
