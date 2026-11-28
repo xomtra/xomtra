@@ -63,7 +63,7 @@ Retention wins over them and applies from the next run, without a restart
 `XOMTRA_EDITION` selects the defaults of a resource profile; every value can still be
 set explicitly with its own variable.
 
-| | `full` (default, compose/VM) | `lite` (HA add-on, small machines) |
+| | `full` (Docker compose, VM) | `lite` (Home Assistant add-on only) |
 |---|---|---|
 | Lake data files | object storage (`XOMTRA_S3_*`) | local directory `XOMTRA_LAKE_DATA_PATH` |
 | State / 5-minute / hourly retention | 365 / 365 / 1825 days | 90 / 90 / 1825 days |
@@ -73,17 +73,12 @@ set explicitly with its own variable.
 system; the `XOMTRA_S3_*` variables are then not needed and the DuckLake catalog stays
 in Postgres. Keep the directory on an SSD, not on an SD card or eMMC.
 
-**Lite stack with Docker compose.** `compose.lite.yaml` turns `compose.yaml` into the
-lite edition: no SeaweedFS and no Dagster; the lake data files are in the volume
-`lake-data`, and one `worker` container (`xomtra-ingest worker`) runs the live stream
-and the scheduled jobs with the same schedules as Dagster (hourly ingest at :07,
-retention 03:30, analyses 04:15, weekly snapshot Monday 07:00, in `XOMTRA_TIMEZONE`).
-
-```bash
-docker compose -f compose.yaml -f compose.lite.yaml up -d
-docker compose -f compose.yaml -f compose.lite.yaml exec worker xomtra-ingest runs
-docker compose -f compose.yaml -f compose.lite.yaml exec worker xomtra-ingest job catalog_daily
-```
+**Worker of the add-on.** The Docker compose installation is always the full edition
+(ADR 095): it is meant for a machine with enough memory, not for a small server. The
+lite edition runs only in the [Home Assistant add-on](home-assistant-addon.md), where
+one `worker` process (`xomtra-ingest worker`) runs the live stream and the scheduled
+jobs with the same schedules as Dagster (hourly ingest at :07, retention 03:30,
+analyses 04:15, weekly snapshot Monday 07:00, in the time zone of Home Assistant).
 
 The worker records its runs in the Postgres database `ops` (`worker.job_run`, kept 90
 days). Jobs run one at a time; a schedule missed while the worker was down runs once

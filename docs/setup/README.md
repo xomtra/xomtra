@@ -8,7 +8,7 @@ Quick start: [Docker Compose](docker.md) – `docker compose up -d`, then connec
 Assistant in the browser (ADR 077); [local access](local-access.md) – LAN only,
 personal tokens for Claude Desktop, Claude Code and other MCP clients, sign-in to the
 admin GUI with a [Home Assistant account](ha-login.md). Backups and restore:
-[backup.md](backup.md).
+[backup.md](backup.md). To remove it again completely: [uninstall](uninstall.md).
 
 Home Assistant add-on (lite edition, in development): [home-assistant-addon.md](home-assistant-addon.md).
 

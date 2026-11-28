@@ -6,7 +6,7 @@
 # up front, the setup page is then skipped) or for the public access mode.
 #
 #   ./init-env.sh            interactive; answers can also come from the environment:
-#   XOMTRA_ACCESS_MODE=local XOMTRA_LOCAL_HOST=xomtra.lan \
+#   XOMTRA_ACCESS_MODE=local XOMTRA_LOCAL_HOST=xomtra.home.arpa \
 #   XOMTRA_HA_URL=http://homeassistant.lan:8123 XOMTRA_HA_TOKEN=... ./init-env.sh
 #
 #   ./init-env.sh --fill     keep an existing .env, only add keys of the current template.

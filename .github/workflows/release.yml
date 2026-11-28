@@ -128,6 +128,11 @@ jobs:
               echo "$var=$REGISTRY/$image:$VERSION@$digest"
             done < digests.txt
           } > "dist/xomtra-$VERSION-images.env"
+          # The compose directory of this tag, so that an installation needs curl but not git.
+          # Same layout as a clone (xomtra/deploy/compose), covered by SHA256SUMS.
+          git archive --format=tar.gz --prefix=xomtra/ HEAD deploy/compose LICENSE NOTICE \
+            > "dist/xomtra-$VERSION-compose.tar.gz"
+          tar -tzf "dist/xomtra-$VERSION-compose.tar.gz" | grep -x 'xomtra/deploy/compose/compose.yaml' > /dev/null
           # Claude Desktop extension (ADR 056), built by the code of the released image.
           mcp_digest=$(awk '$1 == "xomtra-mcp" { print $2 }' digests.txt)
           docker run --rm --network none --entrypoint python \
@@ -159,6 +164,9 @@ jobs:
             echo
             echo "Home Assistant add-on: add \`https://github.com/$GH_REPO\` to the repositories"
             echo "of the add-on store; it installs \`xomtra-addon-{amd64,aarch64}:$VERSION\`."
+            echo
+            echo "Docker Compose without git: \`xomtra-$VERSION-compose.tar.gz\` holds"
+            echo "\`xomtra/deploy/compose\` of this tag (checked by \`SHA256SUMS\`)."
             echo
             echo "Claude Desktop extension for the local access mode: \`xomtra-$VERSION.mcpb\`"
             echo "(also offered with the server address filled in by the admin GUI)."

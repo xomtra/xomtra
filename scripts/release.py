@@ -33,7 +33,6 @@ PYPROJECTS = (
 # Files whose default image references follow the release version.
 IMAGE_REFERENCES = (
     "deploy/compose/compose.yaml",
-    "deploy/compose/compose.lite.yaml",
     "deploy/compose/.env.example",
 )
 IMAGES = ("xomtra-mcp", "xomtra-ingest", "xomtra-caddy")

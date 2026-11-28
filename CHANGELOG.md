@@ -28,6 +28,24 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   Upgrade note: nothing to do. `XOMTRA_*_RETENTION_DAYS` in `.env` and the add-on's
   options `*_retention_days` keep working and are now the default that a value saved in
   the admin GUI overrides.
+- Docs: complete uninstall of the Docker Compose installation
+  ([docs/setup/uninstall.md](docs/setup/uninstall.md)): optional backup of the volumes,
+  `docker compose down -v --rmi all`, the Claude clients and the CA certificate, the
+  token and user in Home Assistant, and the public setup.
+- Release asset `xomtra-<version>-compose.tar.gz` with `xomtra/deploy/compose` of the
+  tag, covered by `SHA256SUMS`: Docker Compose installs and upgrades without git.
+- Docs: cosign runs in its official container pinned by digest, no installation needed.
+
+### Removed
+
+- Docker compose: the lite override `deploy/compose/compose.lite.yaml` (ADR 095). The
+  Docker compose installation is the full edition only (SeaweedFS, Dagster); it is
+  meant for a machine with enough memory, not for a small server. The lite edition
+  (worker, lake on the local disk) stays in the Home Assistant add-on. Upgrade note:
+  installations started with `compose.lite.yaml` (or `COMPOSE_FILE=...:compose.lite.yaml`
+  in `.env`) keep the file from their current version; their lake is in the volume
+  `lake-data` and does not move to SeaweedFS. To move to the full edition, install it
+  anew (new volumes); it loads the history again from what Home Assistant still holds.
 
 ### Fixed
 
