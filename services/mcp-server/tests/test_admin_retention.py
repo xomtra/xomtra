@@ -43,6 +43,12 @@ async def test_retention_says_it_is_the_xomtra_data_lake() -> None:
     assert "retention periods of the xomtra Data Lake, not of Home Assistant." in en
     assert "<h1>Uchovávání</h1>" in cs
     assert "nastavení retence v Data Lake xomtry, nikoli v Home Assistantu." in cs
+    # The standard (Docker) edition: the section Data Lake points to its own backups.
+    lake = en.split("<h2>Data Lake</h2>", 1)[1]
+    assert "Home Assistant backups do not include xomtra. Back up the Data Lake" in lake
+    assert "docs/setup/backup.md" in lake
+    assert "class='warn loud'" in lake
+    assert "Data Lake zálohujte sami" in cs
 
 
 async def test_retention_save_longer_validate_reset() -> None:

@@ -250,6 +250,13 @@ def _out(href: str, label: str) -> str:
 
 
 _REPO = "https://github.com/xomtra/xomtra"
+BACKUP_DOCS = f"{_REPO}/blob/main/docs/setup/backup.md"
+
+
+def out_link(href: str, label: str) -> str:
+    return _out(href, label)
+
+
 FOOTER = (
     "<footer>"
     + _out(f"{_REPO}/releases/tag/v{__version__}", f"<code>xomtra {escape(__version__)}</code>")

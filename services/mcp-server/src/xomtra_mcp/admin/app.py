@@ -58,7 +58,17 @@ from xomtra_mcp.admin.analysis import (
 )
 from xomtra_mcp.admin.answers import AnswersPage
 from xomtra_mcp.admin.config import PREFIX, AdminSettings
-from xomtra_mcp.admin.html import CSS, cards, e, fmt, page, table, token_flow
+from xomtra_mcp.admin.html import (
+    BACKUP_DOCS,
+    CSS,
+    cards,
+    e,
+    fmt,
+    out_link,
+    page,
+    table,
+    token_flow,
+)
 from xomtra_mcp.admin.oidc import EntraOIDC, LoginError, LoginTransaction
 from xomtra_mcp.admin.session import Signer
 from xomtra_mcp.admin.view import View, prefix
@@ -167,6 +177,16 @@ BACKUP_NOTE = (
     "Linux) and back up that machine.</span></p>"
 )
 
+
+# The standard (Docker) edition is outside Home Assistant backups altogether.
+STANDARD_BACKUP_NOTE = (
+    "<p id=backups class='warn loud'>Home Assistant backups do not include xomtra. "
+    "Back up the Data Lake yourself, together with the other volumes (Postgres, "
+    "secrets, Caddy); without that backup, the history that Home Assistant no longer "
+    "keeps is lost for good.<span class=more>How to back up cold or while running: "
+    + out_link(BACKUP_DOCS, "Backups of the Docker installation")
+    + "</span></p>"
+)
 
 # Shown on the page Connect clients: the local access mode only serves clients in the LAN.
 CLIENTS_NOTE = (
@@ -801,10 +821,8 @@ class AdminApp:
                     for c in history
                 ],
             )
-        if self.ingress or self.data is not None:
-            body += "<h2>Data Lake</h2>"
-        if self.ingress:
-            body += BACKUP_NOTE
+        # Both editions: the section Data Lake starts with what backups cover.
+        body += "<h2>Data Lake</h2>" + (BACKUP_NOTE if self.ingress else STANDARD_BACKUP_NOTE)
         if self.data is not None:
             sizes = await asyncio.to_thread(status.table_sizes, self.data)
             body += "<h2>Tables in the lake</h2>" + table(
