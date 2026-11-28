@@ -11,18 +11,6 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
-### Changed
-
-- Docs: the installation is split into two separate paths. **Local access** (LAN or
-  VPN, personal tokens) is the default and the first one in
-  [docker.md](docs/setup/docker.md) and [the setup overview](docs/setup/README.md);
-  **access from the internet** for claude.ai ([claude-connector.md](docs/setup/claude-connector.md))
-  is an advanced guide on top of it: requirements, the switch in `.env` with
-  `docker compose up -d --force-recreate`, what stops working (personal tokens) and the
-  way back. It states that an installation runs one access mode at a time and that the
-  admin GUI cannot switch it, and that the Home Assistant sign-in of the connector needs
-  `XOMTRA_HA_URL` in `.env`.
-
 ## [0.10.0] - 2026-11-28
 
 ### Added
@@ -51,6 +39,16 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Docs: cosign runs in its official container pinned by digest, no installation needed.
 
 ### Changed
+
+- Docs: the installation is split into two separate paths. **Local access** (LAN or
+  VPN, personal tokens) is the default and the first one in
+  [docker.md](docs/setup/docker.md) and [the setup overview](docs/setup/README.md);
+  **access from the internet** for claude.ai ([claude-connector.md](docs/setup/claude-connector.md))
+  is an advanced guide on top of it: requirements, the switch in `.env` with
+  `docker compose up -d --force-recreate`, what stops working (personal tokens) and the
+  way back. It states that an installation runs one access mode at a time and that the
+  admin GUI cannot switch it, and that the Home Assistant sign-in of the connector needs
+  `XOMTRA_HA_URL` in `.env`.
 
 - Docs: Docker Compose installs and upgrades from the release archive
   `xomtra-<version>-compose.tar.gz` checked with `SHA256SUMS` (`curl` and `tar`, no
