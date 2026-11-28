@@ -11,6 +11,11 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Fixed
+
+- Local access: `https://<address>/` redirects to the admin GUI (`/admin/`) instead of
+  answering "Not found".
+
 ## [0.10.0] - 2026-11-28
 
 ### Added
