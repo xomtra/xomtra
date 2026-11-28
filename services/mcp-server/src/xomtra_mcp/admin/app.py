@@ -571,7 +571,7 @@ class AdminApp:
                 ha_card,
                 *([disk[0]] if disk else []),
                 ("Entities in HA", ha.get("entities"), ""),
-                ("Last state in lake", last_state, fresh_cls),
+                ("Last data state change", last_state, fresh_cls),
                 ("Last statistic", lake.get("last_statistic"), ""),
             ]
         )

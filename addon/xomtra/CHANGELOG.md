@@ -35,6 +35,8 @@
 - Admin: the Home Assistant card on *Overview* and after the setup shows the address
   (FQDN or IP) of the connected Home Assistant instead of its version and response time;
   in the add-on it says *this Home Assistant*.
+- Admin: the *Overview* card *Last state in lake* is now *Last data state change*; it is
+  the time of the newest state change stored in the lake, not of a page refresh.
 
 ### Removed
 
