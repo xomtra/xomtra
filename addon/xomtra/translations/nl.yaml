@@ -4,13 +4,13 @@ configuration:
     description: Logniveau van de xomtra-diensten.
   states_retention_days:
     name: Statusgeschiedenis (dagen)
-    description: Hoeveel dagen statusgeschiedenis in het lake blijven.
+    description: Hoeveel dagen statusgeschiedenis in het lake blijven. Standaardwaarde; de pagina Bewaartermijn in het beheer van xomtra kan die overschrijven.
   statistics_5min_retention_days:
     name: 5-minutenstatistieken (dagen)
-    description: Hoeveel dagen 5-minutenstatistieken in het lake blijven.
+    description: Hoeveel dagen 5-minutenstatistieken in het lake blijven. Standaardwaarde; de pagina Bewaartermijn in het beheer van xomtra kan die overschrijven.
   statistics_hour_retention_days:
     name: Uurstatistieken (dagen)
-    description: Hoeveel dagen uurstatistieken in het lake blijven.
+    description: Hoeveel dagen uurstatistieken in het lake blijven. Standaardwaarde; de pagina Bewaartermijn in het beheer van xomtra kan die overschrijven.
   mcp_url:
     name: MCP-adres
     description: >-

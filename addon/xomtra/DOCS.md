@@ -46,6 +46,11 @@ The **Overview** shows the free space of the disk. Below 10 % free xomtra runs i
 retention early; below 3 % it pauses collecting until there is space again and then
 catches up from Home Assistant's history.
 
+The retention periods (state history, 5-minute and hourly statistics) are set on the
+page **Retention** of xomtra's admin. The add-on's options of the same name are only the
+default; a value saved in the admin wins, applies from the next nightly run and needs no
+restart.
+
 ## Backups
 
 Home Assistant backups do not include xomtra's analytics. They keep the tokens, the

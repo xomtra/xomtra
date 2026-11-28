@@ -285,7 +285,7 @@ def test_values_are_formatted_for_the_locale() -> None:
     assert fmt(31204118) == '<data class="n" value="31204118">31,204,118</data>'
     assert fmt(0.9812, pct=True) == '<data class="p" value="0.9812">98.1%</data>'
     assert fmt(datetime(2026, 11, 26, 7, 20, tzinfo=UTC)) == (
-        '<time datetime="2026-11-26T07:20:00Z">2026-11-26 07:20 UTC</time>'
+        '<time datetime="2026-11-26T07:20:00Z">11/26/2026 07:20 UTC</time>'
     )
     assert 'datetime="2026-11-26T07:20:00Z"' in fmt("2026-11-26 07:20:00")  # naive = UTC
     assert fmt(True) == "True"

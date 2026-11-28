@@ -76,7 +76,9 @@
   }
 
   function dateParts(d, withTime) {
-    var opts = { year: "numeric", month: "2-digit", day: "2-digit", timeZone: timeZone };
+    // Czech writes 1. 5. 2026, the others pad day and month (27.05.2026); html.py the same.
+    var digits = String(lang).toLowerCase().indexOf("cs") === 0 && !loc.date_format ? "numeric" : "2-digit";
+    var opts = { year: "numeric", month: digits, day: digits, timeZone: timeZone };
     if (withTime) {
       opts.hour = "2-digit";
       opts.minute = "2-digit";

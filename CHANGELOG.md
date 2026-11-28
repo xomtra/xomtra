@@ -11,8 +11,25 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Added
+
+- Retention set in the admin GUI: the page Retention has a form for each of the three
+  periods (states, 5-minute statistics, hourly statistics; 1 to 3650 days), with a
+  reason, the history of changes and *Reset*. A saved period wins over the
+  installation's configuration and applies from the next retention run, without a
+  restart; a shorter period asks for a confirmation, because the next run deletes the
+  older data. Every change is in the audit (ADR 094). The page no longer tells you to
+  edit `.env` or restart containers.
+
+  Upgrade note: nothing to do. `XOMTRA_*_RETENTION_DAYS` in `.env` and the add-on's
+  options `*_retention_days` keep working and are now the default that a value saved in
+  the admin GUI overrides.
+
 ### Fixed
 
+- Admin GUI: dates are written as the language of the admin writes them (for example
+  27. 11. 2025 in Czech, 27.11.2025 in German) already on the server, and the cut-off
+  date on Retention is formatted like every other date (it was ISO).
 - Admin GUI: the page Catalog of a new installation explains that the catalog is
   profiled once a day at 04:15 (in `XOMTRA_TIMEZONE`) and shows its entities after the
   first night, instead of an empty table; the empty choice of the kind filter reads

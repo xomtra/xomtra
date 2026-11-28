@@ -15,7 +15,7 @@ from typing import Any, Protocol
 
 import duckdb
 
-from hacore.analysis_settings import BY_KEY, Value
+from hacore.analysis_settings import STORED_BY_KEY, Value
 from xomtra_mcp.data import DataAccess
 
 
@@ -170,7 +170,7 @@ class PostgresSettingsStore:
     def set(self, key: str, value: Value | None, *, by: str | None, reason: str | None) -> None:
         from psycopg2.extras import Json  # noqa: PLC0415
 
-        if key not in BY_KEY:
+        if key not in STORED_BY_KEY:
             raise SettingsStoreError(f"unknown setting {key}")
         self._run(
             "INSERT INTO analysis.setting_change (key, value, changed_by, reason) "

@@ -4,13 +4,13 @@ configuration:
     description: Log-Level der xomtra-Dienste.
   states_retention_days:
     name: Zustandsverlauf (Tage)
-    description: Wie viele Tage Zustandsverlauf im Lake bleiben.
+    description: Wie viele Tage Zustandsverlauf im Lake bleiben. Standardwert; die Seite Aufbewahrung in der Verwaltung von xomtra kann ihn überschreiben.
   statistics_5min_retention_days:
     name: 5-Minuten-Statistiken (Tage)
-    description: Wie viele Tage 5-Minuten-Statistiken im Lake bleiben.
+    description: Wie viele Tage 5-Minuten-Statistiken im Lake bleiben. Standardwert; die Seite Aufbewahrung in der Verwaltung von xomtra kann ihn überschreiben.
   statistics_hour_retention_days:
     name: Stündliche Statistiken (Tage)
-    description: Wie viele Tage stündliche Statistiken im Lake bleiben.
+    description: Wie viele Tage stündliche Statistiken im Lake bleiben. Standardwert; die Seite Aufbewahrung in der Verwaltung von xomtra kann ihn überschreiben.
   mcp_url:
     name: MCP-Adresse
     description: >-

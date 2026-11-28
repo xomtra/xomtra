@@ -70,3 +70,24 @@ def test_unreachable_database_falls_back(caplog: pytest.LogCaptureFixture) -> No
 
 def test_no_database_means_no_dismissals() -> None:
     assert analysis_store.load_dismissals(IngestSettings(ops_pg_password=SecretStr(""))) == []
+
+
+def test_stored_retention_wins_over_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR 094: a retention period stored in the admin GUI wins over the environment;
+    the GUI's bounds are accepted by the ingest."""
+    from hacore.analysis_settings import RETENTION_SPECS
+
+    monkeypatch.setenv("XOMTRA_EDITION", "lite")
+    monkeypatch.setenv("XOMTRA_STATISTICS_5MIN_RETENTION_DAYS", "60")
+    s = IngestSettings(edition="lite")
+    out = analysis_store.with_overrides(s, {"states_retention_days": 30})
+    assert out.states_retention_days == 30
+    assert out.statistics_5min_retention_days == 60
+    assert out.retention.states.days == 30
+    for spec in RETENTION_SPECS:
+        assert spec.key in IngestSettings.model_fields
+        for edge in (spec.lo, spec.hi):
+            IngestSettings(**{spec.key: int(edge)})  # type: ignore[arg-type]
+    values, problems = parse_stored([("states_retention_days", 0), ("states_retention_days", 30)])
+    assert values == {"states_retention_days": 30}
+    assert len(problems) == 1

@@ -120,7 +120,7 @@ async def test_admin_sign_in_pages_and_audit(data: DataAccess) -> None:
             ("/admin/", "Catalog"),
             ("/admin/catalog?q=teplota", "sensor.temp"),
             ("/admin/drift", "Entity changes"),
-            ("/admin/retention", "XOMTRA_STATES_RETENTION_DAYS"),
+            ("/admin/retention", "Hourly statistics"),
             ("/admin/audit", "not configured"),
         ]:
             resp = await client.get(path)
