@@ -123,15 +123,13 @@ def lake_maintenance(settings: IngestSettings | None = None) -> None:
 
 
 def _has_silver_entities() -> bool:
+    """Whether silver.entities exists (SQLMesh publishes it as a view)."""
     with open_lake() as con:
-        return (
-            con.execute(
-                "SELECT 1 FROM duckdb_tables() WHERE database_name = ? "
-                "AND schema_name = 'silver' AND table_name = 'entities'",
-                [lake.LAKE_ALIAS],
-            ).fetchone()
-            is not None
-        )
+        try:
+            con.execute(f"SELECT 1 FROM {lake.LAKE_ALIAS}.silver.entities LIMIT 0")  # noqa: S608
+        except duckdb.CatalogException:
+            return False
+    return True
 
 
 def profile_catalog(settings: IngestSettings | None = None) -> dict[str, Any]:
