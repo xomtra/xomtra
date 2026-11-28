@@ -11,6 +11,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-28
+
 ### Added
 
 - Docs: [backup and restore](docs/setup/backup.md) of the Docker Compose installation,
@@ -35,6 +37,12 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 - Release asset `xomtra-<version>-compose.tar.gz` with `xomtra/deploy/compose` of the
   tag, covered by `SHA256SUMS`: Docker Compose installs and upgrades without git.
 - Docs: cosign runs in its official container pinned by digest, no installation needed.
+
+### Changed
+
+- Docs: Docker Compose installs and upgrades from the release archive
+  `xomtra-<version>-compose.tar.gz` checked with `SHA256SUMS` (`curl` and `tar`, no
+  git); [docs/setup/docker.md](docs/setup/docker.md) has a new section *Upgrade*.
 
 ### Removed
 
@@ -663,7 +671,8 @@ with Entra ID as before.
 - Role `HAmmond.Reader` no longer sees state attributes; audit records are kept for
   90 days (`AUDIT_RETENTION_DAYS`) (#17).
 
-[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/xomtra/xomtra/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/xomtra/xomtra/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/xomtra/xomtra/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/xomtra/xomtra/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/xomtra/xomtra/compare/v0.8.0...v0.9.0

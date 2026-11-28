@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.10.0 - 2026-11-28
+
+### Added
+
+- Docs: [backup and restore](docs/setup/backup.md) of the Docker Compose installation,
+  cold (volumes with the stack stopped) and hot (Postgres dump first, then the lake
+  files through S3 with rclone), with the reason for the order and what to restore.
+
+- Retention set in the admin GUI: the page Retention has a form for each of the three
+  periods (states, 5-minute statistics, hourly statistics; 1 to 3650 days), with a
+  reason, the history of changes and *Reset*. A saved period wins over the
+  installation's configuration and applies from the next retention run, without a
+  restart; a shorter period asks for a confirmation, because the next run deletes the
+  older data. Every change is in the audit (ADR 094). The page no longer tells you to
+  edit `.env` or restart containers.
+
+  Upgrade note: nothing to do. `XOMTRA_*_RETENTION_DAYS` in `.env` and the add-on's
+  options `*_retention_days` keep working and are now the default that a value saved in
+  the admin GUI overrides.
+- Docs: complete uninstall of the Docker Compose installation
+  ([docs/setup/uninstall.md](docs/setup/uninstall.md)): optional backup of the volumes,
+  `docker compose down -v --rmi all`, the Claude clients and the CA certificate, the
+  token and user in Home Assistant, and the public setup.
+- Release asset `xomtra-<version>-compose.tar.gz` with `xomtra/deploy/compose` of the
+  tag, covered by `SHA256SUMS`: Docker Compose installs and upgrades without git.
+- Docs: cosign runs in its official container pinned by digest, no installation needed.
+
+### Changed
+
+- Docs: Docker Compose installs and upgrades from the release archive
+  `xomtra-<version>-compose.tar.gz` checked with `SHA256SUMS` (`curl` and `tar`, no
+  git); [docs/setup/docker.md](docs/setup/docker.md) has a new section *Upgrade*.
+
+### Removed
+
+- Docker compose: the lite override `deploy/compose/compose.lite.yaml` (ADR 095). The
+  Docker compose installation is the full edition only (SeaweedFS, Dagster); it is
+  meant for a machine with enough memory, not for a small server. The lite edition
+  (worker, lake on the local disk) stays in the Home Assistant add-on. Upgrade note:
+  installations started with `compose.lite.yaml` (or `COMPOSE_FILE=...:compose.lite.yaml`
+  in `.env`) keep the file from their current version; their lake is in the volume
+  `lake-data` and does not move to SeaweedFS. To move to the full edition, install it
+  anew (new volumes); it loads the history again from what Home Assistant still holds.
+
+### Fixed
+
+- Admin GUI: dates are written as the language of the admin writes them (for example
+  27. 11. 2025 in Czech, 27.11.2025 in German) already on the server, and the cut-off
+  date on Retention is formatted like every other date (it was ISO).
+- Admin GUI: the page Catalog of a new installation explains that the catalog is
+  profiled once a day at 04:15 (in `XOMTRA_TIMEZONE`) and shows its entities after the
+  first night, instead of an empty table; the empty choice of the kind filter reads
+  "all kinds". To profile right away: `docker compose exec dagster-daemon xomtra-ingest
+  catalog`.
+
 ## 0.9.2 - 2026-11-27
 
 ### Added
@@ -177,33 +232,5 @@
   session, the access list and, with an administrator token in xomtra's HA connection,
   HA's user directory. Audit records `connector:sign_in` (with `ha_token_revoked`) and
   `connector:session_refused`.
-
-## 0.7.1 - 2026-11-26
-
-### Added
-
-- Option to turn off the default answer style (add-on option `default_guidelines`,
-  `XOMTRA_DEFAULT_GUIDELINES=false` elsewhere), with a note on the admin pages for
-  tokens and clients (ADR 080).
-- Place for a central theme from xomtra.com (ADR 075, e.g. Christmas, Easter,
-  Halloween): when one is active it comes first in `answer_guidelines` and takes
-  precedence over the default style. It cannot be turned off, is forgotten 24 hours
-  after it was received and never overrides the core rules.
-
-### Changed
-
-- Default answer style: very funny, crude and vulgar, like a mate in the pub, fitted to
-  the language, country, culture and locality of the installation and to the owner's
-  line of work when the user mentions it (never to wealth or status), for the user as
-  the occupant of the property; teasing the user only with tact; facts stay exact
-  (ADR 073, 080).
-- Humour made personal and a bit politically incorrect: the assistant uses what it
-  already knows about the user from its own context (memory, profile, conversation),
-  never personal details inferred from the house data, never the user's clients or
-  employers by name, always within the core rules (ADR 080).
-- Core rules that always apply, also with the default style off and above a central
-  theme: no jokes, irony or vulgarity about accidents, faults, outages, risky
-  situations or threats to life or health; no sexist, racist, homophobic, xenophobic
-  or political jokes or innuendo and no slurs against any group.
 
 Older versions: https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md

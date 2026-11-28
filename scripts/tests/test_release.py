@@ -57,13 +57,15 @@ def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         re.M,
     )
     assert current
-    for path in (*release.PYPROJECTS, *release.IMAGE_REFERENCES, release.ADDON_CONFIG):
+    paths = (*release.PYPROJECTS, *release.IMAGE_REFERENCES, release.ADDON_CONFIG)
+    for path in (*paths, *release.INSTALL_DOCS):
         target = tmp_path / path
         target.parent.mkdir(parents=True, exist_ok=True)
         text = (REPO / path).read_text(encoding="utf-8")
         text = text.replace(f'version = "{current[1]}"', 'version = "0.1.0"')
         text = text.replace(f'version: "{current[1]}"', 'version: "0.1.0"')
         text = re.sub(rf"(xomtra-[a-z]+):{re.escape(current[1])}\b", r"\1:0.1.0", text)
+        text = re.sub(r"^VERSION=\S+$", "VERSION=0.1.0", text, flags=re.M)
         target.write_text(text, encoding="utf-8")
     (tmp_path / "CHANGELOG.md").write_text(CHANGELOG, encoding="utf-8")
     monkeypatch.setattr(release, "ROOT", tmp_path)
@@ -105,6 +107,7 @@ def test_prepare_then_check(tree: Path) -> None:
     assert "xomtra-ingest:0.2.0}" in compose
     assert ":main}" not in compose
     assert 'version: "0.2.0"' in (tree / release.ADDON_CONFIG).read_text()
+    assert "\nVERSION=0.2.0\n" in (tree / "docs/setup/docker.md").read_text()
     changelog = (tree / "CHANGELOG.md").read_text()
     released = "## [Unreleased]\n\n## [0.2.0] - 2026-12-01\n\n### Added\n\n- Something new."
     assert released in changelog
@@ -137,6 +140,20 @@ def test_prerelease_keeps_changelog(tree: Path) -> None:
     assert "xomtra-caddy:0.2.0-rc.1" in (tree / "deploy/compose/.env.example").read_text()
     assert 'version: "0.2.0-rc.1"' in (tree / release.ADDON_CONFIG).read_text()
     assert release.notes(version) == "### Added\n\n- Something new."
+
+
+def test_prerelease_keeps_the_install_docs(tree: Path) -> None:
+    release.prepare(release.Version.parse("0.2.0-rc.1"), lock=False)
+    assert "\nVERSION=0.1.0\n" in (tree / "docs/setup/docker.md").read_text()
+
+
+def test_check_needs_the_install_docs_version(tree: Path) -> None:
+    version = release.Version.parse("0.2.0")
+    release.prepare(version, today=dt.date(2026, 12, 1), lock=False)
+    docs = tree / "docs/setup/docker.md"
+    docs.write_text(docs.read_text().replace("VERSION=0.2.0", "VERSION=0.1.0"))
+    with pytest.raises(release.ReleaseError, match=r"docker\.md"):
+        release.check(version)
 
 
 def test_check_needs_changelog_section(tree: Path) -> None:

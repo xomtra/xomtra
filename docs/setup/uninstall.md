@@ -58,7 +58,7 @@ image layers:
 ```bash
 docker ps -a --filter label=com.docker.compose.project=xomtra       # empty
 docker volume ls --filter label=com.docker.compose.project=xomtra   # empty
-cd ../../.. && rm -rf xomtra                                         # the cloned directory
+cd ../../.. && rm -rf xomtra xomtra-*-compose.tar.gz SHA256SUMS       # the release directory
 docker image rm $(docker images -q ghcr.io/sigstore/cosign/cosign) 2>/dev/null   # cosign container, if used
 docker image prune -f
 ```

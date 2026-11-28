@@ -40,7 +40,9 @@ which
 3. adds the release tags to those images (same digests) and signs them again with the
    identity `release.yml@refs/tags/vX.Y.Z`; an existing `X.Y.Z` is never moved;
 4. publishes a GitHub release with the CHANGELOG section, the digests and the asset
-   `xomtra-X.Y.Z-images.env` (pinned image references) plus `SHA256SUMS`.
+   `xomtra-X.Y.Z-images.env` (pinned image references), `xomtra-X.Y.Z-compose.tar.gz`
+   (the directory `xomtra/deploy/compose` of the tag, for an installation without git)
+   and the Claude Desktop extension, plus `SHA256SUMS`.
 
 ## Cutting a release (maintainer)
 
@@ -68,7 +70,10 @@ Every pull request with a user-visible change adds a line under `[Unreleased]` i
 ## Installing a release
 
 ```bash
-git clone --branch v0.2.0 --depth 1 https://github.com/xomtra/xomtra.git
+curl -fLO https://github.com/xomtra/xomtra/releases/download/v0.2.0/xomtra-0.2.0-compose.tar.gz
+curl -fLO https://github.com/xomtra/xomtra/releases/download/v0.2.0/SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+tar -xzf xomtra-0.2.0-compose.tar.gz
 cd xomtra/deploy/compose
 cp .env.example .env && chmod 600 .env
 # fill in .env, then replace the three *_IMAGE lines with the ones from

@@ -10,8 +10,8 @@ cores and 4 GB RAM, a few GB of disk,
 and Home Assistant reachable from this machine, usually on port 8123
 (`http://<ha-address>:8123`).
 
-Tools: `git` and `curl` to download the release (`sudo apt-get install -y git curl` on
-Debian and Ubuntu, `sudo dnf install -y git curl` on Fedora and RHEL). Verifying the
+Tools: `curl` to download the release (`sudo apt-get install -y curl` on Debian and
+Ubuntu, `sudo dnf install -y curl` on Fedora and RHEL); git is not needed. Verifying the
 signatures of the images is optional, with cosign in its container
 ([releasing.md](../releasing.md#installing-a-release)).
 
@@ -38,14 +38,23 @@ name is not a precondition; it only saves you from updating the clients afterwar
 
 ## 1. Start
 
-Download the release (or clone the repository), start the stack and print the setup
-link:
+Download the release, check it, start the stack and print the setup link:
 
 ```bash
-git clone --depth 1 --branch v<version> https://github.com/xomtra/xomtra.git
+VERSION=0.10.0
+curl -fLO "https://github.com/xomtra/xomtra/releases/download/v$VERSION/xomtra-$VERSION-compose.tar.gz"
+curl -fLO "https://github.com/xomtra/xomtra/releases/download/v$VERSION/SHA256SUMS"
+sha256sum --ignore-missing -c SHA256SUMS
+tar -xzf "xomtra-$VERSION-compose.tar.gz"
 cd xomtra/deploy/compose
 docker compose up -d && docker compose exec admin xomtra-admin setup-link
 ```
+
+The archive `xomtra-<version>-compose.tar.gz` (a release asset) holds the directory
+`xomtra/deploy/compose` of the release tag; `sha256sum` must print `OK`. The latest
+version is on the [releases page](https://github.com/xomtra/xomtra/releases). A clone
+of the tag (`git clone --depth 1 --branch v$VERSION https://github.com/xomtra/xomtra.git`)
+gives the same directory.
 
 `docker compose up -d` returns once the admin GUI is up (it waits for the databases,
 which takes a minute or two on the first start); the second command then prints the
@@ -130,6 +139,26 @@ the databases and the stored Home Assistant token cannot be opened. A snapshot o
 whole virtual machine is the simplest robust backup; a cold backup (stack stopped for a
 few minutes) and a hot backup (Postgres dump first, then the lake files through S3),
 each with its restore, are in [backup.md](backup.md).
+
+## Upgrade
+
+Read the upgrade notes of the new version in the
+[CHANGELOG](https://github.com/xomtra/xomtra/blob/main/CHANGELOG.md), back up
+([backup.md](backup.md)), then unpack the new archive over the old one in the same
+parent directory (your `.env` is not in the archive and stays) and start it:
+
+```bash
+VERSION=<new version>
+curl -fLO "https://github.com/xomtra/xomtra/releases/download/v$VERSION/xomtra-$VERSION-compose.tar.gz"
+curl -fLO "https://github.com/xomtra/xomtra/releases/download/v$VERSION/SHA256SUMS"
+sha256sum --ignore-missing -c SHA256SUMS
+tar -xzf "xomtra-$VERSION-compose.tar.gz"
+cd xomtra/deploy/compose
+docker compose up -d
+```
+
+With a clone instead: `git fetch --tags && git checkout v<new version>` in it, then
+`docker compose up -d`.
 
 ## Upgrading from a version with secrets in .env
 

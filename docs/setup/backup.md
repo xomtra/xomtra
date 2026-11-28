@@ -73,8 +73,8 @@ ls -lh "$B"
 ### Restore a cold backup
 
 On the same version of xomtra as the backup (upgrade afterwards). On a new machine
-clone that release first ([Docker Compose, step 1](docker.md#1-start)) without starting
-it; on the same machine remove the old stack first with `docker compose down -v`
+download and unpack that release first ([Docker Compose, step 1](docker.md#1-start))
+without starting it; on the same machine remove the old stack first with `docker compose down -v`
 (this deletes its volumes).
 
 ```bash
@@ -134,7 +134,7 @@ the older backup still needs them.
 
 ### Restore a hot backup
 
-As for the cold backup: the same version of xomtra, on a new machine the cloned release
+As for the cold backup: the same version of xomtra, on a new machine the unpacked release
 without starting it, on the same machine after `docker compose down -v`. Define `B`,
 `RCLONE` and `lake_rclone` as above, with `B` pointing to the backup.
 
