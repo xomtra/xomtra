@@ -36,6 +36,8 @@ ls -lh ~/xomtra-backup
 The archive `xomtra_secrets.tgz` contains every internal password and key, and `.env`
 may contain the Home Assistant token: keep the backup like a password, not in a shared
 folder. Afterwards `docker rmi alpine` removes the helper image.
+To restore it later, see [backup.md](backup.md#restore-a-cold-backup) (here the
+archives are named after the Docker volume, e.g. `xomtra_secrets.tgz`).
 
 ## 2. Remove the server
 

@@ -124,10 +124,12 @@ bookmarks) has to be updated.
 ## Backups
 
 Back up the Docker volumes `secrets` (passwords and keys), `postgres-data` (catalog,
-tokens, settings, the Home Assistant connection) and the lake (`seaweedfs-data`).
-Without the volume `secrets` the databases and the stored Home Assistant token cannot
-be opened. The simplest robust backup is a backup of
-the whole virtual machine.
+tokens, settings, the Home Assistant connection), `seaweedfs-data` (the lake) and
+`caddy-data` (the local CA), and `.env` if you have one. Without the volume `secrets`
+the databases and the stored Home Assistant token cannot be opened. A snapshot of the
+whole virtual machine is the simplest robust backup; a cold backup (stack stopped for a
+few minutes) and a hot backup (Postgres dump first, then the lake files through S3),
+each with its restore, are in [backup.md](backup.md).
 
 ## Upgrading from a version with secrets in .env
 

@@ -98,7 +98,8 @@ docker run --rm "$COSIGN" verify ghcr.io/xomtra/xomtra-mcp@sha256:<digest> \
 
 1. Read the CHANGELOG entries between your version and the target (upgrade notes, new
    `.env` variables).
-2. Back up `.env` and the compose directory.
+2. Back up `.env` and the compose directory, and the data
+   ([backups](setup/backup.md)).
 3. Replace the compose directory with the one of the new tag, keep your `.env`, put in
    the `*_IMAGE` lines of the new release and add any new variables.
 4. Optionally verify the signatures, then `docker compose pull && docker compose up -d`.
