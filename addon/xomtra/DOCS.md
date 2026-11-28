@@ -9,7 +9,7 @@ available to Claude and other MCP clients.
 1. Start the add-on. The first start creates its database and internal keys in the
    add-on's data folder; this takes a minute.
 2. Open **xomtra** in the sidebar (Home Assistant administrators only).
-3. On **Tokens**, issue a personal token for each person and device.
+3. On **MCP tokens**, issue a personal token for each person and device.
 4. On **Connect clients**, download the Claude Desktop extension or copy the command for
    Claude Code. The MCP endpoint is port 8000 of your Home Assistant host.
 
@@ -26,7 +26,7 @@ Home Assistant permission.
 
 xomtra gives your assistant guidelines for answering: by default the set **Default**,
 which looks for the relevant data first, answers first and then shows the evidence as a
-chart or a table, in a friendly tone. On the admin page **Answers** you can activate
+chart or a table, in a friendly tone. On the admin page **MCP setup** you can activate
 another set (**Concise**, or **Core only** for no guidelines at all) or duplicate one and
 write your own; several named sets can be kept and one is active. A change applies within
 30 seconds, without a restart. The sets are kept in the add-on's database (and in Home

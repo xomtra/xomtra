@@ -54,7 +54,7 @@ can see depends on your role; entities outside it are not returned.
 
 def build_instructions(guidelines: Guidelines) -> str:
     """Server instructions: the core rules and the answer guidelines set active at
-    start. The operator may switch the set at any time on the admin page Answers, so
+    start. The operator may switch the set at any time on the admin page MCP setup, so
     results carry the current text in answer_guidelines (ADR 090)."""
     text = f"{OVERVIEW}\nCore rules (always apply):\n{CORE_GUIDELINES}"
     active = guidelines.active()

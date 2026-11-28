@@ -34,6 +34,23 @@ async def test_retention_page_has_no_env_instructions() -> None:
     assert "name=value type=number" in page
 
 
+async def test_retention_says_it_is_the_xomtra_data_lake() -> None:
+    """The page says whose retention it is, so nobody takes it for the HA recorder's."""
+    async with client_for(app_with(MemorySettingsStore(), MemoryAuditSink())) as client:
+        en = (await client.get("/admin/retention")).text
+        cs = (await client.get("/admin/retention", headers={"cookie": "xomtra_lang=cs"})).text
+    assert "<h1>Retention</h1>" in en
+    assert "retention periods of the xomtra Data Lake, not of Home Assistant." in en
+    assert "<h1>Uchovávání</h1>" in cs
+    assert "nastavení retence v Data Lake xomtry, nikoli v Home Assistantu." in cs
+    # The standard (Docker) edition: the section Data Lake points to its own backups.
+    lake = en.split("<h2>Data Lake</h2>", 1)[1]
+    assert "Home Assistant backups do not include xomtra. Back up the Data Lake" in lake
+    assert "docs/setup/backup.md" in lake
+    assert "class='warn loud'" in lake
+    assert "Data Lake zálohujte sami" in cs
+
+
 async def test_retention_save_longer_validate_reset() -> None:
     store, audit = MemorySettingsStore(), MemoryAuditSink()
     async with client_for(app_with(store, audit)) as client:

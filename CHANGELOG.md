@@ -11,6 +11,23 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ## [Unreleased]
 
+### Changed
+
+- Admin: the page *Retention* says at the top that its periods are those of the xomtra
+  Data Lake, not of Home Assistant (whose recorder has its own retention).
+- Admin: the page *Retention* has a new section *Data Lake* above the lake's tables,
+  opening with a highlighted panel on backups. In the add-on it is the note that Home
+  Assistant backups do not include the lake (moved from *Overview*); in the Docker
+  edition it says to back up the Data Lake and the other volumes and links the
+  [backup guide](docs/setup/backup.md).
+- Admin: the pages *Answers* and *Tokens* are called *MCP setup* and *MCP tokens*
+  (cs *MCP Setup*, *MCP Tokeny*), so it is clear they set up the MCP connection of the
+  AI assistants; their addresses `/admin/answers` and `/admin/tokens` stay.
+- Admin: the page *Analysis settings* is called *Analysis parameters* (cs *Parametry
+  Analýz*); its address `/admin/analysis` stays.
+- Admin: the page *Audit* is called *Audit log* (cs *Audit Log*); its address
+  `/admin/audit` stays.
+
 ### Fixed
 
 - Local access: `https://<address>/` redirects to the admin GUI (`/admin/`) instead of
