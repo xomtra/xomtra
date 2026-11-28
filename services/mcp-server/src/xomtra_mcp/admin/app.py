@@ -132,6 +132,21 @@ def _default_ha_port(url: str) -> str | None:
     return parts._replace(netloc=f"{host}:8123").geturl()
 
 
+def ha_host(url: str | None) -> str:
+    """The FQDN or IP of the connected Home Assistant, shown instead of its version."""
+    parts = urlparse(url or "")
+    if parts.hostname == "supervisor":  # the add-on reaches Core through the Supervisor
+        return "this Home Assistant"
+    return parts.hostname or "?"
+
+
+def lake_size(n: int | None) -> str | None:
+    """Size of the lake's data files (DuckLake catalog), in MiB or GiB."""
+    if n is None:
+        return None
+    return f"{n / 2**30:,.1f} GiB" if n >= 2**30 else f"{n / 2**20:,.1f} MiB"
+
+
 def _url_host(hostname: str) -> str:
     return f"[{hostname}]" if ":" in hostname else hostname
 
@@ -554,7 +569,7 @@ class AdminApp:
         if not ha.get("configured"):
             ha_card = ("Home Assistant", "not configured", "warn")
         elif ha.get("ok"):
-            ha_card = ("Home Assistant", f"{ha['version']} · {ha['latency_ms']} ms", "ok")
+            ha_card = ("Home Assistant", ha_host(conn.url if conn else None), "ok")
         else:
             ha_card = ("Home Assistant", "unreachable", "bad")
         disk = self._disk()
@@ -562,9 +577,10 @@ class AdminApp:
             [
                 ha_card,
                 *([disk[0]] if disk else []),
+                ("Data lake size", lake_size(lake.get("lake_bytes")), ""),
                 ("Entities in HA", ha.get("entities"), ""),
-                ("Last state in lake", last_state, fresh_cls),
-                ("Last statistic", lake.get("last_statistic"), ""),
+                ("Last data state change", last_state, fresh_cls),
+                ("Last hourly statistic", lake.get("last_statistic"), ""),
             ]
         )
         if ha.get("error"):
@@ -598,7 +614,8 @@ class AdminApp:
 
     def _disk(self) -> tuple[tuple[str, Any, str], str] | None:
         """Card and note on the free space of the lake's disk (ADR 072)."""
-        path = self.settings.lake_data_path
+        worker = self.settings.lake_data_path  # the worker pauses / prunes on this disk
+        path = worker or self.settings.disk_path
         if not path:
             return None
         try:
@@ -608,6 +625,15 @@ class AdminApp:
         ratio = usage.free / usage.total if usage.total else 1.0
         value = f"{usage.free / 2**30:,.1f} GiB · {ratio:.0%}"
         stop, low = self.settings.worker_stop_free_ratio, self.settings.worker_min_free_ratio
+        if not worker:
+            cls = "bad" if ratio < stop else "warn" if ratio < low else "ok"
+            note = (
+                "<p class=warn>Little free space on the disk with the data. Free some space "
+                "or shorten the retention, before Postgres and SeaweedFS stop writing.</p>"
+                if cls != "ok"
+                else ""
+            )
+            return ("Free disk", value, cls), note
         if ratio < stop:
             note = (
                 f"<p class=bad>Less than {stop:.0%} free on the disk: collecting is paused "
@@ -1889,7 +1915,7 @@ class AdminApp:
             "<p class=ok>Home Assistant is connected.</p>"
             + cards(
                 [
-                    ("Home Assistant", ha["version"], "ok"),
+                    ("Home Assistant", ha_host(url), "ok"),
                     ("Entities in HA", ha.get("entities"), ""),
                 ]
             )

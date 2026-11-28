@@ -6,7 +6,6 @@ import asyncio
 import errno
 import socket
 import ssl
-import time
 from collections.abc import Callable
 from typing import Any
 
@@ -22,7 +21,6 @@ type Row = dict[str, Any]
 async def ha_status(url: str | None, token: str | None) -> Row:
     if not (url and token):
         return {"configured": False}
-    started = time.monotonic()
     try:
         async with asyncio.timeout(15), HAClient(url, token) as ha:
             snapshot = await fetch_registries(ha)
@@ -38,7 +36,6 @@ async def ha_status(url: str | None, token: str | None) -> Row:
         "configured": True,
         "ok": True,
         "version": version,
-        "latency_ms": round((time.monotonic() - started) * 1000),
         "areas": len(snapshot.areas),
         "devices": len(snapshot.devices),
         "entities": sum(snapshot.domain_counts().values()),
@@ -142,7 +139,12 @@ def lake_overview(data: DataAccess) -> Row:
         stats = _rows(
             cur,
             "SELECT max(period_start) AS last_statistic FROM lake.bronze.ha_statistics "
-            "WHERE period_start >= now() - INTERVAL 3 DAY",
+            "WHERE period = 'hour' AND period_start >= now() - INTERVAL 3 DAY",
+        )
+        size = _rows(
+            cur,
+            "SELECT sum(file_size_bytes + delete_file_size_bytes) AS lake_bytes "
+            "FROM ducklake_table_info('lake')",
         )
         kinds = _rows(
             cur,
@@ -157,6 +159,7 @@ def lake_overview(data: DataAccess) -> Row:
     return {
         "last_state": (fresh[0]["last_state"] if fresh else None),
         "last_statistic": (stats[0]["last_statistic"] if stats else None),
+        "lake_bytes": (size[0]["lake_bytes"] if size else None),
         "kinds": kinds,
         "drift_7d": drift,
     }

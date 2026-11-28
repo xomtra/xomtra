@@ -69,6 +69,9 @@ class AdminSettings(BaseSettings):
     # Free space of the lake's local disk on the overview (ADR 072); the worker pauses
     # writing below worker_stop_free_ratio. Unset with object storage.
     lake_data_path: str | None = None
+    # Any directory on the disk with the data volumes (Docker edition: a read-only mount of
+    # the SeaweedFS volume); shown only, the worker thresholds apply to lake_data_path.
+    disk_path: str | None = None
     worker_min_free_ratio: float = Field(default=0.10, ge=0, lt=1)
     worker_stop_free_ratio: float = Field(default=0.03, ge=0, lt=1)
 

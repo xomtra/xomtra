@@ -4,6 +4,11 @@
 
 ### Added
 
+- Admin: *Overview* shows the size of the data lake (its data files according to the
+  DuckLake catalog).
+- Admin: *Overview* shows the free space on the disk also in the Docker edition (the
+  `admin` container mounts the SeaweedFS volume read-only at `/disk`,
+  `XOMTRA_DISK_PATH`), with a warning below 10 %.
 - Docs: [backup and restore](docs/setup/backup.md) of the Docker Compose installation,
   cold (volumes with the stack stopped) and hot (Postgres dump first, then the lake
   files through S3 with rclone), with the reason for the order and what to restore.
@@ -32,6 +37,13 @@
 - Docs: Docker Compose installs and upgrades from the release archive
   `xomtra-<version>-compose.tar.gz` checked with `SHA256SUMS` (`curl` and `tar`, no
   git); [docs/setup/docker.md](docs/setup/docker.md) has a new section *Upgrade*.
+- Admin: the Home Assistant card on *Overview* and after the setup shows the address
+  (FQDN or IP) of the connected Home Assistant instead of its version and response time;
+  in the add-on it says *this Home Assistant*.
+- Admin: the *Overview* card *Last state in lake* is now *Last data state change*; it is
+  the time of the newest state change stored in the lake, not of a page refresh.
+- Admin: *Last statistic* on *Overview* is now *Last hourly statistic* and shows the
+  newest hourly statistic only (before, a 5-minute one could be newer).
 
 ### Removed
 

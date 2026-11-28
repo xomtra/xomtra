@@ -12,7 +12,7 @@ from pydantic import SecretStr
 
 from hacore.testing import VALID_TOKEN, running_fake_ha
 from xomtra_mcp.admin import status
-from xomtra_mcp.admin.app import SESSION_COOKIE, AdminApp
+from xomtra_mcp.admin.app import SESSION_COOKIE, AdminApp, ha_host, lake_size
 from xomtra_mcp.admin.config import AdminSettings
 from xomtra_mcp.admin.oidc import EntraOIDC
 from xomtra_mcp.admin.session import Signer
@@ -117,7 +117,7 @@ async def test_admin_sign_in_pages_and_audit(data: DataAccess) -> None:
         assert done.status_code == 303
         assert SESSION_COOKIE in client.cookies
         for path, text in [
-            ("/admin/", "Catalog"),
+            ("/admin/", "Data lake size"),
             ("/admin/catalog?q=teplota", "sensor.temp"),
             ("/admin/drift", "Entity changes"),
             ("/admin/retention", "Hourly statistics"),
@@ -213,6 +213,20 @@ async def test_ha_status() -> None:
     assert bad["ok"] is False
     assert bad["error"].startswith("Home Assistant rejected the access token.")
     assert "HAAuthError" in bad["detail"]
+    assert "latency_ms" not in ok
+
+
+def test_ha_host_shows_the_address_not_the_version() -> None:
+    assert ha_host("http://ha.example.org:8123") == "ha.example.org"
+    assert ha_host("https://192.0.2.10/") == "192.0.2.10"
+    assert ha_host("http://[2001:db8::1]:8123") == "2001:db8::1"
+    assert ha_host("http://supervisor/core") == "this Home Assistant"
+
+
+def test_lake_size() -> None:
+    assert lake_size(None) is None
+    assert lake_size(5 * 2**20) == "5.0 MiB"
+    assert lake_size(3 * 2**30 // 2) == "1.5 GiB"
 
 
 async def _plain_http_server() -> tuple[asyncio.Server, int]:
