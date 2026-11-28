@@ -23,6 +23,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   AI assistants; their addresses `/admin/answers` and `/admin/tokens` stay.
 - Admin: the page *Analysis settings* is called *Analysis parameters* (cs *Parametry
   Analýz*); its address `/admin/analysis` stays.
+- Admin: the page *Audit* is called *Audit log* (cs *Audit Log*); its address
+  `/admin/audit` stays.
 
 ## [0.10.0] - 2026-11-28
 

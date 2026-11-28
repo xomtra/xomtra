@@ -229,7 +229,7 @@ NAV = (
     ("/drift", "Entity changes"),
     ("/retention", "Retention"),
     ("/analysis", "Analysis parameters"),
-    ("/audit", "Audit"),
+    ("/audit", "Audit log"),
 )
 
 

@@ -341,7 +341,8 @@
    "all kinds": "všechny druhy",
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Zatím žádný profil. Katalog se profiluje jednou denně ve 4:15; nová instalace ukáže entity po první noci.",
    "Time zone:": "Časové pásmo:",
-   "These are the retention periods of the xomtra Data Lake, not of Home Assistant.": "Jde o nastavení retence v Data Lake xomtry, nikoli v Home Assistantu."
+   "These are the retention periods of the xomtra Data Lake, not of Home Assistant.": "Jde o nastavení retence v Data Lake xomtry, nikoli v Home Assistantu.",
+   "Audit log": "Audit Log"
   },
   "de": {
    "(max 300)": "(max. 300)",
@@ -648,7 +649,8 @@
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Noch kein Profil. Der Katalog wird einmal am Tag um 04:15 profiliert; eine neue Installation zeigt ihre Entitäten nach der ersten Nacht.",
    "Time zone:": "Zeitzone:",
    "MCP tokens": "MCP-Tokens",
-   "These are the retention periods of the xomtra Data Lake, not of Home Assistant.": "Das ist die Aufbewahrung im Data Lake von xomtra, nicht in Home Assistant."
+   "These are the retention periods of the xomtra Data Lake, not of Home Assistant.": "Das ist die Aufbewahrung im Data Lake von xomtra, nicht in Home Assistant.",
+   "Audit log": "Audit-Log"
   },
   "nl": {
    "(max 300)": "(max. 300)",
@@ -953,7 +955,8 @@
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Nog geen profiel. De catalogus wordt eens per dag om 04:15 geprofileerd; een nieuwe installatie toont haar entiteiten na de eerste nacht.",
    "Time zone:": "Tijdzone:",
    "MCP tokens": "MCP-tokens",
-   "These are the retention periods of the xomtra Data Lake, not of Home Assistant.": "Dit zijn de bewaartermijnen van het Data Lake van xomtra, niet van Home Assistant."
+   "These are the retention periods of the xomtra Data Lake, not of Home Assistant.": "Dit zijn de bewaartermijnen van het Data Lake van xomtra, niet van Home Assistant.",
+   "Audit log": "Auditlog"
   },
   "pl": {
    "(max 300)": "(maks. 300)",
@@ -1260,7 +1263,8 @@
    "all kinds": "wszystkie rodzaje",
    "No profile yet. The catalog is profiled once a day at 04:15; a new installation shows its entities after the first night.": "Jeszcze brak profilu. Katalog jest profilowany raz dziennie o 04:15; nowa instalacja pokaże swoje encje po pierwszej nocy.",
    "Time zone:": "Strefa czasowa:",
-   "These are the retention periods of the xomtra Data Lake, not of Home Assistant.": "To ustawienia retencji w Data Lake xomtry, a nie w Home Assistant."
+   "These are the retention periods of the xomtra Data Lake, not of Home Assistant.": "To ustawienia retencji w Data Lake xomtry, a nie w Home Assistant.",
+   "Audit log": "Dziennik audytu"
   }
  },
  "th": {

@@ -911,7 +911,7 @@ class AdminApp:
             body += "<p class=warn>The audit database is not configured for the admin GUI.</p>"
         else:
             body += table(cols, [[r.get(c) for c in cols] for r in rows], {6, 7})
-        return HTMLResponse(page("Audit", body, user.get("username")))
+        return HTMLResponse(page("Audit log", body, user.get("username")))
 
     async def recent_audit(self) -> list[dict[str, Any]] | None:
         dsn = self.settings.audit_dsn
