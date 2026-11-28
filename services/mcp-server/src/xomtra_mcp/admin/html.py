@@ -261,8 +261,7 @@ FOOTER = (
 )
 
 
-def page(title: str, body: str, user: str | None, *, heading: str | None = None) -> str:
-    """A whole admin page; ``title`` marks the menu item, ``heading`` (default: title) is the h1."""
+def page(title: str, body: str, user: str | None) -> str:
     v = view.current.get()
     nav = (item for item in NAV if v.access or item[0] != "/access")
     links = "".join(
@@ -278,7 +277,7 @@ def page(title: str, body: str, user: str | None, *, heading: str | None = None)
         if user
         else ""
     )
-    shown = escape(i18n.translate(heading or title, v.lang))
+    shown = escape(i18n.translate(title, v.lang))
     return i18n.translate(
         f"<!doctype html><html lang={v.lang}><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width, initial-scale=1">'

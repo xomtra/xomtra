@@ -752,6 +752,8 @@ class AdminApp:
             status_code = max(status_code, 503)
         stored, history = stored_all or ({}, [])
         body = note + (
+            "<p><strong>These are the retention periods of the xomtra Data Lake, not of "
+            "Home Assistant.</strong></p>"
             "<p class=muted>Applied daily at 03:30; the data files disappear 7 days later. "
             "A value saved here wins over the installation's configuration and is used by "
             "the next run, without a restart. Reset hands the period back to the "
@@ -808,8 +810,7 @@ class AdminApp:
                 [list(r.values()) for r in sizes],
                 {2, 3, 4, 5},
             )
-        heading = "Data retention in the xomtra data lake"
-        return HTMLResponse(page(title, body, user.get("username"), heading=heading), status_code)
+        return HTMLResponse(page(title, body, user.get("username")), status_code)
 
     async def retention_post(self, request: Request, user: dict[str, Any]) -> Response:
         """Store a retention period (ADR 094); shortening needs a confirmation."""

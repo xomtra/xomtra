@@ -13,9 +13,8 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Changed
 
-- Admin: the heading of the page *Retention* reads "Data retention in the xomtra data
-  lake", so it is not mistaken for the retention of the Home Assistant recorder; the
-  menu item stays *Retention*.
+- Admin: the page *Retention* says at the top that its periods are those of the xomtra
+  Data Lake, not of Home Assistant (whose recorder has its own retention).
 - Admin: the pages *Answers* and *Tokens* are called *MCP setup* and *MCP tokens*
   (cs *MCP Setup*, *MCP Tokeny*), so it is clear they set up the MCP connection of the
   AI assistants; their addresses `/admin/answers` and `/admin/tokens` stay.
