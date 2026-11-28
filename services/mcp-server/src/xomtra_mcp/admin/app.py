@@ -155,11 +155,11 @@ type Handler = Callable[[Request, dict[str, Any]], Awaitable[Response]]
 
 
 # The add-on keeps the lake out of Home Assistant backups (config.yaml backup_exclude).
+# Shown on the page Retention, in the section Data Lake, above the lake's tables.
 BACKUP_NOTE = (
-    "<h2 id=backups>Backups</h2>"
-    "<p class=warn>Home Assistant backups do not include xomtra's analytics. They keep "
-    "the tokens, the settings and the dismissed findings, but not the lake: the "
-    "history, the findings and the weekly summaries, which take tens of GB. After a "
+    "<p id=backups class='warn loud'>Home Assistant backups do not include xomtra's "
+    "analytics. They keep the tokens, the settings and the dismissed findings, but "
+    "not the lake: the history, the findings and the weekly summaries, which take tens of GB. After a "
     "restore xomtra starts a new lake and loads the history again from Home "
     "Assistant, only as far back as Home Assistant still keeps it, and computes the "
     "findings again.<span class=more>For a robust setup with backups of the whole "
@@ -608,8 +608,6 @@ class AdminApp:
             if drift
             else "<p class=muted>None.</p>"
         )
-        if self.ingress:
-            body += BACKUP_NOTE
         return HTMLResponse(page("Overview", body, user.get("username")))
 
     def _disk(self) -> tuple[tuple[str, Any, str], str] | None:
@@ -803,6 +801,10 @@ class AdminApp:
                     for c in history
                 ],
             )
+        if self.ingress or self.data is not None:
+            body += "<h2>Data Lake</h2>"
+        if self.ingress:
+            body += BACKUP_NOTE
         if self.data is not None:
             sizes = await asyncio.to_thread(status.table_sizes, self.data)
             body += "<h2>Tables in the lake</h2>" + table(
@@ -981,7 +983,7 @@ class AdminApp:
     async def analysis_page(
         self, request: Request, user: dict[str, Any], *, note: str = "", status_code: int = 200
     ) -> Response:
-        title = "Analysis settings"
+        title = "Analysis parameters"
         if self.analysis is None:
             body = "<p class=warn>The audit database is not configured for the admin GUI.</p>"
             return HTMLResponse(page(title, body, user.get("username")))

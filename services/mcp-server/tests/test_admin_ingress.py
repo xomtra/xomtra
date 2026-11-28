@@ -49,6 +49,7 @@ async def test_ingress_page_uses_the_ingress_path() -> None:
     async with client_for(app) as client:
         resp = await client.get("/tokens", headers=HA)
         root = await client.get("/", headers=HA)
+        retention = await client.get("/retention", headers=HA)
     assert resp.status_code == 200
     assert f'href="{INGRESS}/catalog"' in resp.text
     # Versioned, so that an upgrade does not show new pages with a cached old stylesheet.
@@ -62,8 +63,12 @@ async def test_ingress_page_uses_the_ingress_path() -> None:
     assert "frame-ancestors 'self'" in csp
     assert resp.headers["x-frame-options"] == "SAMEORIGIN"
     assert root.status_code == 200
-    assert "Home Assistant backups do not include" in root.text  # the lake is excluded
-    assert "its own virtual machine" in root.text
+    # The lake is excluded from HA backups: said in the section Data Lake of Retention.
+    assert "Home Assistant backups do not include" not in root.text
+    lake = retention.text.split("<h2>Data Lake</h2>", 1)[1]
+    assert "Home Assistant backups do not include" in lake
+    assert "its own virtual machine" in lake
+    assert "class='warn loud'" in lake
     record = next(r for r in audit.records if r.tool == "admin:tokens")
     assert (record.subject, record.username, record.idp) == ("8f0c2a", "jana", "ha-ingress")
 
@@ -300,13 +305,14 @@ async def test_gui_follows_the_language_cookie_and_accept_language() -> None:
     app, _, _ = make_app()
     async with client_for(app) as client:
         cs = await client.get("/", headers={**HA, "cookie": "xomtra_lang=cs"})
+        cs_retention = await client.get("/retention", headers={**HA, "cookie": "xomtra_lang=cs"})
         tokens = await client.get("/tokens", headers={**HA, "cookie": "xomtra_lang=cs"})
         de = await client.get("/", headers={**HA, "accept-language": "de-AT,de;q=0.9"})
         en = await client.get("/", headers={**HA, "accept-language": "fr-FR"})
     assert "<html lang=cs>" in cs.text
     assert "<h1>Přehled</h1>" in cs.text
-    assert "Zálohy Home Assistantu neobsahují analytiku xomtry" in cs.text
-    assert "Home Assistant backups do not include" not in cs.text
+    assert "Zálohy Home Assistantu neobsahují analytiku xomtry" in cs_retention.text
+    assert "Home Assistant backups do not include" not in cs_retention.text
     assert ">Vydat token</button>" in tokens.text
     assert "placeholder='pro koho'" in tokens.text
     assert "<title>MCP Tokeny · xomtra admin</title>" in tokens.text

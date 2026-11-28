@@ -106,6 +106,8 @@ p.ok, p.bad, p.warn { color:var(--ink); background:var(--surface); border:1px so
   border-left:3px solid var(--c); border-radius:8px; padding:10px 14px; }
 p.ok { --c:var(--ok); } p.bad { --c:var(--bad); } p.warn { --c:var(--warn); }
 p .more { display:block; margin-top:8px; color:var(--muted); }
+p.loud { border-color:var(--c); border-left-width:5px; font-weight:500; padding:14px 18px; }
+p.loud .more { font-weight:400; }
 .scroll + p, .scroll + h2 + p { margin-top:14px; }
 .scroll { overflow-x:auto; background:var(--surface); border:1px solid var(--line);
   border-radius:12px; }
@@ -226,7 +228,7 @@ NAV = (
     ("/catalog", "Catalog"),
     ("/drift", "Entity changes"),
     ("/retention", "Retention"),
-    ("/analysis", "Analysis settings"),
+    ("/analysis", "Analysis parameters"),
     ("/audit", "Audit"),
 )
 
