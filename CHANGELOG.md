@@ -25,6 +25,17 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
   options `*_retention_days` keep working and are now the default that a value saved in
   the admin GUI overrides.
 
+### Removed
+
+- Docker compose: the lite override `deploy/compose/compose.lite.yaml` (ADR 095). The
+  Docker compose installation is the full edition only (SeaweedFS, Dagster); it is
+  meant for a machine with enough memory, not for a small server. The lite edition
+  (worker, lake on the local disk) stays in the Home Assistant add-on. Upgrade note:
+  installations started with `compose.lite.yaml` (or `COMPOSE_FILE=...:compose.lite.yaml`
+  in `.env`) keep the file from their current version; their lake is in the volume
+  `lake-data` and does not move to SeaweedFS. To move to the full edition, install it
+  anew (new volumes); it loads the history again from what Home Assistant still holds.
+
 ### Fixed
 
 - Admin GUI: dates are written as the language of the admin writes them (for example
