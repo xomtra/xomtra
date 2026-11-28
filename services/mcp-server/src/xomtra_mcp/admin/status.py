@@ -139,7 +139,7 @@ def lake_overview(data: DataAccess) -> Row:
         stats = _rows(
             cur,
             "SELECT max(period_start) AS last_statistic FROM lake.bronze.ha_statistics "
-            "WHERE period_start >= now() - INTERVAL 3 DAY",
+            "WHERE period = 'hour' AND period_start >= now() - INTERVAL 3 DAY",
         )
         size = _rows(
             cur,

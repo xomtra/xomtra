@@ -580,7 +580,7 @@ class AdminApp:
                 ("Data lake size", lake_size(lake.get("lake_bytes")), ""),
                 ("Entities in HA", ha.get("entities"), ""),
                 ("Last data state change", last_state, fresh_cls),
-                ("Last statistic", lake.get("last_statistic"), ""),
+                ("Last hourly statistic", lake.get("last_statistic"), ""),
             ]
         )
         if ha.get("error"):

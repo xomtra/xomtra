@@ -42,6 +42,8 @@
   in the add-on it says *this Home Assistant*.
 - Admin: the *Overview* card *Last state in lake* is now *Last data state change*; it is
   the time of the newest state change stored in the lake, not of a page refresh.
+- Admin: *Last statistic* on *Overview* is now *Last hourly statistic* and shows the
+  newest hourly statistic only (before, a 5-minute one could be newer).
 
 ### Removed
 
