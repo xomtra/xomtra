@@ -614,7 +614,8 @@ class AdminApp:
 
     def _disk(self) -> tuple[tuple[str, Any, str], str] | None:
         """Card and note on the free space of the lake's disk (ADR 072)."""
-        path = self.settings.lake_data_path
+        worker = self.settings.lake_data_path  # the worker pauses / prunes on this disk
+        path = worker or self.settings.disk_path
         if not path:
             return None
         try:
@@ -624,6 +625,15 @@ class AdminApp:
         ratio = usage.free / usage.total if usage.total else 1.0
         value = f"{usage.free / 2**30:,.1f} GiB · {ratio:.0%}"
         stop, low = self.settings.worker_stop_free_ratio, self.settings.worker_min_free_ratio
+        if not worker:
+            cls = "bad" if ratio < stop else "warn" if ratio < low else "ok"
+            note = (
+                "<p class=warn>Little free space on the disk with the data. Free some space "
+                "or shorten the retention, before Postgres and SeaweedFS stop writing.</p>"
+                if cls != "ok"
+                else ""
+            )
+            return ("Free disk", value, cls), note
         if ratio < stop:
             note = (
                 f"<p class=bad>Less than {stop:.0%} free on the disk: collecting is paused "

@@ -233,3 +233,32 @@ async def test_overview_shows_free_disk(tmp_path: Any, monkeypatch: pytest.Monke
     assert "2.0 GiB · 2%" in full.text
     assert "collecting is paused" not in roomy.text
     assert "50.0 GiB · 50%" in roomy.text
+
+
+async def test_overview_shows_free_disk_of_the_docker_volumes(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import shutil
+    from collections import namedtuple
+
+    usage = namedtuple("usage", "total used free")
+    app = AdminApp(
+        AdminSettings(auth_mode="none", base_url=BASE, disk_path=str(tmp_path)),
+        data=None,
+        audit=MemoryAuditSink(),
+        analysis=MemorySettingsStore(),
+    ).build()
+    async with client_for(app) as client:
+        monkeypatch.setattr(
+            shutil, "disk_usage", lambda _p: usage(100 * 2**30, 95 * 2**30, 5 * 2**30)
+        )
+        low = await client.get("/admin/")
+        monkeypatch.setattr(
+            shutil, "disk_usage", lambda _p: usage(100 * 2**30, 50 * 2**30, 50 * 2**30)
+        )
+        roomy = await client.get("/admin/")
+    assert "5.0 GiB · 5%" in low.text
+    assert "Little free space on the disk" in low.text
+    assert "collecting is paused" not in low.text  # the worker runs in the add-on only
+    assert "50.0 GiB · 50%" in roomy.text
+    assert "Little free space" not in roomy.text

@@ -6,6 +6,9 @@
 
 - Admin: *Overview* shows the size of the data lake (its data files according to the
   DuckLake catalog).
+- Admin: *Overview* shows the free space on the disk also in the Docker edition (the
+  `admin` container mounts the SeaweedFS volume read-only at `/disk`,
+  `XOMTRA_DISK_PATH`), with a warning below 10 %.
 - Docs: [backup and restore](docs/setup/backup.md) of the Docker Compose installation,
   cold (volumes with the stack stopped) and hot (Postgres dump first, then the lake
   files through S3 with rclone), with the reason for the order and what to restore.
