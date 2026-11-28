@@ -44,13 +44,16 @@ The token travels unencrypted inside your network (HTTP). Away from home use a V
 
 ### 2a. Local connector
 
-As with the add-on: local network or VPN, HTTP, personal tokens, the same assistants
+The default. As with the add-on: local network or VPN, personal tokens, the same
+assistants, but over HTTPS with xomtra's own certificate authority
 (`XOMTRA_ACCESS_MODE=local`, see [local access](local-access.md)). Nothing else needed.
 
 ### 2b. External connector
 
-`XOMTRA_ACCESS_MODE=public`: Claude on the web, on the desktop and on the phone. **All
-of these are required:**
+`XOMTRA_ACCESS_MODE=public`, advanced and optional: Claude on the web, on the desktop
+and on the phone. It replaces the local connector (an installation runs one of the two;
+personal tokens then stop working) and is switched in `.env`. **All of these are
+required:**
 
 1. **Your own domain** with an **A record** (e.g. `xomtra.<your-domain>`) pointing to the
    public IP address of your home network.

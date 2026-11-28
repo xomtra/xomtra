@@ -1,8 +1,15 @@
-# Docker Compose: install with one command
+# Docker Compose: install with one command (local access)
 
 xomtra on any Linux machine with Docker (a virtual machine, a mini PC, a NAS). Nothing to
 fill in before the start (ADR 077): the internal passwords and keys are generated on the
 first start, and Home Assistant is connected in the browser afterwards.
+
+This guide sets up **local access**, the default: xomtra is reachable only in your LAN
+(or over your VPN), and Claude Desktop, Claude Code and other MCP clients connect with
+personal tokens. No domain, port forward or public certificate is needed. claude.ai on
+the web and on the phone needs **access from the internet** instead, a separate,
+advanced setup on top of this one: [Claude connector](claude-connector.md). An
+installation runs one of the two, not both.
 
 Requirements: Docker Engine with the Compose plugin v2 ([official install](https://docs.docker.com/engine/install/),
 check with `docker compose version`), 2 CPU
@@ -116,9 +123,9 @@ what you need, for example:
 | `ADMIN_CIDR` | all private ranges | limit the admin GUI to your admin machine's network |
 | `LAN_CIDR` | all private ranges | limit who may use the MCP endpoint |
 | `XOMTRA_HA_URL`, `XOMTRA_HA_TOKEN` | entered in the admin GUI | non-interactive install (they win over the GUI) |
-| `XOMTRA_ACCESS_MODE=public` | `local` | Claude connector on a public host, see [claude-connector.md](claude-connector.md) |
 
-`./init-env.sh` asks these questions and writes `.env` for you. After changing `.env`,
+`./init-env.sh` asks these questions and writes `.env` for you (answer `local` to the
+access mode). After changing `.env`,
 run `docker compose up -d --force-recreate`: the address is part of the links of the
 admin GUI and of the Home Assistant sign-in, and services that did not change otherwise
 would keep the old one. The data, tokens and the Home Assistant connection stay (they
@@ -129,6 +136,13 @@ you change `XOMTRA_LOCAL_HOST` later, run `docker compose up -d --force-recreate
 issues the certificate for the new address from the same local CA, so clients that
 trust the CA keep trusting the server; only the URL in the clients (MCP endpoint,
 bookmarks) has to be updated.
+
+## Access from the internet (optional)
+
+Only for claude.ai on the web and on the phone. It replaces the local access (personal
+tokens stop working) and needs your own domain at Cloudflare, a port forward and
+Claude's IP ranges; it is switched in `.env`, not in the admin GUI. Step by step:
+[Claude connector](claude-connector.md).
 
 ## Backups
 

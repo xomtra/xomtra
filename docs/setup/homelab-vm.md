@@ -75,8 +75,9 @@ Compare the new fingerprint (`qm guest exec <vmid> -- ssh-keygen -lf
 
 ## 4. Deploy the stack
 
-Prerequisites: [Entra app registration](entra-app-registration.md), DNS record and
-Cloudflare token from the [connector guide](claude-connector.md), and the GHCR packages
+Prerequisites: DNS record, Cloudflare token and the `.env` values of the public mode
+from the [connector guide](claude-connector.md) (sign-in with a Home Assistant account
+by default, or an [Entra app registration](entra-app-registration.md)), and the GHCR packages
 `xomtra-mcp` and `xomtra-caddy` set to *Public* (otherwise `docker login ghcr.io`
 with a read-only token first).
 
