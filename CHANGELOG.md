@@ -13,6 +13,10 @@ Add an entry under `[Unreleased]` in every pull request with a user-visible chan
 
 ### Added
 
+- Docs: [backup and restore](docs/setup/backup.md) of the Docker Compose installation,
+  cold (volumes with the stack stopped) and hot (Postgres dump first, then the lake
+  files through S3 with rclone), with the reason for the order and what to restore.
+
 - Retention set in the admin GUI: the page Retention has a form for each of the three
   periods (states, 5-minute statistics, hourly statistics; 1 to 3650 days), with a
   reason, the history of changes and *Reset*. A saved period wins over the
