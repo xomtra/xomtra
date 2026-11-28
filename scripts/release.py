@@ -36,6 +36,9 @@ IMAGE_REFERENCES = (
     "deploy/compose/.env.example",
 )
 IMAGES = ("xomtra-mcp", "xomtra-ingest", "xomtra-caddy")
+# Install docs whose `VERSION=` line names the last final release (the compose archive
+# to download); pre-releases leave them alone.
+INSTALL_DOCS = ("docs/setup/docker.md",)
 # Home Assistant add-on: the Supervisor pulls <image>:<version of config.yaml>.
 ADDON_CONFIG = "addon/xomtra/config.yaml"
 REGISTRY = "ghcr.io/xomtra"
@@ -51,6 +54,7 @@ _PEP440_PRE = {"alpha": "a", "beta": "b", "rc": "rc"}
 _PYPROJECT_VERSION = re.compile(r'^version = "([^"]+)"$', re.MULTILINE)
 _ADDON_VERSION = re.compile(r'^version: "([^"]+)"$', re.MULTILINE)
 _IMAGE_REF = re.compile(rf"({re.escape(REGISTRY)}/(?:{'|'.join(IMAGES)})):([A-Za-z0-9._-]+)")
+_DOCS_VERSION = re.compile(r"^VERSION=(\S+)$", re.MULTILINE)
 _LINK_DEF = re.compile(r"^\[[^\]]+\]: \S+$\n?", re.MULTILINE)
 _SECTION = re.compile(r"^## \[([^\]]+)\](.*)$", re.MULTILINE)
 
@@ -185,6 +189,20 @@ def addon_changelog(changelog: str) -> str:
     return "\n\n".join(parts) + "\n"
 
 
+def _set_install_docs(version: Version) -> list[str]:
+    """Point the install docs at ``version``; returns the changed files."""
+    changed = []
+    for path in INSTALL_DOCS:
+        text = _read(path)
+        new, count = _DOCS_VERSION.subn(f"VERSION={version.semver}", text, count=1)
+        if count != 1:
+            raise ReleaseError(f"{path}: no VERSION= line")
+        if new != text:
+            _write(path, new)
+            changed.append(path)
+    return changed
+
+
 def prepare(version: Version, *, today: dt.date | None = None, lock: bool = True) -> list[str]:
     """Set the release version everywhere; returns the changed files."""
     changed = []
@@ -210,6 +228,7 @@ def prepare(version: Version, *, today: dt.date | None = None, lock: bool = True
         _write(ADDON_CONFIG, new)
         changed.append(ADDON_CONFIG)
     if not version.prerelease:
+        changed += _set_install_docs(version)
         _write(CHANGELOG, _move_unreleased(_read(CHANGELOG), version, today or dt.date.today()))
         changed.append(CHANGELOG)
         _write(ADDON_CHANGELOG, addon_changelog(_read(CHANGELOG)))
@@ -244,6 +263,11 @@ def check(version: Version) -> None:
     except ReleaseError as err:
         problems.append(str(err))
     if not version.prerelease:
+        for path in INSTALL_DOCS:
+            match = _DOCS_VERSION.search(_read(path))
+            if (match.group(1) if match else None) != version.semver:
+                found = match.group(1) if match else None
+                problems.append(f"{path}: VERSION={found}, expected {version.semver}")
         addon_file = ROOT / ADDON_CHANGELOG
         found = addon_file.read_text(encoding="utf-8") if addon_file.exists() else ""
         if found != addon_changelog(_read(CHANGELOG)):
