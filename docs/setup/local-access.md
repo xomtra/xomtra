@@ -1,26 +1,22 @@
 # Local access (LAN only, personal tokens)
 
-The quickest way to try xomtra (ADR 056): the MCP endpoint and the admin GUI are
+The default access mode of the [Docker Compose install](docker.md) and the right one for
+most homes (ADR 056): the MCP endpoint and the admin GUI are
 reachable only in your LAN. No public DNS name, certificate authority account, port
 forward or cloud identity is needed. Claude Desktop, Claude Code and other MCP clients
 on a computer in the LAN (or connected by your VPN) use a **personal token** that you
 issue in the admin GUI.
 
 claude.ai on the web and on phones connects through Anthropic's servers and therefore
-needs the [public access mode](claude-connector.md) instead.
+needs [access from the internet](claude-connector.md) instead, a separate advanced setup.
+An installation runs one of the two modes, not both.
 
 ## 1. Install
 
-```bash
-cd deploy/compose
-docker compose up -d
-docker compose exec admin xomtra-admin setup-link   # one-time link: connect Home Assistant
-```
-
-Nothing has to be prepared (ADR 077): the internal passwords and keys are generated
-into the Docker volume `secrets`, the server uses its LAN address, and the Home
-Assistant URL and token are entered on the setup page. Details, optional settings and
-backups: [Docker Compose install](docker.md).
+Follow the [Docker Compose install](docker.md), steps 1 and 2: download the release,
+`docker compose up -d`, connect Home Assistant with the one-time setup link. Nothing has
+to be prepared (ADR 077) and nothing has to be set for the local mode: it is the default
+(`XOMTRA_ACCESS_MODE=local`).
 
 `LAN_CIDR` (default: all private ranges) limits who may reach the MCP endpoint.
 
